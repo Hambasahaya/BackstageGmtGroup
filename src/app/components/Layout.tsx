@@ -367,7 +367,7 @@ export function Layout() {
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
             <div className="flex h-12 w-40 items-center">
-              <img src="/img/GMT Suite-02 1.png" alt="GMT Suite" className="h-full w-full object-contain object-left" />
+              <img src="/img/GMT Suite-04.png" alt="GMT Suite" className="h-full w-full object-contain object-left" />
             </div>
             <button
               aria-label="Close navigation"
