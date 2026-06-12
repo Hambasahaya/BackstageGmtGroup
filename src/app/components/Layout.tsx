@@ -366,14 +366,8 @@ export function Layout() {
       >
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-teal-100 bg-white p-1 shadow-sm shadow-teal-900/5">
-                <img src="/img/GMT Suite-02 1.png" alt="GMT Suite" className="h-full w-full object-contain" />
-              </div>
-              <div>
-                <p className="text-base font-bold leading-tight">GMT Group</p>
-                <p className="text-xs text-slate-500">Central Dashboard</p>
-              </div>
+            <div className="flex h-12 w-40 items-center">
+              <img src="/img/GMT Suite-02 1.png" alt="GMT Suite" className="h-full w-full object-contain object-left" />
             </div>
             <button
               aria-label="Close navigation"
