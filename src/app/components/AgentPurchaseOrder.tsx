@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
+import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
 
 type Product = {
   id: number;
@@ -152,7 +152,7 @@ function mapProduct(product: ProductDto): Product {
     description: product.deskripsi ?? "-",
     unit: product.unit ?? "unit",
     price: product.price,
-    photo: product.foto || "/img/LogoGm.png",
+    photo: resolveApiAssetUrl(product.foto) || "/img/LogoGm.png",
   };
 }
 

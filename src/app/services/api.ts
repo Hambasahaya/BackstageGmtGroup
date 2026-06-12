@@ -189,8 +189,8 @@ export type ApplyAgentPayload = {
 };
 
 export type AgentVerificationPayload = {
-  photo: string;
-  ktp_photo: string;
+  photo: File;
+  ktp_photo: File;
   bank_name: string;
   account_number: string;
   ttl: string;
@@ -535,11 +535,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  completeAgentVerification: (payload: AgentVerificationPayload) =>
-    apiRequest<{ message: string; user: UserSession }>("/api/auth/agent-verification", {
+  completeAgentVerification: (payload: AgentVerificationPayload) => {
+    const formData = new FormData();
+    formData.set("photo", payload.photo);
+    formData.set("ktp_photo", payload.ktp_photo);
+    formData.set("bank_name", payload.bank_name);
+    formData.set("account_number", payload.account_number);
+    formData.set("ttl", payload.ttl);
+    formData.set("full_address", payload.full_address);
+    if (payload.domicile) {
+      formData.set("domicile", payload.domicile);
+    }
+
+    return apiRequest<{ message: string; user: UserSession }>("/api/auth/agent-verification", {
       method: "POST",
-      body: JSON.stringify(payload),
-    }),
+      body: formData,
+    });
+  },
   agentApplications: (status?: AgentApplicationStatus | "all") =>
     apiRequest<{ applications: AgentApplicationDto[] }>("/api/super-admin/agent-applications", {
       query: { status: status === "all" ? undefined : status },

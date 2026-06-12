@@ -1,6 +1,6 @@
 import { FileImage, Send, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { api, getAuthToken, getStoredUser, saveAuthSession, type AgentVerificationPayload, type ApplyAgentPayload } from "../services/api";
+import { api, getAuthToken, getStoredUser, saveAuthSession, type ApplyAgentPayload } from "../services/api";
 
 const applyInitial: ApplyAgentPayload = {
   job: "",
@@ -15,9 +15,19 @@ const applyInitial: ApplyAgentPayload = {
   target_product: "",
 };
 
-const verificationInitial: AgentVerificationPayload = {
-  photo: "",
-  ktp_photo: "",
+type VerificationForm = {
+  photo: File | null;
+  ktp_photo: File | null;
+  bank_name: string;
+  account_number: string;
+  ttl: string;
+  full_address: string;
+  domicile: string;
+};
+
+const verificationInitial: VerificationForm = {
+  photo: null,
+  ktp_photo: null,
   bank_name: "",
   account_number: "",
   ttl: "",
@@ -75,6 +85,30 @@ function TextArea({
   );
 }
 
+function FileField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: File | null;
+  onChange: (value: File | null) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+      <input
+        type="file"
+        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[#0F766E] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+        required
+      />
+      {value && <span className="mt-1 block text-xs text-slate-500">{value.name}</span>}
+    </label>
+  );
+}
+
 export function ApplyAgent() {
   const storedUser = getStoredUser();
   const status = storedUser?.detail_user?.status ?? null;
@@ -109,6 +143,9 @@ export function ApplyAgent() {
     setIsSubmitting(true);
 
     try {
+      if (!verificationForm.photo || !verificationForm.ktp_photo) {
+        throw new Error("Foto dan KTP wajib diupload.");
+      }
       const response = await api.completeAgentVerification(verificationForm);
       const token = localStorage.getItem("gmt-auth-token") ?? "";
       saveAuthSession(token, response.user);
@@ -152,8 +189,8 @@ export function ApplyAgent() {
           </div>
           <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <TextField label="Path foto" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} placeholder="uploads/users/photo.jpg" />
-              <TextField label="Path KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} placeholder="uploads/users/ktp.jpg" />
+              <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
+              <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
               <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
               <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
               <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" />

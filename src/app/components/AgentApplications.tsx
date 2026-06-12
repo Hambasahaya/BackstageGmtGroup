@@ -1,6 +1,6 @@
 import { CheckCircle2, Eye, Search, ShieldCheck, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api, type AgentApplicationDto, type AgentApplicationStatus } from "../services/api";
+import { api, resolveApiAssetUrl, type AgentApplicationDto, type AgentApplicationStatus } from "../services/api";
 
 const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit",
@@ -34,6 +34,23 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
 
 function getStatus(application: AgentApplicationDto): AgentApplicationStatus {
   return application.detail_user?.status ?? "not_verif";
+}
+
+function DocumentPreview({ label, value }: { label: string; value?: string | null }) {
+  const url = resolveApiAssetUrl(value);
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-md border border-slate-200 bg-white">
+          <img src={url} alt={label} className="h-44 w-full object-contain" />
+        </a>
+      ) : (
+        <p className="mt-2 text-sm text-slate-800">-</p>
+      )}
+    </div>
+  );
 }
 
 export function AgentApplications() {
@@ -201,6 +218,8 @@ export function AgentApplications() {
               <button onClick={() => setSelectedApplication(null)} className="rounded-md p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
+              <DocumentPreview label="Foto" value={selectedApplication.detail_user?.photo} />
+              <DocumentPreview label="KTP" value={selectedApplication.detail_user?.ktp_photo} />
               {Object.entries({
                 Pekerjaan: selectedApplication.detail_user?.job,
                 Instagram: selectedApplication.detail_user?.instagram,
@@ -212,8 +231,6 @@ export function AgentApplications() {
                 "Nama referral": selectedApplication.detail_user?.referral_name,
                 "Sumber lainnya": selectedApplication.detail_user?.referral_other,
                 "Target produk": selectedApplication.detail_user?.target_product,
-                "Path foto": selectedApplication.detail_user?.photo,
-                "Path KTP": selectedApplication.detail_user?.ktp_photo,
                 Bank: selectedApplication.detail_user?.bank_name,
                 Rekening: selectedApplication.detail_user?.account_number,
                 TTL: selectedApplication.ttl,
