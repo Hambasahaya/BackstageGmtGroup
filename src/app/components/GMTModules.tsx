@@ -1,24 +1,38 @@
 import {
-  AlertTriangle,
+  BarChart3,
+  Bot,
+  Brain,
   CalendarCheck,
-  CheckCircle2,
-  Download,
   FileArchive,
   FileSpreadsheet,
   FileText,
-  Globe2,
+  GitCompare,
   Image,
+  Instagram,
   Link2,
   Mail,
+  Megaphone,
+  PenLine,
   Plus,
+  Plug,
   QrCode,
+  Route,
   Search,
-  Send,
+  Sparkles,
   Smartphone,
+  Target,
+  TrendingUp,
   Upload,
-  Workflow,
 } from "lucide-react";
-import type { ElementType, ReactNode } from "react";
+import { useEffect, useState, type ElementType, type ReactNode } from "react";
+import {
+  fetchInstagramInsights,
+  fetchMetaAccounts,
+  fetchMetaAuthUrl,
+  type InstagramInsights,
+  type MetaAccountHealth,
+} from "../services/metaIntegrations";
+import { fetchKeywordResearch, type KeywordResearchResponse } from "../services/seoIntegrations";
 
 type StatusTone = "green" | "yellow" | "red" | "blue" | "slate" | "teal";
 
@@ -156,11 +170,151 @@ function FeatureGrid({ features }: { features: Array<{ icon: ElementType; title:
   );
 }
 
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: ElementType;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        </div>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-[#0F766E]">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function MetricPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-bold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+const formatNumber = (value: number | null | undefined) => {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("id-ID").format(Math.round(value));
+};
+
+const formatPercent = (value: number | null | undefined) => {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  return `${Math.round(value * 1000) / 10}%`;
+};
+
+const formatCurrencyRange = (low: number | null, high: number | null) => {
+  if (low === null && high === null) {
+    return "-";
+  }
+
+  const formatter = new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  });
+
+  if (low !== null && high !== null) {
+    return `${formatter.format(low)} - ${formatter.format(high)}`;
+  }
+
+  return formatter.format(low ?? high ?? 0);
+};
+
+const getCompetitionTone = (competition: string | null): StatusTone => {
+  if (competition === "HIGH") {
+    return "red";
+  }
+
+  if (competition === "MEDIUM") {
+    return "yellow";
+  }
+
+  if (competition === "LOW") {
+    return "green";
+  }
+
+  return "slate";
+};
+
+const getKeywordIntent = (keyword: string) => {
+  const normalized = keyword.toLowerCase();
+
+  if (/\b(sewa|rental|harga|jual|paket)\b/.test(normalized)) {
+    return "Transactional";
+  }
+
+  if (/\b(cara|panduan|tips|jenis|apa|contoh)\b/.test(normalized)) {
+    return "Informational";
+  }
+
+  return "Commercial";
+};
+
+const getOpportunity = (volume: number | null, competitionIndex: number | null, position?: number) => {
+  if (position && position > 3 && position <= 20) {
+    return "Existing ranking opportunity";
+  }
+
+  if ((volume || 0) >= 1000 && (competitionIndex || 0) <= 60) {
+    return "High";
+  }
+
+  if ((volume || 0) >= 300) {
+    return "Medium";
+  }
+
+  return "Low";
+};
+
+const getDifficulty = (competitionIndex: number | null) => {
+  if (competitionIndex === null) {
+    return "Unknown";
+  }
+
+  if (competitionIndex >= 70) {
+    return "High";
+  }
+
+  if (competitionIndex >= 35) {
+    return "Medium";
+  }
+
+  return "Low";
+};
+
 export function MultiWebsiteManagement() {
   const websites = [
-    ["gmtlighting.id", "Lighting & stage equipment", "Rina SEO", <StatusBadge tone="green">Live</StatusBadge>, "GA4, GSC, Sitemap", "SEO Team, Manager"],
-    ["gmttruss.id", "Rigging & truss", "Bima Admin", <StatusBadge tone="blue">Staging</StatusBadge>, "GA4, Sitemap", "SEO Team"],
-    ["gmttraining.id", "Training & certification", "Nadia HR", <StatusBadge tone="green">Live</StatusBadge>, "GA4, GSC", "HR, Manager"],
+    ["gmtlighting.id", "Lighting & stage equipment", "Rina SEO", <StatusBadge tone="green">Live</StatusBadge>, "GA4, GSC, Instagram, Google Ads", "SEO Team, Ads Team, Manager"],
+    ["gmttruss.id", "Rigging & truss", "Bima Admin", <StatusBadge tone="blue">Staging</StatusBadge>, "GA4, GSC, Sitemap", "SEO Team"],
+    ["gmttraining.id", "Training & certification", "Nadia HR", <StatusBadge tone="green">Live</StatusBadge>, "GA4, GSC, Meta Ads", "HR, Ads Team, Manager"],
   ];
 
   return (
@@ -170,7 +324,7 @@ export function MultiWebsiteManagement() {
       action="Tambah website"
       stats={[
         { label: "Website live", value: "18", detail: "3 staging siap deploy" },
-        { label: "Integrasi aktif", value: "42", detail: "GA4, GSC, sitemap" },
+        { label: "Integrasi aktif", value: "42", detail: "GSC, Ads, Instagram, AI" },
         { label: "PIC admin", value: "12", detail: "Terpetakan per unit bisnis" },
         { label: "Role access", value: "56", detail: "Akses granular per website" },
       ]}
@@ -178,6 +332,7 @@ export function MultiWebsiteManagement() {
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Filter status</button>
         <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Switch website</button>
+        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Data source</button>
         <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Role access</button>
       </div>
       <DataTable
@@ -189,36 +344,341 @@ export function MultiWebsiteManagement() {
 }
 
 export function SeoManagement() {
+  const [keywordsInput, setKeywordsInput] = useState("");
+  const [gscSiteUrl, setGscSiteUrl] = useState("https://gmtgroup.co.id/");
+  const [keywordResearch, setKeywordResearch] = useState<KeywordResearchResponse | null>(null);
+  const [isResearchLoading, setIsResearchLoading] = useState(false);
+  const [researchError, setResearchError] = useState("");
+
+  const keywordRows = (keywordResearch?.keywords || []).map((item) => [
+    item.keyword,
+    formatNumber(item.searchVolume),
+    formatCurrencyRange(item.cpcLow, item.cpcHigh),
+    <StatusBadge tone={getCompetitionTone(item.competition)}>{item.competition || "N/A"}</StatusBadge>,
+    item.competitionIndex === null ? "-" : `${item.competitionIndex}/100`,
+    item.gsc ? formatNumber(item.gsc.clicks) : "-",
+    item.gsc ? formatPercent(item.gsc.ctr) : "-",
+    item.gsc?.position ? `#${Math.round(item.gsc.position * 10) / 10}` : "-",
+    item.trendPercent === null ? "-" : <StatusBadge tone={item.trendPercent >= 0 ? "green" : "red"}>{`${item.trendPercent > 0 ? "+" : ""}${item.trendPercent}%`}</StatusBadge>,
+  ]);
+
+  const handleKeywordResearch = async () => {
+    setIsResearchLoading(true);
+    setResearchError("");
+
+    try {
+      const response = await fetchKeywordResearch({
+        keywords: keywordsInput,
+        siteUrl: gscSiteUrl,
+      });
+      setKeywordResearch(response);
+    } catch (error) {
+      setResearchError(error instanceof Error ? error.message : "Keyword research gagal diproses.");
+    } finally {
+      setIsResearchLoading(false);
+    }
+  };
+
+  const analyzerRows = (keywordResearch?.keywords || []).map((item) => {
+    const intent = getKeywordIntent(item.keyword);
+    const articleLength = item.searchVolume && item.searchVolume >= 1000 ? "3,000-5,000 words" : "1,500-2,500 words";
+
+    return [
+      item.keyword,
+      getOpportunity(item.searchVolume, item.competitionIndex, item.gsc?.position),
+      getDifficulty(item.competitionIndex),
+      item.cpcHigh || item.cpcLow ? "Revenue keyword" : "Needs CPC data",
+      intent === "Transactional" ? "Service landing page + FAQ" : "SEO article + FAQ",
+      articleLength,
+      item.gsc ? "Use GSC landing page data after page dimension sync" : "Needs GSC query/page data",
+    ];
+  });
+
+  const rankTrackerRows = (keywordResearch?.keywords || [])
+    .filter((item) => item.gsc)
+    .map((item) => [
+      item.keyword,
+      `#${Math.round((item.gsc?.position || 0) * 10) / 10}`,
+      "From GSC",
+      formatPercent(item.gsc?.ctr),
+      formatNumber(item.gsc?.clicks),
+      `${keywordResearch?.meta.startDate} - ${keywordResearch?.meta.endDate}`,
+    ]);
+
+  const researchedKeywordCount = keywordResearch?.keywords.length || 0;
+  const gscKeywordCount = (keywordResearch?.keywords || []).filter((item) => item.gsc).length;
+
   return (
     <ModuleShell
       title="SEO Management"
-      description="Pusat keyword tracking, technical audit, content optimization, competitor monitoring, dan sinkronisasi GSC/GA4."
-      action="Import keyword"
+      description="Pusat keyword research, AI SEO analyzer, content gap, content planner, article generator, internal link AI, rank tracker, dan sinkronisasi GSC/Google Ads/WordPress."
+      action="Run SEO AI"
       stats={[
-        { label: "Tracked keyword", value: "9,842", detail: "736 naik minggu ini" },
-        { label: "Technical issues", value: "287", detail: "404, broken link, noindex" },
-        { label: "Avg CTR", value: "4.8%", detail: "Dari GSC sync terakhir" },
-        { label: "SEO health", value: "91%", detail: "Skor rata-rata website" },
+        { label: "Keyword researched", value: formatNumber(researchedKeywordCount), detail: keywordResearch ? "Google Ads Keyword Planner" : "Belum mengambil data API" },
+        { label: "GSC keyword matched", value: formatNumber(gscKeywordCount), detail: keywordResearch ? "Google Search Console" : "Belum mengambil data API" },
+        { label: "Content gaps", value: "0", detail: "Menunggu crawler real" },
+        { label: "AI briefs ready", value: "0", detail: "Menunggu AI provider real" },
       ]}
     >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <SectionCard icon={Plug} title="External Integrations" description="Connector readiness untuk data SEO, Ads, dan publishing.">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <MetricPill label="Google Search Console API" value="Query, page, CTR, position" />
+            <MetricPill label="Google Ads Keyword Planner API" value="Volume, CPC, competition" />
+            <MetricPill label="WordPress REST API" value="Draft, publish, categories" />
+          </div>
+        </SectionCard>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-950">Keyword Research Input</h2>
+              <p className="mt-1 text-sm text-slate-500">Masukkan keyword dan GSC property URL untuk menarik data real dari Google Ads Keyword Planner dan Search Console.</p>
+            </div>
+            <button
+              onClick={handleKeywordResearch}
+              disabled={isResearchLoading}
+              className="inline-flex w-fit items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              <Search className="h-4 w-4" />
+              {isResearchLoading ? "Fetching Google data..." : "Analyze keywords"}
+            </button>
+          </div>
+          <input
+            value={gscSiteUrl}
+            onChange={(event) => setGscSiteUrl(event.target.value)}
+            placeholder="https://gmtgroup.co.id/ atau sc-domain:gmtgroup.co.id"
+            className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+          />
+          <textarea
+            value={keywordsInput}
+            onChange={(event) => setKeywordsInput(event.target.value)}
+            placeholder={"Masukkan keyword real dari bisnis GMT, satu per baris"}
+            className="min-h-32 w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700 outline-none transition focus:border-[#0F766E] focus:bg-white focus:ring-2 focus:ring-teal-100"
+          />
+          {researchError && (
+            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+              {researchError}
+            </div>
+          )}
+          {keywordResearch && (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+              Connected: {keywordResearch.meta.sources.join(", ")} | {keywordResearch.meta.startDate} sampai {keywordResearch.meta.endDate}
+            </div>
+          )}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <MetricPill label="Primary market" value="Indonesia" />
+            <MetricPill label="Language" value="Bahasa Indonesia" />
+            <MetricPill label="Data source" value={keywordResearch ? `Google Ads ${keywordResearch.meta.adsApiVersion}` : "Waiting for API"} />
+          </div>
+        </section>
+      </div>
+
+      <SectionCard icon={BarChart3} title="Keyword Research Results" description="Data real dari Google Ads Keyword Planner dan Google Search Console.">
+        {keywordRows.length ? (
+          <DataTable
+            columns={["Keyword", "Search Volume", "CPC Range", "Competition", "Competition Index", "GSC Clicks", "GSC CTR", "Avg Position", "Trend"]}
+            rows={keywordRows}
+          />
+        ) : (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+            Jalankan Analyze keywords untuk mengambil data real dari Google API. Tabel ini tidak memakai data dummy.
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard icon={Brain} title="AI SEO Analyzer" description="Analisis opportunity, difficulty, business potential, content type, article length, dan internal link strategy.">
+        {analyzerRows.length ? (
+          <DataTable
+            columns={["Keyword", "Ranking Opportunity", "Difficulty", "Business Potential", "Recommended Content", "Article Length", "Internal Linking Strategy"]}
+            rows={analyzerRows}
+          />
+        ) : (
+          <EmptyState text="Analyzer belum menampilkan data karena belum ada hasil real dari Google Ads Keyword Planner/GSC." />
+        )}
+      </SectionCard>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <SectionCard icon={GitCompare} title="Content Gap Analysis" description="Bandingkan website GMT dan kompetitor untuk menemukan topik, cluster, dan kategori yang hilang.">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" defaultValue="https://gmtgroup.co.id/" />
+            <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" placeholder="https://competitor-domain.id" />
+          </div>
+          <EmptyState text="Belum ada content gap real. Perlu endpoint crawler/sitemap yang membaca GMT dan competitor URL, lalu membandingkan artikel, kategori, dan keyword cluster aktual." />
+        </SectionCard>
+
+        <SectionCard icon={Route} title="AI Content Planner" description="Roadmap pillar, cluster, dan supporting content untuk 3, 6, dan 12 bulan.">
+          <EmptyState text="Belum ada roadmap real. Roadmap akan dibuat setelah keyword real, content gap real, dan kalender WordPress aktual tersedia." />
+        </SectionCard>
+      </div>
+
+      <SectionCard icon={PenLine} title="AI Article Generator" description="Generator artikel SEO 3,000-5,000 kata dengan E-E-A-T, struktur heading, FAQ, link suggestion, dan schema markup.">
+        <EmptyState text="Belum ada artikel real. Butuh AI provider dan data WordPress/GSC supaya title, meta, outline, body, link, dan schema tidak dibuat dari contoh palsu." />
+      </SectionCard>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <SectionCard icon={Link2} title="Internal Link AI" description="Scan artikel GMT dan rekomendasikan link internal, anchor text, serta related article.">
+          <EmptyState text="Belum ada rekomendasi link real. Perlu WordPress REST API untuk membaca post/page aktual dan membangun peta internal link." />
+        </SectionCard>
+
+        <SectionCard icon={TrendingUp} title="Rank Tracker" description="Daily tracking keyword position, change, visibility, dan estimated traffic.">
+          {rankTrackerRows.length ? (
+            <DataTable
+              columns={["Keyword", "Position", "Change", "CTR", "GSC Clicks", "Date Range"]}
+              rows={rankTrackerRows}
+            />
+          ) : (
+            <EmptyState text="Belum ada rank tracker real. Posisi akan muncul dari average position GSC setelah keyword berhasil dianalisis." />
+          )}
+        </SectionCard>
+      </div>
+
+      <SectionCard icon={Plug} title="Real Data Status" description="Status koneksi berdasarkan data yang benar-benar dimuat di halaman ini.">
+        <DataTable
+          columns={["Integration", "Loaded Rows", "Status", "Source"]}
+          rows={[
+            ["Google Ads Keyword Planner", formatNumber(keywordResearch?.keywords.length || 0), keywordResearch ? <StatusBadge tone="green">Loaded</StatusBadge> : <StatusBadge tone="slate">Not loaded</StatusBadge>, "/api/seo/keyword-research"],
+            ["Google Search Console", formatNumber(gscKeywordCount), gscKeywordCount ? <StatusBadge tone="green">Loaded</StatusBadge> : <StatusBadge tone="slate">Not loaded</StatusBadge>, "/api/seo/keyword-research"],
+            ["WordPress REST API", "0", <StatusBadge tone="slate">Not connected</StatusBadge>, "No endpoint yet"],
+            ["AI Provider", "0", <StatusBadge tone="slate">Not connected</StatusBadge>, "No endpoint yet"],
+          ]}
+        />
+      </SectionCard>
+    </ModuleShell>
+  );
+}
+
+export function MarketingIntegrations() {
+  const [metaHealth, setMetaHealth] = useState<MetaAccountHealth | null>(null);
+  const [instagramInsights, setInstagramInsights] = useState<InstagramInsights | null>(null);
+  const [metaError, setMetaError] = useState("");
+  const [isMetaLoading, setIsMetaLoading] = useState(true);
+  const [isConnectingMeta, setIsConnectingMeta] = useState(false);
+
+  const refreshMetaStatus = async () => {
+    setIsMetaLoading(true);
+    setMetaError("");
+
+    try {
+      const accounts = await fetchMetaAccounts();
+      setMetaHealth(accounts);
+
+      if (accounts.connected) {
+        const insights = await fetchInstagramInsights();
+        setInstagramInsights(insights);
+      } else {
+        setInstagramInsights(null);
+      }
+    } catch (error) {
+      setMetaError(error instanceof Error ? error.message : "Gagal membaca status Meta API.");
+    } finally {
+      setIsMetaLoading(false);
+    }
+  };
+
+  const handleConnectMeta = async () => {
+    setIsConnectingMeta(true);
+    setMetaError("");
+
+    try {
+      const { url } = await fetchMetaAuthUrl();
+      window.location.href = url;
+    } catch (error) {
+      setMetaError(error instanceof Error ? error.message : "Gagal membuat URL OAuth Meta.");
+      setIsConnectingMeta(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshMetaStatus();
+  }, []);
+
+  const connectedInstagram = metaHealth?.instagramAccounts[0];
+  const metaConnected = Boolean(metaHealth?.connected);
+  const topMedia = instagramInsights?.media[0];
+  const latestReach = instagramInsights?.insights
+    .find((item) => item.name === "reach")
+    ?.values?.at(-1)?.value;
+
+  return (
+    <ModuleShell
+      title="Marketing Integrations"
+      description="Pusat koneksi API untuk Google Search Console, Instagram, Google Ads, Meta Ads, dan AI engine agar data marketing bisa dipakai per website."
+      stats={[
+        { label: "Meta status", value: isMetaLoading ? "Checking" : metaConnected ? "Connected" : "Not connected", detail: connectedInstagram?.username ? `@${connectedInstagram.username}` : "OAuth server-side" },
+        { label: "Instagram accounts", value: formatNumber(metaHealth?.instagramAccounts.length || 0), detail: metaConnected ? "Dari Graph API" : "Menunggu OAuth" },
+        { label: "Latest reach", value: formatNumber(latestReach || 0), detail: latestReach ? "Instagram insights" : "Belum ada data insights" },
+        { label: "Recent media", value: formatNumber(instagramInsights?.media.length || 0), detail: topMedia?.media_type || "Menunggu koneksi" },
+      ]}
+    >
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">Meta OAuth Connection</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Token disimpan di backend. Frontend hanya membaca status, akun Instagram Business, dan insight ringkas.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={refreshMetaStatus}
+            disabled={isMetaLoading}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          >
+            {isMetaLoading ? "Checking..." : "Refresh status"}
+          </button>
+          <button
+            onClick={handleConnectMeta}
+            disabled={isConnectingMeta}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            <Plug className="h-4 w-4" />
+            {isConnectingMeta ? "Opening Meta..." : metaConnected ? "Reconnect Meta" : "Connect Meta"}
+          </button>
+        </div>
+      </div>
+      {(metaError || metaHealth?.error) && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+          {metaError || metaHealth?.error}
+        </div>
+      )}
       <FeatureGrid
         features={[
-          { icon: Search, title: "Keyword Tracking", text: "Pantau posisi, search volume, ranking change, target page, CTR, ranking history, dan competitor compare." },
-          { icon: AlertTriangle, title: "Technical SEO Audit", text: "Auto check 404, broken link, duplicate meta/title, missing alt, slow page, index/noindex, dan health score." },
-          { icon: FileText, title: "Content SEO Optimization", text: "Checklist keyword di title/H1, link internal/eksternal, meta description, image alt, schema, dan readability score." },
-          { icon: Link2, title: "Competitor Monitoring", text: "Bandingkan keyword overlap, estimasi backlink, dan top pages kompetitor untuk tiap niche website." },
-          { icon: Globe2, title: "GSC & GA4 Sync", text: "Monitor click, impression, CTR, average position, organic traffic, engagement, dan conversion." },
-          { icon: CheckCircle2, title: "SEO Action Queue", text: "Issue langsung menjadi task untuk SEO Team, Content Team, atau Manager approval." },
+          { icon: Search, title: "Google Search Console", text: "Ambil click, impression, CTR, average position, query, page, device, dan country per website." },
+          { icon: Instagram, title: "Instagram API", text: "Sinkronkan reach, engagement, follower growth, content performance, comment signal, dan campaign tag." },
+          { icon: Megaphone, title: "Ads Platforms", text: "Gabungkan Google Ads dan Meta Ads untuk spend, CPC, CTR, conversion, ROAS, dan audience performance." },
+          { icon: Bot, title: "AI Insight API", text: "Ubah data SEO, social, Ads, dan website menjadi rekomendasi aksi, report, content brief, dan prioritas campaign." },
+          { icon: Plug, title: "Connector Health", text: "Pantau token, permission scope, jadwal sync, error terakhir, dan data freshness per channel." },
+          { icon: Sparkles, title: "Marketing Automation", text: "Siapkan trigger untuk ranking turun, ads boros, konten viral, issue teknis, dan peluang keyword baru." },
         ]}
       />
       <DataTable
-        columns={["Keyword", "Position", "Volume", "Change", "Target page", "CTR"]}
+        columns={["Source", "Website", "Scope data", "Sync", "Status", "Next action"]}
         rows={[
-          ["lampu panggung", "#3", "8.1K", <StatusBadge tone="green">+4</StatusBadge>, "/produk/lampu-panggung", "6.7%"],
-          ["sewa truss jakarta", "#8", "2.4K", <StatusBadge tone="yellow">-2</StatusBadge>, "/rental/truss", "3.9%"],
-          ["training rigging", "#12", "1.2K", <StatusBadge tone="green">+6</StatusBadge>, "/training/rigging", "4.2%"],
+          ["Google Search Console", "gmtlighting.id", "Query, page, CTR, position", "Daily 06:00", <StatusBadge tone="green">Connected</StatusBadge>, "Map query to landing page"],
+          [
+            "Instagram API",
+            connectedInstagram?.username ? `@${connectedInstagram.username}` : "No account",
+            "Profile, media, reach, engagement",
+            "On demand",
+            isMetaLoading ? <StatusBadge tone="blue">Checking</StatusBadge> : metaConnected ? <StatusBadge tone="green">Connected</StatusBadge> : <StatusBadge tone="slate">Not connected</StatusBadge>,
+            metaConnected ? "Review App permissions before public use" : "Complete OAuth",
+          ],
+          ["Google Ads", "GMT Group Ads", "Spend, conversion, ROAS", "Daily 07:00", <StatusBadge tone="yellow">Review scope</StatusBadge>, "Add conversion access"],
+          ["Meta Ads", "GMT Training", "Campaign, adset, leads", "Daily 07:30", metaConnected ? <StatusBadge tone="yellow">Needs ads endpoint</StatusBadge> : <StatusBadge tone="blue">Queued</StatusBadge>, metaConnected ? "Implement ad account reporting" : "Finish OAuth"],
+          ["AI Insight API", "All websites", "Summary and recommendation", "On demand", <StatusBadge tone="green">Ready</StatusBadge>, "Define prompt templates"],
         ]}
       />
+      <SectionCard icon={Instagram} title="Instagram API Health" description="Ringkasan akun dan data yang benar-benar dibaca dari endpoint Meta.">
+        <DataTable
+          columns={["Check", "Value", "Status", "Source"]}
+          rows={[
+            ["OAuth token", metaHealth?.savedAt || "-", metaConnected ? <StatusBadge tone="green">Stored server-side</StatusBadge> : <StatusBadge tone="slate">Missing</StatusBadge>, "/api/meta/accounts"],
+            ["Instagram Business Account", connectedInstagram?.username ? `@${connectedInstagram.username}` : "-", metaConnected ? <StatusBadge tone="green">Resolved</StatusBadge> : <StatusBadge tone="slate">Not resolved</StatusBadge>, "instagram_business_account"],
+            ["Insights", latestReach ? formatNumber(latestReach) : "-", latestReach ? <StatusBadge tone="green">Loaded</StatusBadge> : <StatusBadge tone="slate">Not loaded</StatusBadge>, "/api/meta/instagram-insights"],
+            ["Recent media", topMedia?.permalink || "-", topMedia ? <StatusBadge tone="green">Loaded</StatusBadge> : <StatusBadge tone="slate">Not loaded</StatusBadge>, "IG media edge"],
+          ]}
+        />
+      </SectionCard>
     </ModuleShell>
   );
 }
@@ -410,23 +870,23 @@ export function Reporting() {
   return (
     <ModuleShell
       title="Reporting"
-      description="Export SEO report, keyword report, event attendance, dan article performance ke PDF/Excel dengan auto email report."
+      description="Export SEO report, Ads report, Instagram performance, keyword report, event attendance, article performance, dan AI summary ke PDF/Excel."
       action="Generate report"
       stats={[
         { label: "Scheduled reports", value: "16", detail: "Auto email mingguan/bulanan" },
-        { label: "PDF exports", value: "92", detail: "Bulan berjalan" },
-        { label: "Excel exports", value: "74", detail: "Keyword dan attendance" },
+        { label: "PDF exports", value: "92", detail: "SEO, Ads, social, AI summary" },
+        { label: "Excel exports", value: "74", detail: "Keyword, Ads, GSC, attendance" },
         { label: "Recipients", value: "38", detail: "Manager dan PIC website" },
       ]}
     >
       <FeatureGrid
         features={[
           { icon: FileText, title: "SEO Report", text: "Health score, technical issue, organic traffic, GSC/GA4 metric, dan rekomendasi." },
+          { icon: Megaphone, title: "Ads Report", text: "Spend, CPC, CTR, conversion, ROAS, campaign trend, dan rekomendasi budget." },
+          { icon: Instagram, title: "Instagram Report", text: "Reach, engagement, follower growth, top content, dan campaign attribution." },
           { icon: FileSpreadsheet, title: "Keyword Report", text: "Ranking movement, search volume, CTR, target page, dan competitor compare." },
           { icon: CalendarCheck, title: "Event Attendance", text: "Registrasi, approval, QR check-in, no-show, dan attendance analytics." },
-          { icon: Download, title: "PDF & Excel", text: "Export manual untuk meeting atau audit data dengan format siap bagikan." },
-          { icon: Send, title: "Auto Email", text: "Kirim laporan otomatis ke PIC dan manager sesuai jadwal." },
-          { icon: Workflow, title: "Article Performance", text: "Views, engagement, conversion, publish cadence, dan approval bottleneck." },
+          { icon: Target, title: "AI Marketing Summary", text: "Ringkasan peluang, risiko, action priority, dan kebutuhan campaign berikutnya." },
         ]}
       />
     </ModuleShell>

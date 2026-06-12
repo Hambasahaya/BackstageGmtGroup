@@ -1,111 +1,165 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowRight, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
+import { getRoleHomePath } from "../auth/navigation";
+import {
+  api,
+  clientName,
+  getAuthToken,
+  getStoredUser,
+  refreshStoredUser,
+  rememberLoginSourceFromPage,
+  saveAuthSession,
+} from "../services/api";
 
 export function Login() {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
+  const [searchParams] = useSearchParams();
+  const storedUser = getStoredUser();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const redirectPath = useMemo(() => searchParams.get("redirect") || "", [searchParams]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate("/dashboard");
+  useEffect(() => {
+    rememberLoginSourceFromPage(searchParams);
+  }, [searchParams]);
+
+  if (getAuthToken() && storedUser) {
+    return <Navigate to={redirectPath || getRoleHomePath(storedUser)} replace />;
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await api.login({ email, password });
+      saveAuthSession(response.token, response.user);
+      let user = response.user;
+      try {
+        user = await refreshStoredUser(response.token);
+      } catch {
+        // Login response still carries role for the normal redirect path.
+      }
+      navigate(redirectPath || getRoleHomePath(user), { replace: true });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Login gagal. Periksa email dan password.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F5F7FA]">
-      <div className="hidden w-1/2 flex-col justify-between bg-[#0F766E] p-12 text-white lg:flex">
-        <div>
-          <div className="mb-8 flex items-center gap-5">
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-white p-3">
-              <img src="/img/LogoGm.png" alt="GMT Group" className="h-full w-full object-contain brightness-0" />
-            </div>
-            <div>
-              <p className="text-4xl font-semibold leading-tight">GMT Group</p>
-              <p className="text-lg text-teal-50">Central Dashboard</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-            <div className="mb-8">
-              <img src="/img/LogoGm.png" alt="GMT Group" className="mb-6 h-14 w-auto object-contain brightness-0" />
-              <h2 className="mb-2 text-3xl font-bold text-slate-950">Masuk Dashboard</h2>
-              <p className="text-slate-500">Gunakan akun GMT Group untuk melanjutkan.</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div>
-                <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@gmtgroup.id"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="********"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-3 pr-12 outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                    required
-                  />
-                  <button
-                    type="button"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
+    <main className="min-h-screen overflow-hidden bg-black text-white">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid w-full items-center gap-4 lg:grid-cols-[minmax(330px,400px)_1fr] xl:gap-5">
+          <section className="relative z-10 mx-auto w-full max-w-[390px] rounded-lg border border-white/10 bg-[#101010] p-5 shadow-2xl shadow-black/60 sm:p-7">
+            <div className="mb-7 flex justify-center">
+              <div className="flex items-center gap-2">
+                <img src="/img/LogoGm.png" alt="GMT Group" className="h-8 w-8 object-contain brightness-0 invert" />
+                <div className="leading-none">
+                  <p className="text-sm font-semibold tracking-tight text-white">gmt</p>
+                  <p className="text-[10px] text-white/55">suite</p>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
+            <div className="text-center">
+              <h1 className="text-xl font-semibold tracking-tight text-white">Masuk Website Pusat</h1>
+              <p className="mt-2 text-xs leading-5 text-white/50">
+                Gunakan akun backend untuk masuk sesuai role operasional.
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/70">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {clientName}
+              </span>
+              <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/70">
+                agent / sales / admin
+              </span>
+            </div>
+
+            <form onSubmit={handleSubmit} className="mt-7 space-y-3.5">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-medium text-white/55">Email</span>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/35" />
                   <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    type="email"
+                    autoComplete="email"
+                    className="h-10 w-full rounded-md border border-white/10 bg-white px-9 text-xs text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-white/15"
+                    placeholder="sales@example.com"
+                    required
                   />
-                  <span className="ml-2 text-sm text-slate-600">Ingat saya</span>
-                </label>
-                <a href="#" className="text-sm font-medium text-[#0F766E] hover:underline">
-                  Lupa password?
-                </a>
-              </div>
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-medium text-white/55">Password</span>
+                <div className="relative">
+                  <LockKeyhole className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/35" />
+                  <input
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    type="password"
+                    autoComplete="current-password"
+                    className="h-10 w-full rounded-md border border-white/10 bg-white px-9 text-xs text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-white/15"
+                    placeholder="Password"
+                    required
+                  />
+                </div>
+              </label>
+
+              {errorMessage && (
+                <div className="rounded-md border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-100">
+                  {errorMessage}
+                </div>
+              )}
 
               <button
                 type="submit"
-                className="w-full rounded-lg bg-[#0F766E] py-3 font-semibold text-white shadow-sm transition hover:bg-[#115E59]"
+                disabled={isSubmitting}
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-white px-4 text-xs font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/40"
               >
-                Masuk
+                {isSubmitting ? "Memproses..." : "Masuk"}
+                <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </form>
-          </div>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            (c) 2026 GMT Group Central Dashboard. All rights reserved.
-          </p>
+            <p className="mt-5 text-center text-xs text-white/45">
+              Belum punya akun?{" "}
+              <Link to="/register" className="font-semibold text-white hover:text-white/80">
+                Register
+              </Link>
+            </p>
+          </section>
+
+          <section className="relative hidden min-h-[650px] overflow-hidden rounded-lg border border-white/10 bg-[#070707] lg:block">
+            <img
+              src="/img/login-event-collage.png"
+              alt="GMT event production collage"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black via-black/70 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/50 to-transparent" />
+          </section>
+
+          <section className="overflow-hidden rounded-lg border border-white/10 bg-[#070707] lg:hidden">
+            <img
+              src="/img/login-event-collage.png"
+              alt="GMT event production collage"
+              className="h-52 w-full object-cover sm:h-72"
+            />
+          </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

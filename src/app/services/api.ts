@@ -1,0 +1,623 @@
+export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
+export type PreorderStatus = "draft" | "in_review" | "approve" | "invalid";
+export type PaymentStatus = "unpaid" | "pending" | "paid" | "expired" | "failed" | "refund";
+export type WithdrawStatus = "on_progress" | "approval";
+export type OnboardingProgressStatus = "in_progress" | "completed";
+
+export type ProductDto = {
+  id: number;
+  namaproduct: string;
+  foto?: string | null;
+  deskripsi?: string | null;
+  unit?: string | null;
+  price: number;
+};
+
+export type PreorderItemDto = {
+  id?: number;
+  id_product?: number;
+  product_id?: number;
+  product?: ProductDto;
+  product_snapshot?: string;
+  product_name?: string;
+  namaproduct?: string;
+  qty: number;
+  discount_percent: number;
+  price?: number;
+  subtotal?: number;
+  discount_total?: number;
+  total?: number;
+  komisi?: number;
+};
+
+export type PreorderDto = {
+  id: number;
+  po_number?: string;
+  status: PreorderStatus;
+  nama_customer: string;
+  email: string;
+  alamat: string;
+  no_hp: string;
+  catatan?: string | null;
+  items?: PreorderItemDto[];
+  preorder_items?: PreorderItemDto[];
+  subtotal: number;
+  total_discount?: number;
+  total_diskon?: number;
+  total: number;
+  total_komisi: number;
+  payment_status?: PaymentStatus | null;
+  payment_url?: string | null;
+  payment_token?: string | null;
+  midtrans_order_id?: string | null;
+  invalid_reason?: string | null;
+  created_at?: string;
+};
+
+export type PaymentLinkResponse = {
+  message?: string;
+  payment_url?: string | null;
+  payment_token?: string | null;
+  midtrans_order_id?: string | null;
+  payment_status?: PaymentStatus | null;
+  preorder?: PreorderDto;
+};
+
+export type WalletDto = {
+  total_commission: number;
+  available_balance: number;
+  pending_withdraw: number;
+  withdrawn_balance: number;
+};
+
+export type WithdrawDto = {
+  id: number;
+  withdraw_number?: string;
+  amount: number;
+  status: WithdrawStatus;
+  created_at: string;
+  approved_at?: string | null;
+};
+
+export type OnboardingVideoDto = {
+  id: number;
+  slug: string;
+  title: string;
+  description?: string | null;
+  video_url: string;
+  duration_seconds: number;
+  sort_order: number;
+  is_required: boolean;
+};
+
+export type OnboardingProgressDto = {
+  video_id: number;
+  slug: string;
+  status: OnboardingProgressStatus;
+  watched_seconds: number;
+  completed_at?: string | null;
+};
+
+export type OnboardingSummaryDto = {
+  completed_count: number;
+  total_required: number;
+  completion_percent: number;
+  is_completed: boolean;
+  progress: OnboardingProgressDto[];
+};
+
+export type UserSession = {
+  id: number;
+  name: string;
+  email: string;
+  role: ApiRole;
+  detail_user?: DetailUserDto;
+};
+
+export type AgentApplicationStatus = "not_verif" | "verif" | "official_agent" | "stopped_agent";
+
+export type DetailUserDto = {
+  id?: number;
+  user_id?: number;
+  company_name?: string;
+  job?: string | null;
+  instagram?: string | null;
+  facebook?: string | null;
+  tiktok?: string | null;
+  agent_program_type?: string | null;
+  agent_motivation?: string | null;
+  referral_source?: string | null;
+  referral_name?: string | null;
+  referral_other?: string | null;
+  target_product?: string | null;
+  photo?: string | null;
+  ktp_photo?: string | null;
+  full_address?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  status?: AgentApplicationStatus | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AuthResponse = {
+  message: string;
+  token: string;
+  session: {
+    session_id: string;
+    user_id?: number;
+    client: string;
+    expires_at?: string;
+    revoked_at?: string | null;
+  };
+  user: UserSession;
+};
+
+export type RegisterPayload = {
+  name: string;
+  phone_number: string;
+  email: string;
+  password: string;
+  gender?: string;
+  ttl?: string;
+  domicile?: string;
+  company_name?: string;
+  job?: string;
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  photo?: string;
+  ktp_photo?: string;
+  full_address?: string;
+  bank_name?: string;
+  account_number?: string;
+  status?: string;
+  role?: ApiRole;
+};
+
+export type ApplyAgentPayload = {
+  job: string;
+  instagram: string;
+  facebook: string;
+  tiktok: string;
+  agent_program_type: string;
+  agent_motivation: string;
+  referral_source: string;
+  referral_name?: string;
+  referral_other?: string;
+  target_product: string;
+};
+
+export type AgentVerificationPayload = {
+  photo: string;
+  ktp_photo: string;
+  bank_name: string;
+  account_number: string;
+  ttl: string;
+  full_address: string;
+  domicile?: string;
+};
+
+export type AgentApplicationDto = UserSession & {
+  phone_number?: string;
+  domicile?: string;
+  ttl?: string;
+  detail_user?: DetailUserDto;
+};
+
+export type NotificationDto = {
+  id?: number;
+  role?: ApiRole;
+  title?: string;
+  message?: string;
+  data?: string | Record<string, unknown> | null;
+  read_at?: string | null;
+  status?: "belum_terbaca" | "terbaca";
+};
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
+const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
+const defaultLogoutRedirectUrl = import.meta.env.VITE_LOGOUT_REDIRECT_URL ?? "/";
+export const authTokenStorageKey = "gmt-auth-token";
+export const userStorageKey = "gmt-auth-user";
+export const loginSourceStorageKey = "gmt-login-source-url";
+const legacyRoleStorageKey = "gmt-current-role";
+
+type RequestOptions = RequestInit & {
+  auth?: boolean;
+  query?: Record<string, string | number | undefined>;
+};
+
+function buildUrl(path: string, query?: RequestOptions["query"]) {
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${base}${normalizedPath}`, window.location.origin);
+
+  Object.entries(query ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  return url.toString();
+}
+
+export function resolveApiAssetUrl(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  if (/^(https?:)?\/\//i.test(value) || /^(blob|data):/i.test(value)) {
+    return value;
+  }
+
+  const base = apiBaseUrl.replace(/\/$/, "");
+  const normalizedPath = value.startsWith("/") ? value : `/${value}`;
+
+  return `${base}${normalizedPath}`;
+}
+
+function parseSseEvent(rawEvent: string) {
+  let eventName = "message";
+  const dataLines: string[] = [];
+
+  rawEvent.split(/\r?\n/).forEach((line) => {
+    if (!line || line.startsWith(":")) {
+      return;
+    }
+
+    const separatorIndex = line.indexOf(":");
+    const field = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
+    const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 1).replace(/^ /, "");
+
+    if (field === "event") {
+      eventName = value || "message";
+    }
+
+    if (field === "data") {
+      dataLines.push(value);
+    }
+  });
+
+  return { eventName, data: dataLines.join("\n") };
+}
+
+export function connectSalesNotificationStream({
+  onNotification,
+  onOpen,
+  onError,
+}: {
+  onNotification: (notification: NotificationDto) => void;
+  onOpen?: () => void;
+  onError?: (error: unknown) => void;
+}) {
+  const controller = new AbortController();
+  let retryTimer: number | undefined;
+  let retryDelay = 1000;
+
+  const connect = async () => {
+    try {
+      const token = getAuthToken();
+      const headers = new Headers({ Accept: "text/event-stream" });
+
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      const response = await fetch(buildUrl("/api/sales/notifications/stream"), {
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Notification stream failed with status ${response.status}`);
+      }
+
+      onOpen?.();
+      retryDelay = 1000;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split(/\r?\n\r?\n/);
+        buffer = chunks.pop() ?? "";
+
+        chunks.forEach((chunk) => {
+          const { eventName, data } = parseSseEvent(chunk);
+
+          if (eventName !== "notification" || !data) {
+            return;
+          }
+
+          try {
+            onNotification(JSON.parse(data) as NotificationDto);
+          } catch {
+            onNotification({ title: "Notifikasi Baru", message: data });
+          }
+        });
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        onError?.(error);
+      }
+    }
+
+    if (!controller.signal.aborted) {
+      retryTimer = window.setTimeout(connect, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 15000);
+    }
+  };
+
+  void connect();
+
+  return () => {
+    controller.abort();
+
+    if (retryTimer) {
+      window.clearTimeout(retryTimer);
+    }
+  };
+}
+
+export function getAuthToken() {
+  return window.localStorage.getItem(authTokenStorageKey);
+}
+
+export function saveAuthSession(token: string, user: UserSession) {
+  window.localStorage.setItem(authTokenStorageKey, token);
+  window.localStorage.setItem(userStorageKey, JSON.stringify(user));
+}
+
+export function clearAuthSession() {
+  window.localStorage.removeItem(authTokenStorageKey);
+  window.localStorage.removeItem(userStorageKey);
+  window.localStorage.removeItem(legacyRoleStorageKey);
+}
+
+export function getStoredUser(): UserSession | null {
+  try {
+    const value = window.localStorage.getItem(userStorageKey);
+    return value ? (JSON.parse(value) as UserSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function toSafeRedirectUrl(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value, window.location.origin);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "";
+    }
+
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+export function rememberLoginSource(sourceUrl?: string | null) {
+  const safeSource = toSafeRedirectUrl(sourceUrl) || toSafeRedirectUrl(websiteAUrl);
+
+  if (safeSource) {
+    window.localStorage.setItem(loginSourceStorageKey, safeSource);
+  }
+}
+
+export function rememberDefaultLoginSource() {
+  if (!window.localStorage.getItem(loginSourceStorageKey)) {
+    rememberLoginSource();
+  }
+}
+
+export function rememberLoginSourceFromPage(searchParams?: URLSearchParams) {
+  const explicitSource =
+    searchParams?.get("source_url") ??
+    searchParams?.get("return_url") ??
+    searchParams?.get("origin_url");
+  const stateSource = searchParams?.get("state");
+
+  if (explicitSource) {
+    rememberLoginSource(explicitSource);
+    return;
+  }
+
+  if (stateSource && /^https?:\/\//i.test(stateSource)) {
+    rememberLoginSource(stateSource);
+    return;
+  }
+
+  if (document.referrer) {
+    const referrerUrl = toSafeRedirectUrl(document.referrer);
+    const referrerOrigin = referrerUrl ? new URL(referrerUrl).origin : "";
+
+    if (referrerOrigin && referrerOrigin !== window.location.origin) {
+      rememberLoginSource(referrerUrl);
+    }
+  }
+}
+
+export function getLogoutRedirectUrl() {
+  const storedSource = toSafeRedirectUrl(window.localStorage.getItem(loginSourceStorageKey));
+  return storedSource || toSafeRedirectUrl(defaultLogoutRedirectUrl) || "/";
+}
+
+export function clearLoginSource() {
+  window.localStorage.removeItem(loginSourceStorageKey);
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { auth = true, query, headers, body, ...requestOptions } = options;
+  const token = getAuthToken();
+  const requestHeaders = new Headers(headers);
+
+  if (body && !requestHeaders.has("Content-Type") && !(body instanceof FormData)) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
+
+  if (auth && token) {
+    requestHeaders.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(buildUrl(path, query), {
+    ...requestOptions,
+    body,
+    headers: requestHeaders,
+  });
+
+  if (response.status === 401) {
+    clearAuthSession();
+  }
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const errorBody = await response.json();
+      message = errorBody.message ?? errorBody.error ?? message;
+    } catch {
+      // Keep the status-based fallback when the backend returns non-JSON.
+    }
+    throw new Error(message);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (contentType.includes("application/pdf")) {
+    return (await response.blob()) as T;
+  }
+
+  return (await response.json()) as T;
+}
+
+export async function refreshStoredUser(token = getAuthToken()) {
+  const response = await apiRequest<{ user: UserSession }>("/api/auth/me");
+
+  if (token) {
+    saveAuthSession(token, response.user);
+  }
+
+  return response.user;
+}
+
+export const api = {
+  login: (payload: { email: string; password: string; client?: string }) =>
+    apiRequest<AuthResponse>("/api/auth/login", {
+      auth: false,
+      method: "POST",
+      body: JSON.stringify({ ...payload, client: payload.client ?? clientName }),
+    }),
+  register: (payload: RegisterPayload) =>
+    apiRequest<{ message: string; user?: UserSession }>("/api/auth/register", {
+      auth: false,
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  applyAgent: (payload: ApplyAgentPayload) =>
+    apiRequest<{ message: string }>("/api/auth/apply-agent", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  completeAgentVerification: (payload: AgentVerificationPayload) =>
+    apiRequest<{ message: string; user: UserSession }>("/api/auth/agent-verification", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  agentApplications: (status?: AgentApplicationStatus | "all") =>
+    apiRequest<{ applications: AgentApplicationDto[] }>("/api/super-admin/agent-applications", {
+      query: { status: status === "all" ? undefined : status },
+    }),
+  updateAgentApplicationStatus: (id: number, status: AgentApplicationStatus) =>
+    apiRequest<{ message: string; user: AgentApplicationDto }>(`/api/super-admin/agent-applications/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  ssoExchange: (payload: { code: string; target_client?: string }) =>
+    apiRequest<AuthResponse>("/api/auth/sso/exchange", {
+      auth: false,
+      method: "POST",
+      body: JSON.stringify({ ...payload, target_client: payload.target_client ?? clientName }),
+    }),
+  ssoCode: (payload: { target_client: string; state?: string }) =>
+    apiRequest<{ code: string; expires_at: string; redirect_url: string }>("/api/auth/sso/code", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  session: () => apiRequest<{ authenticated: boolean; user: UserSession }>("/api/auth/session"),
+  me: () => apiRequest<{ user: UserSession }>("/api/auth/me"),
+  logout: () => apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }),
+  products: (search?: string) => apiRequest<{ products: ProductDto[] }>("/api/products", { auth: false, query: { search } }),
+  agentPreorders: (status?: PreorderStatus) =>
+    apiRequest<{ preorders: PreorderDto[] }>("/api/agent/preorders", { query: { status } }),
+  preorders: (query?: { search?: string; status?: PreorderStatus }) =>
+    apiRequest<{ preorders: PreorderDto[] }>("/api/preorders", { query }),
+  createPreorder: (payload: unknown) =>
+    apiRequest<{ message: string; preorder: PreorderDto }>("/api/preorders", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updatePreorder: (id: number, payload: unknown) =>
+    apiRequest<{ message: string; preorder: PreorderDto }>(`/api/preorders/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deletePreorder: (id: number) => apiRequest<{ message: string }>(`/api/preorders/${id}`, { method: "DELETE" }),
+  submitPreorder: (id: number) => apiRequest<{ message: string; preorder: PreorderDto }>(`/api/preorders/${id}/submit`, { method: "POST" }),
+  createPreorderPaymentLink: (id: number) =>
+    apiRequest<PaymentLinkResponse>(`/api/preorders/${id}/payment-link`, { method: "POST" }),
+  preorderPdf: (id: number) => apiRequest<Blob>(`/api/preorders/${id}/pdf`),
+  salesUpdatePreorderStatus: (id: number, payload: { status: "approve" | "invalid"; invalid_reason?: string }) =>
+    apiRequest<{ message: string; preorder: PreorderDto }>(`/api/sales/preorders/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  notifications: (status?: NotificationDto["status"]) =>
+    apiRequest<{ notifications: NotificationDto[] | null }>("/api/notifications", { query: { status } }),
+  notificationDetail: (id: number) => apiRequest<{ notification: NotificationDto }>(`/api/notifications/${id}`),
+  markNotificationRead: (id: number) =>
+    apiRequest<{ message: string; notification?: NotificationDto }>(`/api/notifications/${id}/read`, { method: "PUT" }),
+  markAllNotificationsRead: () =>
+    apiRequest<{ message: string }>("/api/notifications/read-all", { method: "PUT" }),
+  agentWallet: () => apiRequest<{ wallet: WalletDto }>("/api/agent/wallet"),
+  agentWithdraws: () => apiRequest<{ withdraws: WithdrawDto[] }>("/api/agent/withdraws"),
+  createAgentWithdraw: (amount: number) =>
+    apiRequest<{ message: string; withdraw: WithdrawDto }>("/api/agent/withdraws", {
+      method: "POST",
+      body: JSON.stringify({ amount }),
+    }),
+  superAdminDashboard: () => apiRequest<{ message: string }>("/api/super-admin/dashboard"),
+  superAdminWithdraws: (status?: WithdrawStatus) =>
+    apiRequest<{ withdraws: WithdrawDto[] }>("/api/super-admin/withdraws", { query: { status } }),
+  approveWithdraw: (id: number) =>
+    apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/approve`, { method: "PUT" }),
+  onboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/agent/onboarding/videos"),
+  onboardingProgress: () => apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress"),
+  saveOnboardingProgress: (payload: {
+    video_id: number;
+    watched_seconds: number;
+    duration_seconds: number;
+    status: OnboardingProgressStatus;
+  }) =>
+    apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  resetOnboardingProgress: () => apiRequest<{ message: string }>("/api/agent/onboarding/progress", { method: "DELETE" }),
+};

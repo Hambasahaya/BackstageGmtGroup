@@ -1,11 +1,25 @@
 import { createBrowserRouter, Navigate } from "react-router";
+import type { ReactNode } from "react";
+import { AuthGate } from "./auth/AuthGate";
+import { canAccessRole, getCurrentRole, roleHomePaths, roleLabels, type AppRole } from "./auth/roles";
 import { Layout } from "./components/Layout";
-import { Login } from "./components/Login";
+import { AgentOnboarding } from "./components/AgentOnboarding";
+import { AgentPurchaseOrder } from "./components/AgentPurchaseOrder";
+import { AgentWithdraw } from "./components/AgentWithdraw";
+import { AgentApplications } from "./components/AgentApplications";
+import { ApplyAgent } from "./components/ApplyAgent";
 import { Dashboard } from "./components/Dashboard";
+import { Login } from "./components/Login";
+import { MyGmtEntry } from "./components/MyGmtEntry";
+import { Register } from "./components/Register";
+import { SalesOrders } from "./components/SalesOrders";
+import { SsoCallback } from "./components/SsoCallback";
+import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
 import {
   ArticleManagement,
   EventManagement,
   MediaLibrary,
+  MarketingIntegrations,
   MultiWebsiteManagement,
   NotificationCenter,
   ParticipantManagement,
@@ -15,62 +29,220 @@ import {
   UserRoleManagement,
 } from "./components/GMTModules";
 
+function RoleGate({ allowedRoles, children }: { allowedRoles: AppRole[]; children: ReactNode }) {
+  const currentRole = getCurrentRole();
+
+  if (!canAccessRole(currentRole, allowedRoles)) {
+    return <Navigate to={roleHomePaths[currentRole]} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function RoleHomeRedirect() {
+  const currentRole = getCurrentRole();
+
+  if (currentRole === "marketing") {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">{roleLabels[currentRole]}</p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-950">Fitur role belum tersedia</h1>
+        <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          Role ini sudah dikenali dari session API, tetapi dokumentasi backend belum menyediakan endpoint dashboard khusus.
+        </p>
+      </div>
+    );
+  }
+
+  return <Navigate to={roleHomePaths[currentRole]} replace />;
+}
+
+const superAdminOnly: AppRole[] = ["super_admin"];
+const agentOnly: AppRole[] = ["agent"];
+const verifiedAgentApplicant: AppRole[] = ["user", "agent"];
+const salesOnly: AppRole[] = ["sales"];
+const userOnly: AppRole[] = ["user"];
+
 export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
   },
   {
+    path: "/register",
+    Component: Register,
+  },
+  {
+    path: "/mygmt",
+    Component: MyGmtEntry,
+  },
+  {
+    path: "/sso/callback",
+    Component: SsoCallback,
+  },
+  {
     path: "/",
-    Component: Layout,
+    element: (
+      <AuthGate>
+        <Layout />
+      </AuthGate>
+    ),
     children: [
       {
         index: true,
-        element: <Navigate to="/dashboard" replace />,
+        element: <RoleHomeRedirect />,
       },
       {
         path: "dashboard",
-        Component: Dashboard,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <Dashboard />
+          </RoleGate>
+        ),
       },
       {
         path: "websites",
-        Component: MultiWebsiteManagement,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <MultiWebsiteManagement />
+          </RoleGate>
+        ),
       },
       {
         path: "seo",
-        Component: SeoManagement,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <SeoManagement />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "integrations",
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <MarketingIntegrations />
+          </RoleGate>
+        ),
       },
       {
         path: "articles",
-        Component: ArticleManagement,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <ArticleManagement />
+          </RoleGate>
+        ),
       },
       {
         path: "events",
-        Component: EventManagement,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <EventManagement />
+          </RoleGate>
+        ),
       },
       {
         path: "participants",
-        Component: ParticipantManagement,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <ParticipantManagement />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "agent-applications",
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <AgentApplications />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "withdraw-approvals",
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <SuperAdminWithdraws />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "apply-agent",
+        element: (
+          <RoleGate allowedRoles={userOnly}>
+            <ApplyAgent />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "agent-onboarding",
+        element: (
+          <RoleGate allowedRoles={verifiedAgentApplicant}>
+            <AgentOnboarding />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "agent-withdraw",
+        element: (
+          <RoleGate allowedRoles={agentOnly}>
+            <AgentWithdraw />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "agent-purchase-orders",
+        element: (
+          <RoleGate allowedRoles={agentOnly}>
+            <AgentPurchaseOrder />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "sales-orders",
+        element: (
+          <RoleGate allowedRoles={salesOnly}>
+            <SalesOrders />
+          </RoleGate>
+        ),
       },
       {
         path: "notifications",
-        Component: NotificationCenter,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <NotificationCenter />
+          </RoleGate>
+        ),
       },
       {
         path: "roles",
-        Component: UserRoleManagement,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <UserRoleManagement />
+          </RoleGate>
+        ),
       },
       {
         path: "media",
-        Component: MediaLibrary,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <MediaLibrary />
+          </RoleGate>
+        ),
       },
       {
         path: "workflow",
-        Component: TaskWorkflow,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <TaskWorkflow />
+          </RoleGate>
+        ),
       },
       {
         path: "reports",
-        Component: Reporting,
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <Reporting />
+          </RoleGate>
+        ),
       },
     ],
   },
