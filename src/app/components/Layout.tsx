@@ -365,14 +365,14 @@ export function Layout() {
         } lg:translate-x-0`}
       >
         <div className="flex h-full flex-col">
-          <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
+          <div className="flex h-16 items-center justify-between border-b border-[#0F766E] bg-[#0F766E] px-5">
             <div className="flex h-12 w-40 items-center">
               <img src="/img/GMT Suite-04.png" alt="GMT Suite" className="h-full w-full object-contain object-left" />
             </div>
             <button
               aria-label="Close navigation"
               onClick={() => setSidebarOpen(false)}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-100 lg:hidden"
+              className="rounded-md p-1 text-white/80 hover:bg-white/10 hover:text-white lg:hidden"
             >
               <X className="h-5 w-5" />
             </button>
