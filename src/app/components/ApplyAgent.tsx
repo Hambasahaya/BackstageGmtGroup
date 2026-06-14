@@ -1,6 +1,14 @@
-import { FileImage, Send, UserPlus } from "lucide-react";
+import { Clock3, FileImage, Send, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { api, getAuthToken, getStoredUser, saveAuthSession, type ApplyAgentPayload } from "../services/api";
+import {
+  api,
+  getAuthToken,
+  getStoredUser,
+  saveAuthSession,
+  type AgentApplicationStatus,
+  type ApplyAgentPayload,
+  type DetailUserDto,
+} from "../services/api";
 
 const applyInitial: ApplyAgentPayload = {
   job: "",
@@ -109,11 +117,44 @@ function FileField({
   );
 }
 
+function hasCompletedVerification(detailUser: DetailUserDto | undefined) {
+  return Boolean(
+    detailUser?.photo &&
+      detailUser.ktp_photo &&
+      detailUser.bank_name &&
+      detailUser.account_number &&
+      detailUser.full_address,
+  );
+}
+
+function WaitingCta({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-amber-700 ring-1 ring-amber-200">
+          <Clock3 className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-amber-950">{title}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-amber-800">{description}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ApplyAgent() {
   const storedUser = getStoredUser();
-  const status = storedUser?.detail_user?.status ?? null;
+  const [status, setStatus] = useState<AgentApplicationStatus | null>(storedUser?.detail_user?.status ?? null);
+  const [isVerificationCompleted, setIsVerificationCompleted] = useState(hasCompletedVerification(storedUser?.detail_user));
   const [applyForm, setApplyForm] = useState<ApplyAgentPayload>(applyInitial);
-  const [verificationForm, setVerificationForm] = useState<AgentVerificationPayload>(verificationInitial);
+  const [verificationForm, setVerificationForm] = useState<VerificationForm>(verificationInitial);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,6 +169,7 @@ export function ApplyAgent() {
       const response = await api.applyAgent(applyForm);
       const session = await api.me();
       saveAuthSession(getAuthToken() ?? "", session.user);
+      setStatus(session.user.detail_user?.status ?? "not_verif");
       setSuccessMessage(response.message || "Pengajuan agent berhasil dikirim.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim pengajuan agent.");
@@ -146,9 +188,15 @@ export function ApplyAgent() {
       if (!verificationForm.photo || !verificationForm.ktp_photo) {
         throw new Error("Foto dan KTP wajib diupload.");
       }
-      const response = await api.completeAgentVerification(verificationForm);
+      const response = await api.completeAgentVerification({
+        ...verificationForm,
+        photo: verificationForm.photo,
+        ktp_photo: verificationForm.ktp_photo,
+      });
       const token = localStorage.getItem("gmt-auth-token") ?? "";
       saveAuthSession(token, response.user);
+      setStatus(response.user.detail_user?.status ?? "verif");
+      setIsVerificationCompleted(true);
       setSuccessMessage(response.message || "Data verifikasi berhasil dilengkapi.");
       setVerificationForm(verificationInitial);
     } catch (error) {
@@ -181,29 +229,45 @@ export function ApplyAgent() {
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-sm font-medium text-emerald-800">
           Akun kamu sudah menjadi official agent. Fitur agent penuh sudah tersedia di menu.
         </section>
+      ) : status === "not_verif" ? (
+        <WaitingCta
+          title="Menunggu verifikasi admin"
+          description="Pengajuan awal kamu sudah masuk. Tim admin akan mengecek data terlebih dahulu sebelum membuka tahap upload data verifikasi."
+        />
       ) : status === "verif" ? (
-        <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-5">
-            <h2 className="text-lg font-semibold text-slate-950">Lengkapi data verifikasi</h2>
-            <p className="mt-1 text-sm text-slate-500">Isi data ini setelah admin mengubah status pengajuan menjadi verif.</p>
-          </div>
-          <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
-              <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
-              <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
-              <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-              <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" />
-              <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" />
+        isVerificationCompleted ? (
+          <WaitingCta
+            title="Menunggu aktivasi official agent"
+            description="Data verifikasi kamu sudah lengkap dan sedang ditinjau. Setelah admin menyetujui, status akan berubah menjadi official_agent."
+          />
+        ) : (
+          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 p-5">
+              <h2 className="text-lg font-semibold text-slate-950">Lengkapi data verifikasi</h2>
+              <p className="mt-1 text-sm text-slate-500">Isi data ini setelah admin mengubah status pengajuan menjadi verif.</p>
             </div>
-            <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
-            <div className="flex justify-end border-t border-slate-200 pt-5">
-              <button type="submit" disabled={isSubmitting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
-                <FileImage className="h-4 w-4" />
-                {isSubmitting ? "Menyimpan..." : "Simpan data verifikasi"}
-              </button>
-            </div>
-          </form>
+            <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
+                <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
+                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
+                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" />
+                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" />
+              </div>
+              <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
+              <div className="flex justify-end border-t border-slate-200 pt-5">
+                <button type="submit" disabled={isSubmitting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
+                  <FileImage className="h-4 w-4" />
+                  {isSubmitting ? "Menyimpan..." : "Simpan data verifikasi"}
+                </button>
+              </div>
+            </form>
+          </section>
+        )
+      ) : status === "stopped_agent" ? (
+        <section className="rounded-lg border border-rose-200 bg-rose-50 p-5 text-sm font-medium text-rose-800">
+          Status agent kamu sedang dihentikan. Hubungi admin untuk mengaktifkan kembali akun agent.
         </section>
       ) : (
         <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
