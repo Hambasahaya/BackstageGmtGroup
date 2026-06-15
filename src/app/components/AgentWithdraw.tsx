@@ -105,6 +105,12 @@ export function AgentWithdraw() {
 
   const parsedAmount = useMemo(() => Number(amount), [amount]);
 
+  const openWithdrawModal = () => {
+    setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
+    setFormError("");
+    setIsModalOpen(true);
+  };
+
   const closeModal = () => {
     setIsModalOpen(false);
     setAmount("");
@@ -144,7 +150,7 @@ export function AgentWithdraw() {
           </p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openWithdrawModal}
           className="inline-flex w-fit items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
         >
           <Plus className="h-4 w-4" />
