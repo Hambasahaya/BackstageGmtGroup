@@ -1,7 +1,7 @@
-import { ArrowRight, LockKeyhole, Mail, Phone, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { getRoleHomePath } from "../auth/navigation";
+import { AuthSuiteShell, SpinnerIcon } from "./AuthSuiteShell";
 import {
   api,
   getAuthToken,
@@ -30,7 +30,6 @@ function Field({
   name,
   value,
   onChange,
-  icon: Icon,
   type = "text",
   placeholder,
 }: {
@@ -38,24 +37,20 @@ function Field({
   name: keyof RegisterForm;
   value: string;
   onChange: (name: keyof RegisterForm, value: string) => void;
-  icon: typeof UserRound;
   type?: string;
   placeholder?: string;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-[11px] font-medium text-white/55">{label}</span>
-      <div className="relative">
-        <Icon className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/35" />
-        <input
-          value={value}
-          onChange={(event) => onChange(name, event.target.value)}
-          type={type}
-          className="h-10 w-full rounded-md border border-white/10 bg-white px-9 text-xs text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-white focus:ring-2 focus:ring-white/15"
-          placeholder={placeholder}
-          required
-        />
-      </div>
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-normal text-[#9a9a9a]">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(name, event.target.value)}
+        type={type}
+        className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none transition placeholder:text-[#555] focus:border-white"
+        placeholder={placeholder}
+        required
+      />
     </label>
   );
 }
@@ -118,66 +113,41 @@ export function Register() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-black text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid w-full items-center gap-4 lg:grid-cols-[minmax(330px,400px)_1fr] xl:gap-5">
-          <section className="relative z-10 mx-auto w-full max-w-[390px] rounded-lg border border-white/10 bg-[#101010] p-5 shadow-2xl shadow-black/60 sm:p-7">
-            <div className="mb-7 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <img src="/img/LogoGm.png" alt="GMT Group" className="h-8 w-8 object-contain brightness-0 invert" />
-                <div className="leading-none">
-                  <p className="text-sm font-semibold tracking-tight text-white">gmt</p>
-                  <p className="text-[10px] text-white/55">suite</p>
-                </div>
-              </div>
-              <Link to={loginPath} className="rounded-md border border-white/10 px-3 py-1.5 text-[11px] font-medium text-white/70 hover:bg-white/[0.04]">
-                Login
-              </Link>
-            </div>
-
-            <div className="text-center">
-              <h1 className="text-xl font-semibold tracking-tight text-white">Create an account</h1>
-              <p className="mt-2 text-xs leading-5 text-white/50">
-                Isi data utama untuk membuat akun Website Pusat.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-7 space-y-3.5">
-              <Field label="Nama" name="name" value={form.name} onChange={updateForm} icon={UserRound} placeholder="Nama lengkap" />
-              <Field label="No HP" name="phone_number" value={form.phone_number} onChange={updateForm} icon={Phone} placeholder="081234567890" />
-
-              <Field label="Email" name="email" value={form.email} onChange={updateForm} icon={Mail} type="email" placeholder="user@example.com" />
-              <Field label="Password" name="password" value={form.password} onChange={updateForm} icon={LockKeyhole} type="password" placeholder="Password" />
-
-              {errorMessage && (
-                <div className="rounded-md border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-100">
-                  {errorMessage}
-                </div>
-              )}
-              {successMessage && (
-                <div className="rounded-md border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-100">
-                  {successMessage}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-white px-4 text-xs font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/40"
-              >
-                {isSubmitting ? "Memproses..." : "Create account"}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </form>
-          </section>
-
-          <section className="relative hidden min-h-[650px] overflow-hidden rounded-lg border border-white/10 bg-[#070707] lg:block">
-            <img src="/img/login-event-collage.png" alt="GMT event production collage" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black via-black/70 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black via-black/50 to-transparent" />
-          </section>
-        </div>
+    <AuthSuiteShell mode="register">
+      <div className="flex flex-col gap-2 text-center">
+        <h1 className="text-xl font-semibold leading-tight text-white">Create an account</h1>
+        <p className="text-[11px] font-normal text-[#6c6c6c]">
+          Enter your email below to create your account
+        </p>
       </div>
-    </main>
+
+      <form onSubmit={handleSubmit} className="mt-7 flex flex-1 flex-col gap-[17px]">
+        <div className="grid gap-[18px] sm:grid-cols-2">
+          <Field label="Name" name="name" value={form.name} onChange={updateForm} placeholder="eg. User Baru" />
+          <Field label="Phone Number" name="phone_number" value={form.phone_number} onChange={updateForm} placeholder="081234567890" />
+        </div>
+
+        <Field label="Email" name="email" value={form.email} onChange={updateForm} type="email" placeholder="m@example.com" />
+        <Field label="Password" name="password" value={form.password} onChange={updateForm} type="password" placeholder="********" />
+
+        {errorMessage && <p className="-mt-1 text-[11px] leading-snug text-[#ff8a8a]">{errorMessage}</p>}
+        {successMessage && <p className="-mt-1 text-[11px] leading-snug text-emerald-300">{successMessage}</p>}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSubmitting ? <SpinnerIcon /> : "Create account"}
+        </button>
+      </form>
+
+      <Link
+        to={loginPath}
+        className="mt-3 self-center px-3 py-3 text-xs font-medium text-[#e7e7e7] transition hover:text-white"
+      >
+        Back to login <span className="ml-1.5">-&gt;</span>
+      </Link>
+    </AuthSuiteShell>
   );
 }
