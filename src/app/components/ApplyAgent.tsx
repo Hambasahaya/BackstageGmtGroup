@@ -166,11 +166,23 @@ export function ApplyAgent() {
     setIsSubmitting(true);
 
     try {
+      if (!verificationForm.photo || !verificationForm.ktp_photo) {
+        throw new Error("Foto diri dan foto KTP wajib diupload.");
+      }
+
       const response = await api.applyAgent(applyForm);
-      const session = await api.me();
-      saveAuthSession(getAuthToken() ?? "", session.user);
-      setStatus(session.user.detail_user?.status ?? "not_verif");
-      setSuccessMessage(response.message || "Pengajuan agent berhasil dikirim.");
+      const verificationResponse = await api.completeAgentVerification({
+        ...verificationForm,
+        photo: verificationForm.photo,
+        ktp_photo: verificationForm.ktp_photo,
+      });
+
+      saveAuthSession(getAuthToken() ?? "", verificationResponse.user);
+      setStatus(verificationResponse.user.detail_user?.status ?? "verif");
+      setIsVerificationCompleted(true);
+      setApplyForm(applyInitial);
+      setVerificationForm(verificationInitial);
+      setSuccessMessage(response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim pengajuan agent.");
     } finally {
@@ -213,7 +225,7 @@ export function ApplyAgent() {
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">User</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Apply menjadi Moxlite Agent</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Pengajuan awal cukup berisi pekerjaan, sosial media, alasan, sumber informasi, dan target produk.
+            Isi data pengajuan dan verifikasi dalam satu langkah agar admin bisa langsung meninjau kelengkapan agent.
           </p>
         </div>
         <div className="inline-flex w-fit items-center gap-2 rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-[#0F766E] ring-1 ring-teal-200">
@@ -272,15 +284,33 @@ export function ApplyAgent() {
       ) : (
         <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-5">
-            <h2 className="text-lg font-semibold text-slate-950">Data pengajuan awal</h2>
-            <p className="mt-1 text-sm text-slate-500">Setelah dikirim, status detail user menjadi not_verif.</p>
+            <h2 className="text-lg font-semibold text-slate-950">Data pengajuan dan verifikasi</h2>
+            <p className="mt-1 text-sm text-slate-500">Lengkapi semua data berikut dalam satu pengajuan.</p>
           </div>
           <form onSubmit={handleApplySubmit} className="space-y-5 p-5">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} placeholder="Sales Executive" />
-              <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" />
-              <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" />
-              <TextField label="Facebook" value={applyForm.facebook} onChange={(value) => setApplyForm((current) => ({ ...current, facebook: value }))} placeholder="User FB" />
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data pengajuan</h3>
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} placeholder="Sales Executive" />
+                <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" />
+                <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" />
+                <TextField label="Facebook" value={applyForm.facebook} onChange={(value) => setApplyForm((current) => ({ ...current, facebook: value }))} placeholder="User FB" />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data verifikasi</h3>
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
+                <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
+                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
+                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" />
+                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" />
+              </div>
+              <div className="mt-4">
+                <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
+              </div>
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">

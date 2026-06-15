@@ -19,6 +19,7 @@ type Product = {
   unit: string;
   price: number;
   photo: string;
+  commissionTiers?: Record<string, number>;
 };
 
 type PurchaseOrderItem = {
@@ -155,6 +156,7 @@ function mapProduct(product: ProductDto): Product {
     unit: product.unit ?? "unit",
     price: product.price,
     photo: resolveApiAssetUrl(product.foto) || "/img/LogoGm.png",
+    commissionTiers: product.commission_tiers,
   };
 }
 
@@ -226,7 +228,14 @@ function calculateItem(productList: Product[], item: PurchaseOrderItem) {
   const subtotal = product.price * item.qty;
   const discountTotal = subtotal * (item.discountPercent / 100);
   const total = subtotal - discountTotal;
-  const commission = total * (commissionPercent / 100);
+
+  let commission = total * (commissionPercent / 100);
+  if (product.commissionTiers) {
+    const tierKey = `${item.discountPercent}%`;
+    if (product.commissionTiers[tierKey] !== undefined) {
+      commission = product.commissionTiers[tierKey] * item.qty;
+    }
+  }
 
   return { product, subtotal, discountTotal, total, commission };
 }
@@ -361,10 +370,26 @@ export function AgentPurchaseOrder() {
           return item;
         }
 
+        let newDiscountPercent = changes.discountPercent !== undefined ? changes.discountPercent : item.discountPercent;
+
+        if (changes.productId !== undefined && changes.productId !== item.productId) {
+          const newProduct = getProduct(products, changes.productId);
+          if (newProduct.commissionTiers) {
+            const tiers = Object.keys(newProduct.commissionTiers).map((k) => parseInt(k.replace("%", ""), 10));
+            if (!tiers.includes(newDiscountPercent)) {
+              newDiscountPercent = tiers.includes(0) ? 0 : (tiers[0] ?? 0);
+            }
+          } else {
+            if (!discountOptions.includes(newDiscountPercent)) {
+              newDiscountPercent = 0;
+            }
+          }
+        }
+
         return {
           ...item,
           ...changes,
-          discountPercent: Math.max(0, changes.discountPercent ?? item.discountPercent),
+          discountPercent: Math.max(0, newDiscountPercent),
           qty: Math.max(1, changes.qty ?? item.qty),
         };
       }),
@@ -778,7 +803,12 @@ export function AgentPurchaseOrder() {
                             onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                           >
-                            {discountOptions.map((discount) => (
+                            {(calculated.product.commissionTiers
+                              ? Object.keys(calculated.product.commissionTiers)
+                                  .map((k) => parseInt(k.replace("%", ""), 10))
+                                  .sort((a, b) => a - b)
+                              : discountOptions
+                            ).map((discount) => (
                               <option key={discount} value={discount}>
                                 {discount}%
                               </option>
@@ -905,7 +935,12 @@ export function AgentPurchaseOrder() {
                               onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
                               className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:text-sm"
                             >
-                              {discountOptions.map((discount) => (
+                              {(calculated.product.commissionTiers
+                                ? Object.keys(calculated.product.commissionTiers)
+                                    .map((k) => parseInt(k.replace("%", ""), 10))
+                                    .sort((a, b) => a - b)
+                                : discountOptions
+                              ).map((discount) => (
                                 <option key={discount} value={discount}>
                                   {discount}%
                                 </option>

@@ -11,6 +11,7 @@ export type ProductDto = {
   deskripsi?: string | null;
   unit?: string | null;
   price: number;
+  commission_tiers?: Record<string, number>;
 };
 
 export type PreorderItemDto = {
