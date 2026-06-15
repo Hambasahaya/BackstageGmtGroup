@@ -104,6 +104,7 @@ export function AgentWithdraw() {
   }, []);
 
   const parsedAmount = useMemo(() => Number(amount), [amount]);
+  const formattedAmount = amount ? currencyFormatter.format(parsedAmount) : "";
 
   const openWithdrawModal = () => {
     setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
@@ -228,13 +229,11 @@ export function AgentWithdraw() {
                 <div className="relative">
                   <Banknote className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    type="number"
-                    min="1"
-                    max={wallet.available_balance}
-                    placeholder="Contoh: 500000"
-                    className="w-full rounded-lg border border-slate-300 py-3 pl-9 pr-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    value={formattedAmount}
+                    readOnly
+                    type="text"
+                    placeholder={currencyFormatter.format(0)}
+                    className="w-full cursor-not-allowed rounded-lg border border-slate-300 bg-slate-50 py-3 pl-9 pr-3 text-sm font-semibold text-slate-900 outline-none"
                     required
                   />
                 </div>
