@@ -179,7 +179,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
       productId: getItemProductId(item),
       qty: item.qty,
       discountPercent: item.discount_percent,
-      itemStatus: item.item_status ?? "ready",
+      itemStatus: "ready",
     })),
     subtotal: preorder.subtotal,
     discountTotal: preorder.total_discount ?? preorder.total_diskon ?? 0,
@@ -213,7 +213,6 @@ function toPreorderPayload(
       id_product: item.productId,
       qty: item.qty,
       discount_percent: item.discountPercent,
-      item_status: item.itemStatus,
     })),
   };
 }
@@ -627,7 +626,7 @@ export function AgentPurchaseOrder() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4">
-          <div className="my-4 w-full max-w-6xl rounded-lg bg-white shadow-xl">
+          <div className="my-4 w-full max-w-[96vw] rounded-lg bg-white shadow-xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">
@@ -681,34 +680,32 @@ export function AgentPurchaseOrder() {
                 </label>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                <table className="w-full min-w-[1280px] table-fixed">
+              <div className="overflow-hidden rounded-lg border border-slate-300 bg-white">
+                <table className="w-full table-fixed border-collapse">
                   <colgroup>
-                    <col className="w-14" />
-                    <col className="w-56" />
-                    <col className="w-72" />
-                    <col className="w-28" />
-                    <col className="w-24" />
-                    <col className="w-28" />
-                    <col className="w-36" />
-                    <col className="w-28" />
-                    <col className="w-36" />
-                    <col className="w-36" />
-                    <col className="w-16" />
+                    <col className="w-[4%]" />
+                    <col className="w-[17%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[7%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[9%]" />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                      <th className="px-3 py-3 font-semibold">No</th>
-                      <th className="px-3 py-3 font-semibold">Item</th>
-                      <th className="px-3 py-3 font-semibold">Description</th>
-                      <th className="px-3 py-3 font-semibold">Foto</th>
-                      <th className="px-3 py-3 font-semibold">Qty</th>
-                      <th className="px-3 py-3 font-semibold">Status</th>
-                      <th className="px-3 py-3 font-semibold">Unit Price</th>
-                      <th className="px-3 py-3 font-semibold">Disc</th>
-                      <th className="px-3 py-3 font-semibold">Total Price</th>
-                      <th className="px-3 py-3 font-semibold">Komisi</th>
-                      <th className="px-3 py-3 font-semibold"></th>
+                    <tr className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">No</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Item</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Description</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Foto</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Qty</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Status</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Unit Price</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Disc</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Total Price</th>
+                      <th className="border border-slate-200 px-2 py-3 font-semibold">Komisi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -716,13 +713,13 @@ export function AgentPurchaseOrder() {
                       const calculated = calculateItem(products, item);
 
                       return (
-                        <tr key={item.id} className="border-b border-slate-100 align-top text-sm last:border-0">
-                          <td className="px-3 py-3 font-semibold text-slate-700">{index + 1}</td>
-                          <td className="px-3 py-3">
+                        <tr key={item.id} className="align-top text-xs text-slate-700 sm:text-sm">
+                          <td className="border border-slate-200 px-2 py-3 font-semibold text-slate-700">{index + 1}</td>
+                          <td className="border border-slate-200 px-2 py-3">
                             <select
                               value={item.productId}
                               onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                              className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-medium text-slate-900 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:text-sm"
                             >
                               {products.map((product) => (
                                 <option key={product.id} value={product.id}>
@@ -730,17 +727,28 @@ export function AgentPurchaseOrder() {
                                 </option>
                               ))}
                             </select>
-                            <p className="mt-2 truncate text-xs text-slate-500">{calculated.product.unit}</p>
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <p className="min-w-0 truncate text-xs text-slate-500">{calculated.product.unit}</p>
+                              <button
+                                type="button"
+                                title="Hapus item"
+                                onClick={() => removeItem(item.id)}
+                                disabled={items.length === 1}
+                                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="border border-slate-200 px-2 py-3">
                             <textarea
                               value={calculated.product.description}
                               readOnly
-                              className="min-h-24 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 outline-none"
+                              className="min-h-20 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-600 outline-none sm:text-sm"
                             />
                           </td>
-                          <td className="px-3 py-3">
-                            <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2">
+                          <td className="border border-slate-200 px-2 py-3">
+                            <div className="mx-auto flex aspect-square w-full max-w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1.5">
                               <img
                                 src={calculated.product.photo}
                                 alt={calculated.product.name}
@@ -748,39 +756,26 @@ export function AgentPurchaseOrder() {
                               />
                             </div>
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="border border-slate-200 px-2 py-3">
                             <input
                               value={item.qty}
                               type="number"
                               min="1"
                               onChange={(event) => updateItem(item.id, { qty: Number(event.target.value) })}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                              className="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-2 text-xs outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:text-sm"
                             />
                           </td>
-                          <td className="px-3 py-3">
-                            <select
-                              value={item.itemStatus}
-                              onChange={(event) =>
-                                updateItem(item.id, { itemStatus: event.target.value as PurchaseOrderItem["itemStatus"] })
-                              }
-                              className={`w-full rounded-lg border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 ${
-                                item.itemStatus === "ready"
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 focus:border-emerald-500 focus:ring-emerald-100"
-                                  : "border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-500 focus:ring-amber-100"
-                              }`}
-                            >
-                              <option value="ready">Ready</option>
-                              <option value="po">PO</option>
-                            </select>
+                          <td className="border border-slate-200 px-2 py-3">
+                            <ItemStatusBadge status="ready" />
                           </td>
-                          <td className="px-3 py-3 font-semibold text-slate-900">
+                          <td className="break-words border border-slate-200 px-2 py-3 font-semibold text-slate-900">
                             {currencyFormatter.format(calculated.product.price)}
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="border border-slate-200 px-2 py-3">
                             <select
                               value={item.discountPercent}
                               onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                              className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:text-sm"
                             >
                               {discountOptions.map((discount) => (
                                 <option key={discount} value={discount}>
@@ -792,18 +787,11 @@ export function AgentPurchaseOrder() {
                               {currencyFormatter.format(calculated.discountTotal)}
                             </p>
                           </td>
-                          <td className="px-3 py-3 font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</td>
-                          <td className="px-3 py-3 font-bold text-[#0F766E]">{currencyFormatter.format(calculated.commission)}</td>
-                          <td className="px-3 py-3">
-                            <button
-                              type="button"
-                              title="Hapus item"
-                              onClick={() => removeItem(item.id)}
-                              disabled={items.length === 1}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          <td className="break-words border border-slate-200 px-2 py-3 font-bold text-slate-950">
+                            {currencyFormatter.format(calculated.total)}
+                          </td>
+                          <td className="break-words border border-slate-200 px-2 py-3 font-bold text-[#0F766E]">
+                            {currencyFormatter.format(calculated.commission)}
                           </td>
                         </tr>
                       );
