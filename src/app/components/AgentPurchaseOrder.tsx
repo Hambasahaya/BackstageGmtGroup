@@ -680,7 +680,135 @@ export function AgentPurchaseOrder() {
                 </label>
               </div>
 
-              <div className="overflow-hidden rounded-lg border border-slate-300 bg-white">
+              <div className="space-y-3 md:hidden">
+                {items.map((item, index) => {
+                  const calculated = calculateItem(products, item);
+
+                  return (
+                    <div key={item.id} className="overflow-hidden rounded-lg border border-slate-300 bg-white">
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">No {index + 1}</p>
+                        <button
+                          type="button"
+                          title="Hapus item"
+                          onClick={() => removeItem(item.id)}
+                          disabled={items.length === 1}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-[92px_1fr] text-sm">
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Item
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3">
+                          <select
+                            value={item.productId}
+                            onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                          >
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-2 text-xs text-slate-500">{calculated.product.unit}</p>
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Description
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3">
+                          <textarea
+                            value={calculated.product.description}
+                            readOnly
+                            className="min-h-20 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 outline-none"
+                          />
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Foto
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3">
+                          <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2">
+                            <img
+                              src={calculated.product.photo}
+                              alt={calculated.product.name}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Qty
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3">
+                          <input
+                            value={item.qty}
+                            type="number"
+                            min="1"
+                            onChange={(event) => updateItem(item.id, { qty: Number(event.target.value) })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                          />
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Status
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3">
+                          <ItemStatusBadge status="ready" />
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Unit Price
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3 font-semibold text-slate-900">
+                          {currencyFormatter.format(calculated.product.price)}
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Disc
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3">
+                          <select
+                            value={item.discountPercent}
+                            onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                          >
+                            {discountOptions.map((discount) => (
+                              <option key={discount} value={discount}>
+                                {discount}%
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-2 text-xs font-medium text-slate-500">
+                            {currencyFormatter.format(calculated.discountTotal)}
+                          </p>
+                        </div>
+
+                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Total Price
+                        </div>
+                        <div className="border-b border-slate-200 px-3 py-3 font-bold text-slate-950">
+                          {currencyFormatter.format(calculated.total)}
+                        </div>
+
+                        <div className="border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Komisi
+                        </div>
+                        <div className="px-3 py-3 font-bold text-[#0F766E]">
+                          {currencyFormatter.format(calculated.commission)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-hidden rounded-lg border border-slate-300 bg-white md:block">
                 <table className="w-full table-fixed border-collapse">
                   <colgroup>
                     <col className="w-[4%]" />
