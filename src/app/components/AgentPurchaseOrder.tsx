@@ -3,7 +3,6 @@ import {
   FileDown,
   FileText,
   Pencil,
-  Package,
   Plus,
   Send,
   ShoppingCart,
@@ -27,6 +26,7 @@ type PurchaseOrderItem = {
   productId: number;
   qty: number;
   discountPercent: number;
+  itemStatus: "ready" | "po";
 };
 
 type PurchaseOrder = {
@@ -52,6 +52,7 @@ type PurchaseOrder = {
 
 const commissionPercent = 10;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const discountOptions = [0, 5, 10, 15, 20, 25, 28];
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -95,8 +96,8 @@ const defaultPurchaseOrders: PurchaseOrder[] = [
     customerAddress: "Jl. Gatot Subroto No. 12, Jakarta",
     notes: "Butuh instalasi sebelum akhir bulan.",
     items: [
-      { id: "item-1", productId: 1, qty: 1, discountPercent: 5 },
-      { id: "item-2", productId: 2, qty: 1, discountPercent: 7 },
+      { id: "item-1", productId: 1, qty: 1, discountPercent: 5, itemStatus: "ready" },
+      { id: "item-2", productId: 2, qty: 1, discountPercent: 10, itemStatus: "po" },
     ],
     subtotal: 55000000,
     discountTotal: 3450000,
@@ -114,7 +115,7 @@ const defaultPurchaseOrders: PurchaseOrder[] = [
     customerPhone: "082112345678",
     customerAddress: "Jl. Diponegoro No. 8, Bandung",
     notes: "Masih menunggu konfirmasi qty tambahan.",
-    items: [{ id: "item-1", productId: 3, qty: 4, discountPercent: 5 }],
+    items: [{ id: "item-1", productId: 3, qty: 4, discountPercent: 5, itemStatus: "ready" }],
     subtotal: 20000000,
     discountTotal: 1000000,
     total: 19000000,
@@ -142,7 +143,8 @@ const newItem = (): PurchaseOrderItem => ({
   id: `item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   productId: defaultProducts[0].id,
   qty: 1,
-  discountPercent: 5,
+  discountPercent: 0,
+  itemStatus: "ready",
 });
 
 function mapProduct(product: ProductDto): Product {
@@ -177,6 +179,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
       productId: getItemProductId(item),
       qty: item.qty,
       discountPercent: item.discount_percent,
+      itemStatus: item.item_status ?? "ready",
     })),
     subtotal: preorder.subtotal,
     discountTotal: preorder.total_discount ?? preorder.total_diskon ?? 0,
@@ -210,6 +213,7 @@ function toPreorderPayload(
       id_product: item.productId,
       qty: item.qty,
       discount_percent: item.discountPercent,
+      item_status: item.itemStatus,
     })),
   };
 }
@@ -270,6 +274,19 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
     refund: { label: "Refund", className: "bg-violet-50 text-violet-700 ring-violet-200" },
   };
   const statusMeta = statusMap[status];
+
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
+      {statusMeta.label}
+    </span>
+  );
+}
+
+function ItemStatusBadge({ status }: { status: PurchaseOrderItem["itemStatus"] }) {
+  const statusMeta = {
+    ready: { label: "Ready", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    po: { label: "PO", className: "bg-amber-50 text-amber-700 ring-amber-200" },
+  }[status];
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
@@ -348,7 +365,7 @@ export function AgentPurchaseOrder() {
         return {
           ...item,
           ...changes,
-          discountPercent: Math.max(5, changes.discountPercent ?? item.discountPercent),
+          discountPercent: Math.max(0, changes.discountPercent ?? item.discountPercent),
           qty: Math.max(1, changes.qty ?? item.qty),
         };
       }),
@@ -664,40 +681,48 @@ export function AgentPurchaseOrder() {
                 </label>
               </div>
 
-              <div className="space-y-4">
-                {items.map((item, index) => {
-                  const calculated = calculateItem(products, item);
+              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                <table className="w-full min-w-[1280px] table-fixed">
+                  <colgroup>
+                    <col className="w-14" />
+                    <col className="w-56" />
+                    <col className="w-72" />
+                    <col className="w-28" />
+                    <col className="w-24" />
+                    <col className="w-28" />
+                    <col className="w-36" />
+                    <col className="w-28" />
+                    <col className="w-36" />
+                    <col className="w-36" />
+                    <col className="w-16" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-3 py-3 font-semibold">No</th>
+                      <th className="px-3 py-3 font-semibold">Item</th>
+                      <th className="px-3 py-3 font-semibold">Description</th>
+                      <th className="px-3 py-3 font-semibold">Foto</th>
+                      <th className="px-3 py-3 font-semibold">Qty</th>
+                      <th className="px-3 py-3 font-semibold">Status</th>
+                      <th className="px-3 py-3 font-semibold">Unit Price</th>
+                      <th className="px-3 py-3 font-semibold">Disc</th>
+                      <th className="px-3 py-3 font-semibold">Total Price</th>
+                      <th className="px-3 py-3 font-semibold">Komisi</th>
+                      <th className="px-3 py-3 font-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, index) => {
+                      const calculated = calculateItem(products, item);
 
-                  return (
-                    <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
-                          <Package className="h-4 w-4 text-[#0F766E]" />
-                          Product {index + 1}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          disabled={items.length === 1}
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Hapus
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[160px_1fr]">
-                        <div className="flex aspect-square items-center justify-center rounded-lg border border-slate-200 bg-white p-5">
-                          <img src={calculated.product.photo} alt={calculated.product.name} className="h-full w-full object-contain brightness-0" />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                          <label className="block lg:col-span-2">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">Product</span>
+                      return (
+                        <tr key={item.id} className="border-b border-slate-100 align-top text-sm last:border-0">
+                          <td className="px-3 py-3 font-semibold text-slate-700">{index + 1}</td>
+                          <td className="px-3 py-3">
                             <select
                               value={item.productId}
                               onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                             >
                               {products.map((product) => (
                                 <option key={product.id} value={product.id}>
@@ -705,75 +730,86 @@ export function AgentPurchaseOrder() {
                                 </option>
                               ))}
                             </select>
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">Qty</span>
+                            <p className="mt-2 truncate text-xs text-slate-500">{calculated.product.unit}</p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <textarea
+                              value={calculated.product.description}
+                              readOnly
+                              className="min-h-24 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 outline-none"
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2">
+                              <img
+                                src={calculated.product.photo}
+                                alt={calculated.product.name}
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
                             <input
                               value={item.qty}
                               type="number"
                               min="1"
                               onChange={(event) => updateItem(item.id, { qty: Number(event.target.value) })}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                             />
-                          </label>
-
-                          <label className="block lg:col-span-3">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">Deskripsi product</span>
-                            <textarea
-                              value={calculated.product.description}
-                              readOnly
-                              className="min-h-20 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none"
-                            />
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">Unit</span>
-                            <input
-                              value={calculated.product.unit}
-                              readOnly
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none"
-                            />
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">Unit price</span>
-                            <input
-                              value={currencyFormatter.format(calculated.product.price)}
-                              readOnly
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none"
-                            />
-                          </label>
-
-                          <label className="block">
-                            <span className="mb-2 block text-sm font-medium text-slate-700">Diskon (%)</span>
-                            <input
+                          </td>
+                          <td className="px-3 py-3">
+                            <select
+                              value={item.itemStatus}
+                              onChange={(event) =>
+                                updateItem(item.id, { itemStatus: event.target.value as PurchaseOrderItem["itemStatus"] })
+                              }
+                              className={`w-full rounded-lg border px-3 py-2 text-sm font-semibold outline-none focus:ring-2 ${
+                                item.itemStatus === "ready"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 focus:border-emerald-500 focus:ring-emerald-100"
+                                  : "border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-500 focus:ring-amber-100"
+                              }`}
+                            >
+                              <option value="ready">Ready</option>
+                              <option value="po">PO</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-3 font-semibold text-slate-900">
+                            {currencyFormatter.format(calculated.product.price)}
+                          </td>
+                          <td className="px-3 py-3">
+                            <select
                               value={item.discountPercent}
-                              type="number"
-                              min="5"
-                              step="1"
                               onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                            />
-                          </label>
-
-                          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total price</p>
-                            <p className="mt-1 text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
-                          </div>
-                          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Diskon</p>
-                            <p className="mt-1 text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.discountTotal)}</p>
-                          </div>
-                          <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Komisi</p>
-                            <p className="mt-1 text-sm font-bold text-[#0F766E]">{currencyFormatter.format(calculated.commission)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                            >
+                              {discountOptions.map((discount) => (
+                                <option key={discount} value={discount}>
+                                  {discount}%
+                                </option>
+                              ))}
+                            </select>
+                            <p className="mt-2 text-xs font-medium text-slate-500">
+                              {currencyFormatter.format(calculated.discountTotal)}
+                            </p>
+                          </td>
+                          <td className="px-3 py-3 font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</td>
+                          <td className="px-3 py-3 font-bold text-[#0F766E]">{currencyFormatter.format(calculated.commission)}</td>
+                          <td className="px-3 py-3">
+                            <button
+                              type="button"
+                              title="Hapus item"
+                              onClick={() => removeItem(item.id)}
+                              disabled={items.length === 1}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
               <button
@@ -928,6 +964,7 @@ export function AgentPurchaseOrder() {
                     <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
                       <th className="px-4 py-3 font-semibold">Product</th>
                       <th className="px-4 py-3 font-semibold">Qty</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
                       <th className="px-4 py-3 font-semibold">Diskon</th>
                       <th className="px-4 py-3 font-semibold">Total</th>
                       <th className="px-4 py-3 font-semibold">Komisi</th>
@@ -944,6 +981,9 @@ export function AgentPurchaseOrder() {
                             <p className="text-xs text-slate-500">{calculated.product.unit}</p>
                           </td>
                           <td className="px-4 py-3 text-slate-700">{item.qty}</td>
+                          <td className="px-4 py-3">
+                            <ItemStatusBadge status={item.itemStatus} />
+                          </td>
                           <td className="px-4 py-3 text-slate-700">{item.discountPercent}%</td>
                           <td className="px-4 py-3 font-semibold text-slate-900">{currencyFormatter.format(calculated.total)}</td>
                           <td className="px-4 py-3 font-semibold text-[#0F766E]">{currencyFormatter.format(calculated.commission)}</td>

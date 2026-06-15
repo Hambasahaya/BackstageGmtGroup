@@ -23,6 +23,7 @@ export type PreorderItemDto = {
   namaproduct?: string;
   qty: number;
   discount_percent: number;
+  item_status?: "ready" | "po";
   price?: number;
   subtotal?: number;
   discount_total?: number;
