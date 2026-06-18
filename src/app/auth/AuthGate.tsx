@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
+import { GlobalLoading } from "../components/GlobalLoading";
 import { api, getAuthToken, refreshStoredUser, saveAuthSession, type UserSession } from "../services/api";
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -50,11 +51,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, []);
 
   if (status === "checking") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-4 text-sm font-medium text-slate-600">
-        Memeriksa session Website Pusat...
-      </div>
-    );
+    return <GlobalLoading message="Memeriksa session Website Pusat..." />;
   }
 
   if (status === "guest") {
