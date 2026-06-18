@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import type { ReactNode } from "react";
 import { AuthGate } from "./auth/AuthGate";
-import { canAccessRole, getCurrentRole, roleHomePaths, roleLabels, type AppRole } from "./auth/roles";
+import { canAccessRole, getCurrentAgentStatus, getCurrentRole, roleHomePaths, roleLabels, type AppRole } from "./auth/roles";
 import { Layout } from "./components/Layout";
 import { AgentOnboarding } from "./components/AgentOnboarding";
 import { AgentPurchaseOrder } from "./components/AgentPurchaseOrder";
@@ -39,6 +39,14 @@ function RoleGate({ allowedRoles, children }: { allowedRoles: AppRole[]; childre
   return <>{children}</>;
 }
 
+function OfficialAgentGate({ children }: { children: ReactNode }) {
+  if (getCurrentAgentStatus() !== "official_agent") {
+    return <Navigate to="/apply-agent" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function RoleHomeRedirect() {
   const currentRole = getCurrentRole();
 
@@ -59,7 +67,6 @@ function RoleHomeRedirect() {
 
 const superAdminOnly: AppRole[] = ["super_admin"];
 const agentOnly: AppRole[] = ["agent"];
-const verifiedAgentApplicant: AppRole[] = ["user", "agent"];
 const salesOnly: AppRole[] = ["sales"];
 const userOnly: AppRole[] = ["user"];
 
@@ -175,8 +182,10 @@ export const router = createBrowserRouter([
       {
         path: "agent-onboarding",
         element: (
-          <RoleGate allowedRoles={verifiedAgentApplicant}>
-            <AgentOnboarding />
+          <RoleGate allowedRoles={agentOnly}>
+            <OfficialAgentGate>
+              <AgentOnboarding />
+            </OfficialAgentGate>
           </RoleGate>
         ),
       },
