@@ -596,6 +596,15 @@ export const api = {
     }),
   deletePreorder: (id: number) => apiRequest<{ message: string }>(`/api/preorders/${id}`, { method: "DELETE" }),
   submitPreorder: (id: number) => apiRequest<{ message: string; preorder: PreorderDto }>(`/api/preorders/${id}/submit`, { method: "POST" }),
+  uploadPreorderPaymentProof: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.set("payment_proof", file);
+
+    return apiRequest<{ message: string; preorder?: PreorderDto }>(`/api/preorders/${id}/payment-proof`, {
+      method: "POST",
+      body: formData,
+    });
+  },
   createPreorderPaymentLink: (id: number) =>
     apiRequest<PaymentLinkResponse>(`/api/preorders/${id}/payment-link`, { method: "POST" }),
   preorderPdf: (id: number) => apiRequest<Blob>(`/api/preorders/${id}/pdf`),
