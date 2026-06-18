@@ -29,6 +29,7 @@ import { useEffect, useRef, useState, type ElementType } from "react";
 import { getCurrentAgentStatus, getCurrentRole, roleLabels, type AppRole } from "../auth/roles";
 import {
   api,
+  authSessionUpdatedEvent,
   clearAuthSession,
   clearLoginSource,
   connectSalesNotificationStream,
@@ -36,6 +37,7 @@ import {
   getStoredUser,
   type AgentApplicationStatus,
   type NotificationDto,
+  type UserSession,
 } from "../services/api";
 
 type MenuItem = {
@@ -133,6 +135,7 @@ export function Layout() {
   const [unreadSalesNotifications, setUnreadSalesNotifications] = useState(0);
   const [latestSalesNotification, setLatestSalesNotification] = useState<NotificationDto | null>(null);
   const [salesStreamStatus, setSalesStreamStatus] = useState<"idle" | "connected" | "reconnecting">("idle");
+  const [storedUser, setStoredUser] = useState<UserSession | null>(() => getStoredUser());
   const latestNotificationTimerRef = useRef<number>();
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const currentRole = getCurrentRole();
@@ -149,7 +152,6 @@ export function Layout() {
     }
     return item.statuses.includes(currentAgentStatus);
   });
-  const storedUser = getStoredUser();
   const initials = (storedUser?.name ?? roleLabels[currentRole])
     .split(" ")
     .map((part) => part[0])
@@ -268,6 +270,20 @@ export function Layout() {
     window.localStorage.setItem(salesAudioEnabledStorageKey, "true");
     setShowSalesAudioPrompt(false);
   };
+
+  useEffect(() => {
+    const refreshStoredSession = () => {
+      setStoredUser(getStoredUser());
+    };
+
+    window.addEventListener(authSessionUpdatedEvent, refreshStoredSession);
+    window.addEventListener("storage", refreshStoredSession);
+
+    return () => {
+      window.removeEventListener(authSessionUpdatedEvent, refreshStoredSession);
+      window.removeEventListener("storage", refreshStoredSession);
+    };
+  }, []);
 
   useEffect(() => {
     if (currentRole !== "sales") {

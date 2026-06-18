@@ -1,9 +1,10 @@
-import { Clock3, FileImage, Send, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, CheckCircle2, Clock3, FileImage, Send, UserPlus, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import {
   api,
   getAuthToken,
   getStoredUser,
+  refreshStoredUser,
   saveAuthSession,
   type AgentApplicationStatus,
   type ApplyAgentPayload,
@@ -31,6 +32,12 @@ type VerificationForm = {
   ttl: string;
   full_address: string;
   domicile: string;
+};
+
+type FeedbackDialog = {
+  type: "success" | "error";
+  title: string;
+  message: string;
 };
 
 const verificationInitial: VerificationForm = {
@@ -149,6 +156,51 @@ function WaitingCta({
   );
 }
 
+function FeedbackModal({
+  feedback,
+  onClose,
+}: {
+  feedback: FeedbackDialog;
+  onClose: () => void;
+}) {
+  const isSuccess = feedback.type === "success";
+  const Icon = isSuccess ? CheckCircle2 : AlertCircle;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-black/5">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+          <div className="flex items-start gap-3">
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                isSuccess ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">{feedback.title}</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{feedback.message}</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="flex justify-end p-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+          >
+            Oke
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ApplyAgent() {
   const storedUser = getStoredUser();
   const [status, setStatus] = useState<AgentApplicationStatus | null>(storedUser?.detail_user?.status ?? null);
@@ -157,7 +209,38 @@ export function ApplyAgent() {
   const [verificationForm, setVerificationForm] = useState<VerificationForm>(verificationInitial);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const syncLatestStatus = useCallback(async () => {
+    try {
+      const latestUser = await refreshStoredUser();
+      setStatus(latestUser.detail_user?.status ?? null);
+      setIsVerificationCompleted(hasCompletedVerification(latestUser.detail_user));
+    } catch {
+      // Status sync is best-effort; submit errors still surface in the form.
+    }
+  }, []);
+
+  useEffect(() => {
+    void syncLatestStatus();
+
+    const syncWhenVisible = () => {
+      if (!document.hidden) {
+        void syncLatestStatus();
+      }
+    };
+
+    const intervalId = window.setInterval(syncLatestStatus, 30000);
+    window.addEventListener("focus", syncLatestStatus);
+    document.addEventListener("visibilitychange", syncWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", syncLatestStatus);
+      document.removeEventListener("visibilitychange", syncWhenVisible);
+    };
+  }, [syncLatestStatus]);
 
   const handleApplySubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -182,9 +265,18 @@ export function ApplyAgent() {
       setIsVerificationCompleted(true);
       setApplyForm(applyInitial);
       setVerificationForm(verificationInitial);
-      setSuccessMessage(response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.");
+      const message = response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.";
+      setSuccessMessage(message);
+      setFeedbackDialog({
+        type: "success",
+        title: "Upload berhasil",
+        message: `${message} Status halaman sudah diperbarui.`,
+      });
+      void syncLatestStatus();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim pengajuan agent.");
+      const message = error instanceof Error ? error.message : "Gagal mengirim pengajuan agent.";
+      setErrorMessage(message);
+      setFeedbackDialog({ type: "error", title: "Upload gagal", message });
     } finally {
       setIsSubmitting(false);
     }
@@ -209,10 +301,19 @@ export function ApplyAgent() {
       saveAuthSession(token, response.user);
       setStatus(response.user.detail_user?.status ?? "verif");
       setIsVerificationCompleted(true);
-      setSuccessMessage(response.message || "Data verifikasi berhasil dilengkapi.");
+      const message = response.message || "Data verifikasi berhasil dilengkapi.";
+      setSuccessMessage(message);
+      setFeedbackDialog({
+        type: "success",
+        title: "Upload berhasil",
+        message: `${message} Status halaman sudah diperbarui.`,
+      });
       setVerificationForm(verificationInitial);
+      void syncLatestStatus();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal melengkapi data verifikasi.");
+      const message = error instanceof Error ? error.message : "Gagal melengkapi data verifikasi.";
+      setErrorMessage(message);
+      setFeedbackDialog({ type: "error", title: "Upload gagal", message });
     } finally {
       setIsSubmitting(false);
     }
@@ -220,6 +321,8 @@ export function ApplyAgent() {
 
   return (
     <div className="space-y-6">
+      {feedbackDialog && <FeedbackModal feedback={feedbackDialog} onClose={() => setFeedbackDialog(null)} />}
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">User</p>

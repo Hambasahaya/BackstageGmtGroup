@@ -223,6 +223,7 @@ const defaultLogoutRedirectUrl = import.meta.env.VITE_LOGOUT_REDIRECT_URL ?? "/"
 export const authTokenStorageKey = "gmt-auth-token";
 export const userStorageKey = "gmt-auth-user";
 export const loginSourceStorageKey = "gmt-login-source-url";
+export const authSessionUpdatedEvent = "gmt-auth-session-updated";
 const legacyRoleStorageKey = "gmt-current-role";
 
 type RequestOptions = RequestInit & {
@@ -377,12 +378,14 @@ export function getAuthToken() {
 export function saveAuthSession(token: string, user: UserSession) {
   window.localStorage.setItem(authTokenStorageKey, token);
   window.localStorage.setItem(userStorageKey, JSON.stringify(user));
+  window.dispatchEvent(new CustomEvent(authSessionUpdatedEvent, { detail: { user } }));
 }
 
 export function clearAuthSession() {
   window.localStorage.removeItem(authTokenStorageKey);
   window.localStorage.removeItem(userStorageKey);
   window.localStorage.removeItem(legacyRoleStorageKey);
+  window.dispatchEvent(new CustomEvent(authSessionUpdatedEvent, { detail: { user: null } }));
 }
 
 export function getStoredUser(): UserSession | null {
