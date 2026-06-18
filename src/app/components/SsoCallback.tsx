@@ -1,7 +1,8 @@
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { getRoleHomePath } from "../auth/navigation";
+import { GlobalLoading } from "./GlobalLoading";
 import {
   api,
   refreshStoredUser,
@@ -64,7 +65,11 @@ export function SsoCallback() {
     };
   }, [navigate, searchParams]);
 
-  const Icon = status === "error" ? AlertCircle : status === "success" ? CheckCircle2 : Loader2;
+  if (status === "loading") {
+    return <GlobalLoading message={message} />;
+  }
+
+  const Icon = status === "error" ? AlertCircle : CheckCircle2;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-4 text-slate-900">
@@ -74,7 +79,7 @@ export function SsoCallback() {
             status === "error" ? "bg-rose-50 text-rose-600" : "bg-teal-50 text-[#0F766E]"
           }`}
         >
-          <Icon className={`h-6 w-6 ${status === "loading" ? "animate-spin" : ""}`} />
+          <Icon className="h-6 w-6" />
         </div>
         <p className="mt-4 text-sm font-semibold uppercase tracking-wide text-[#0F766E]">SSO Callback</p>
         <h1 className="mt-1 text-xl font-bold text-slate-950">Website Pusat</h1>

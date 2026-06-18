@@ -67,7 +67,6 @@
     </filter>
   </defs>
 
-  <rect width="720" height="120" fill="white"/>
   <g transform="translate(0 6)">
     <circle class="sphere sphere-1" cx="48" cy="54" r="26" fill="url(#gloss)" filter="url(#soft-blur)"/>
     <circle class="sphere sphere-2" cx="132" cy="54" r="34" fill="url(#gloss)"/>
