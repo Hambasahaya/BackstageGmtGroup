@@ -8,26 +8,32 @@ const STORE_PATH =
 
 const envTokenBundle = () => {
   const {
+    META_ACCESS_TOKEN,
     META_USER_ACCESS_TOKEN,
     META_PAGE_ACCESS_TOKEN,
     META_PAGE_ID,
     META_IG_USER_ID,
+    META_IG_USERNAME,
   } = process.env;
+  const userAccessToken = META_USER_ACCESS_TOKEN || META_ACCESS_TOKEN || "";
 
-  if (!META_USER_ACCESS_TOKEN && !META_PAGE_ACCESS_TOKEN) {
+  if (!userAccessToken && !META_PAGE_ACCESS_TOKEN) {
     return null;
   }
 
   return {
-    userAccessToken: META_USER_ACCESS_TOKEN || "",
+    userAccessToken,
     pages:
-      META_PAGE_ACCESS_TOKEN && META_PAGE_ID
+      META_PAGE_ACCESS_TOKEN && META_IG_USER_ID
         ? [
             {
-              id: META_PAGE_ID,
+              id: META_PAGE_ID || META_IG_USER_ID,
               name: "Env configured Page",
               access_token: META_PAGE_ACCESS_TOKEN,
-              instagram_business_account: META_IG_USER_ID ? { id: META_IG_USER_ID } : undefined,
+              instagram_business_account: {
+                id: META_IG_USER_ID,
+                username: META_IG_USERNAME || undefined,
+              },
             },
           ]
         : [],

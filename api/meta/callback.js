@@ -18,9 +18,10 @@ const exchangeCodeForToken = async ({ code, appId, appSecret, redirectUri }) => 
   return payload;
 };
 
-const exchangeForLongLivedToken = async ({ accessToken, appSecret }) => {
+const exchangeForLongLivedToken = async ({ accessToken, appId, appSecret }) => {
   const url = new URL(`${GRAPH_BASE_URL}/oauth/access_token`);
   url.searchParams.set("grant_type", "fb_exchange_token");
+  url.searchParams.set("client_id", appId);
   url.searchParams.set("client_secret", appSecret);
   url.searchParams.set("fb_exchange_token", accessToken);
 
@@ -74,6 +75,7 @@ export default async function handler(request, response) {
     });
     const longLived = await exchangeForLongLivedToken({
       accessToken: shortLived.access_token,
+      appId: META_APP_ID,
       appSecret: META_APP_SECRET,
     });
     const userAccessToken = longLived.access_token || shortLived.access_token;
@@ -92,6 +94,7 @@ export default async function handler(request, response) {
       pages: pagesPayload.data || [],
     });
 
+    const dashboardUrl = process.env.META_DASHBOARD_URL || "/integrations";
     response.statusCode = 200;
     response.setHeader("Content-Type", "text/html; charset=utf-8");
     response.end(`<!doctype html>
@@ -100,7 +103,7 @@ export default async function handler(request, response) {
   <body style="font-family: system-ui, sans-serif; padding: 32px;">
     <h1>Meta connected</h1>
     <p>OAuth selesai. Token disimpan server-side dan dashboard sudah bisa membaca status koneksi.</p>
-    <p><a href="/integrations">Kembali ke Marketing Integrations</a></p>
+    <p><a href="${dashboardUrl}">Kembali ke Marketing Integrations</a></p>
   </body>
 </html>`);
   } catch (error) {

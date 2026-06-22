@@ -6,6 +6,7 @@ import {
   FileArchive,
   FileSpreadsheet,
   FileText,
+  Globe2,
   GitCompare,
   Image,
   Instagram,
@@ -23,8 +24,26 @@ import {
   Target,
   TrendingUp,
   Upload,
+  Users,
 } from "lucide-react";
 import { useEffect, useState, type ElementType, type ReactNode } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   fetchInstagramInsights,
   fetchMetaAccounts,
@@ -33,6 +52,7 @@ import {
   type MetaAccountHealth,
 } from "../services/metaIntegrations";
 import { fetchKeywordResearch, type KeywordResearchResponse } from "../services/seoIntegrations";
+import { fetchWebsiteAnalytics, type WebsiteAnalyticsResponse } from "../services/websiteAnalytics";
 
 type StatusTone = "green" | "yellow" | "red" | "blue" | "slate" | "teal";
 
@@ -94,17 +114,20 @@ function ModuleShell({
   description,
   action,
   stats,
+  toolbar,
   children,
 }: {
   title: string;
   description: string;
   action?: string;
   stats: Array<{ label: string; value: string; detail: string }>;
+  toolbar?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="space-y-6">
       <PageHeader title={title} description={description} action={action} />
+      {toolbar}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <StatCard key={stat.label} {...stat} />
@@ -230,6 +253,18 @@ const formatPercent = (value: number | null | undefined) => {
   return `${Math.round(value * 1000) / 10}%`;
 };
 
+const calculateCorrelation = (points: Array<{ x: number; y: number }>) => {
+  if (points.length < 3) return undefined;
+
+  const xAverage = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const yAverage = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  const numerator = points.reduce((sum, point) => sum + ((point.x - xAverage) * (point.y - yAverage)), 0);
+  const xSpread = Math.sqrt(points.reduce((sum, point) => sum + ((point.x - xAverage) ** 2), 0));
+  const ySpread = Math.sqrt(points.reduce((sum, point) => sum + ((point.y - yAverage) ** 2), 0));
+
+  return xSpread && ySpread ? numerator / (xSpread * ySpread) : undefined;
+};
+
 const formatCurrencyRange = (low: number | null, high: number | null) => {
   if (low === null && high === null) {
     return "-";
@@ -311,34 +346,146 @@ const getDifficulty = (competitionIndex: number | null) => {
 };
 
 export function MultiWebsiteManagement() {
-  const websites = [
-    ["gmtlighting.id", "Lighting & stage equipment", "Rina SEO", <StatusBadge tone="green">Live</StatusBadge>, "GA4, GSC, Instagram, Google Ads", "SEO Team, Ads Team, Manager"],
-    ["gmttruss.id", "Rigging & truss", "Bima Admin", <StatusBadge tone="blue">Staging</StatusBadge>, "GA4, GSC, Sitemap", "SEO Team"],
-    ["gmttraining.id", "Training & certification", "Nadia HR", <StatusBadge tone="green">Live</StatusBadge>, "GA4, GSC, Meta Ads", "HR, Ads Team, Manager"],
-  ];
+  const [analytics, setAnalytics] = useState<WebsiteAnalyticsResponse | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState("all");
+  const [reportDays, setReportDays] = useState(30);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadAnalytics = async (days = reportDays) => {
+    setIsLoading(true);
+    setError("");
+    try {
+      setAnalytics(await fetchWebsiteAnalytics(days));
+    } catch (loadError) {
+      setAnalytics(null);
+      setError(loadError instanceof Error ? loadError.message : "Gagal memuat data website.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAnalytics(30);
+  }, []);
+
+  const selectedProperties = (analytics?.properties || []).filter((property) =>
+    selectedPropertyId === "all" || property.id === selectedPropertyId);
+  const totals = selectedProperties.reduce((summary, property) => ({
+    sessions: summary.sessions + property.totals.sessions,
+    users: summary.users + property.totals.users,
+    newUsers: summary.newUsers + property.totals.newUsers,
+    pageviews: summary.pageviews + property.totals.pageviews,
+    bounceRateWeighted: summary.bounceRateWeighted + (property.totals.bounceRate * property.totals.sessions),
+    engagementRateWeighted: summary.engagementRateWeighted + (property.totals.engagementRate * property.totals.sessions),
+    durationWeighted: summary.durationWeighted + (property.totals.averageSessionDuration * property.totals.sessions),
+  }), { sessions: 0, users: 0, newUsers: 0, pageviews: 0, bounceRateWeighted: 0, engagementRateWeighted: 0, durationWeighted: 0 });
+  const bounceRate = totals.sessions ? totals.bounceRateWeighted / totals.sessions : undefined;
+  const engagementRate = totals.sessions ? totals.engagementRateWeighted / totals.sessions : undefined;
+  const averageSessionDuration = totals.sessions ? totals.durationWeighted / totals.sessions : undefined;
+  const pagesPerSession = totals.sessions ? totals.pageviews / totals.sessions : undefined;
+  const returningUsers = selectedProperties.reduce((sum, property) => sum + property.visitorTypes
+    .filter((item) => item.type.toLowerCase() === "returning")
+    .reduce((typeSum, item) => typeSum + item.users, 0), 0);
+
+  const dailyMap = new Map<string, { date: string; sessions: number; users: number; pageviews: number }>();
+  for (const property of selectedProperties) {
+    for (const day of property.daily) {
+      const current = dailyMap.get(day.date) || { date: day.date, sessions: 0, users: 0, pageviews: 0 };
+      current.sessions += day.sessions;
+      current.users += day.users;
+      current.pageviews += day.pageviews;
+      dailyMap.set(day.date, current);
+    }
+  }
+  const dailyData = Array.from(dailyMap.values()).sort((first, second) => first.date.localeCompare(second.date)).map((day) => ({
+    ...day,
+    label: day.date.length === 8 ? `${day.date.slice(6, 8)}/${day.date.slice(4, 6)}` : day.date,
+  }));
+
+  const sourceMap = new Map<string, { channel: string; sourceMedium: string; sessions: number; users: number; engagedSessions: number }>();
+  for (const property of selectedProperties) {
+    for (const source of property.sources) {
+      const key = `${source.channel}|${source.sourceMedium}`;
+      const current = sourceMap.get(key) || { ...source, sessions: 0, users: 0, engagedSessions: 0 };
+      current.sessions += source.sessions;
+      current.users += source.users;
+      current.engagedSessions += source.engagedSessions;
+      sourceMap.set(key, current);
+    }
+  }
+  const sourceData = Array.from(sourceMap.values()).sort((first, second) => second.sessions - first.sessions);
+  const pageData = selectedProperties.flatMap((property) => property.pages.map((page) => ({ ...page, website: property.domain })))
+    .sort((first, second) => second.pageviews - first.pageviews)
+    .slice(0, 25);
+  const formatDuration = (seconds: number | undefined) => {
+    if (seconds === undefined) return "-";
+    const rounded = Math.round(seconds);
+    return `${Math.floor(rounded / 60)}m ${rounded % 60}s`;
+  };
 
   return (
     <ModuleShell
-      title="Multi Website Management"
-      description="Kelola seluruh properti digital GMT Group, lengkap dengan domain, niche, PIC, integrasi analytics, dan akses per website."
-      action="Tambah website"
+      title="Website Analytics"
+      description="Pantau traffic dan perilaku pengunjung dari seluruh property GA4 dalam satu dashboard multi-website."
+      toolbar={
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="grid w-full gap-3 sm:grid-cols-2 lg:max-w-2xl">
+              <label className="text-sm font-semibold text-slate-700">Website
+                <select value={selectedPropertyId} onChange={(event) => setSelectedPropertyId(event.target.value)} disabled={isLoading} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
+                  <option value="all">Semua website ({analytics?.properties.length || 0})</option>
+                  {analytics?.properties.map((property) => <option key={property.id} value={property.id}>{property.domain}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-slate-700">Periode
+                <select value={reportDays} onChange={(event) => { const days = Number(event.target.value); setReportDays(days); void loadAnalytics(days); }} disabled={isLoading} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
+                  <option value={7}>7 hari terakhir</option><option value={30}>30 hari terakhir</option><option value={90}>90 hari terakhir</option>
+                </select>
+              </label>
+            </div>
+            <button onClick={() => void loadAnalytics()} disabled={isLoading} className="rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400">{isLoading ? "Memuat GA4..." : "Refresh data"}</button>
+          </div>
+        </section>
+      }
       stats={[
-        { label: "Website live", value: "18", detail: "3 staging siap deploy" },
-        { label: "Integrasi aktif", value: "42", detail: "GSC, Ads, Instagram, AI" },
-        { label: "PIC admin", value: "12", detail: "Terpetakan per unit bisnis" },
-        { label: "Role access", value: "56", detail: "Akses granular per website" },
+        { label: "Sessions", value: analytics ? formatNumber(totals.sessions) : "-", detail: `${selectedProperties.length} website dipilih` },
+        { label: "Users", value: analytics ? formatNumber(totals.users) : "-", detail: "Unique visitors GA4" },
+        { label: "Pageviews", value: analytics ? formatNumber(totals.pageviews) : "-", detail: "Total tampilan halaman" },
+        { label: "Engagement rate", value: formatPercent(engagementRate), detail: "Engaged sessions / sessions" },
       ]}
     >
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Filter status</button>
-        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Switch website</button>
-        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Data source</button>
-        <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Role access</button>
+      {error && <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">{error}</div>}
+      {analytics?.warnings?.length ? <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{analytics.warnings.join(" | ")}</div> : null}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="New users" value={analytics ? formatNumber(totals.newUsers) : "-"} detail="Pengunjung baru dalam periode" />
+        <StatCard label="Returning users" value={analytics ? formatNumber(returningUsers) : "-"} detail="Pengunjung yang kembali" />
+        <StatCard label="Bounce rate" value={formatPercent(bounceRate)} detail="Sesi yang tidak engaged" />
+        <StatCard label="Avg. session duration" value={formatDuration(averageSessionDuration)} detail={`${pagesPerSession === undefined ? "-" : pagesPerSession.toFixed(2)} halaman per sesi`} />
       </div>
-      <DataTable
-        columns={["Domain", "Niche", "PIC Admin", "Status", "Integrasi", "Akses"]}
-        rows={websites}
-      />
+
+      <SectionCard icon={TrendingUp} title="Traffic Trend" description={`Sessions, users, dan pageviews ${analytics ? `${analytics.startDate} sampai ${analytics.endDate}` : "dari GA4"}.`}>
+        {dailyData.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><AreaChart data={dailyData}><CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" /><XAxis dataKey="label" tick={{ fill: "#64748B", fontSize: 12 }} /><YAxis tick={{ fill: "#64748B", fontSize: 12 }} /><Tooltip /><Legend /><Area type="monotone" dataKey="sessions" name="Sessions" stroke="#0F766E" fill="#CCFBF1" strokeWidth={3} /><Area type="monotone" dataKey="users" name="Users" stroke="#2563EB" fill="#DBEAFE" strokeWidth={2} /><Area type="monotone" dataKey="pageviews" name="Pageviews" stroke="#DB2777" fill="#FCE7F3" strokeWidth={2} /></AreaChart></ResponsiveContainer></div> : <EmptyState text={isLoading ? "Sedang memuat tren GA4..." : "Belum ada data tren untuk periode ini."} />}
+      </SectionCard>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SectionCard icon={BarChart3} title="Traffic Source / Medium" description="Organic, social, direct, referral, paid, dan sumber akuisisi lainnya.">
+          {sourceData.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={sourceData.slice(0, 8)} layout="vertical" margin={{ left: 16 }}><CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="channel" type="category" width={100} tick={{ fontSize: 12 }} /><Tooltip /><Bar dataKey="sessions" name="Sessions" fill="#0F766E" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div> : <EmptyState text="Belum ada data acquisition." />}
+        </SectionCard>
+        <SectionCard icon={Users} title="New vs Returning Users" description="Komposisi pengunjung baru dan pengunjung yang kembali.">
+          <div className="grid grid-cols-2 gap-3"><MetricPill label="New users" value={formatNumber(totals.newUsers)} /><MetricPill label="Returning users" value={formatNumber(returningUsers)} /></div>
+          <div className="mt-5"><DataTable columns={["Channel", "Source / Medium", "Sessions", "Users", "Engaged"]} rows={sourceData.slice(0, 8).map((source) => [source.channel, source.sourceMedium, formatNumber(source.sessions), formatNumber(source.users), formatNumber(source.engagedSessions)])} /></div>
+        </SectionCard>
+      </div>
+
+      <SectionCard icon={FileText} title="Page Performance" description="Pageviews, users, engagement rate, dan durasi rata-rata per halaman.">
+        {pageData.length ? <DataTable columns={["Website", "Page", "Title", "Pageviews", "Users", "Engagement", "Avg. duration"]} rows={pageData.map((page) => [page.website, page.path, <span className="line-clamp-2 max-w-xs">{page.title}</span>, formatNumber(page.pageviews), formatNumber(page.users), formatPercent(page.engagementRate), formatDuration(page.averageSessionDuration)])} /> : <EmptyState text="Belum ada data halaman." />}
+      </SectionCard>
+
+      <SectionCard icon={Globe2} title="Website Portfolio" description="Perbandingan performa seluruh property GA4 yang terhubung.">
+        {analytics?.properties.length ? <DataTable columns={["Website", "Sessions", "Users", "Pageviews", "Engagement", "Bounce rate", "Pages/session"]} rows={analytics.properties.map((property) => [property.domain, formatNumber(property.totals.sessions), formatNumber(property.totals.users), formatNumber(property.totals.pageviews), formatPercent(property.totals.engagementRate), formatPercent(property.totals.bounceRate), property.totals.pagesPerSession.toFixed(2)])} /> : <EmptyState text="Belum ada property GA4 yang berhasil dimuat." />}
+      </SectionCard>
     </ModuleShell>
   );
 }
@@ -551,9 +698,24 @@ export function SeoManagement() {
 export function MarketingIntegrations() {
   const [metaHealth, setMetaHealth] = useState<MetaAccountHealth | null>(null);
   const [instagramInsights, setInstagramInsights] = useState<InstagramInsights | null>(null);
+  const [selectedInstagramId, setSelectedInstagramId] = useState("");
   const [metaError, setMetaError] = useState("");
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
+
+  const loadInstagramInsights = async (igUserId: string) => {
+    setIsMetaLoading(true);
+    setMetaError("");
+
+    try {
+      setInstagramInsights(await fetchInstagramInsights(igUserId));
+    } catch (error) {
+      setInstagramInsights(null);
+      setMetaError(error instanceof Error ? error.message : "Gagal membaca insight Instagram.");
+    } finally {
+      setIsMetaLoading(false);
+    }
+  };
 
   const refreshMetaStatus = async () => {
     setIsMetaLoading(true);
@@ -563,10 +725,14 @@ export function MarketingIntegrations() {
       const accounts = await fetchMetaAccounts();
       setMetaHealth(accounts);
 
-      if (accounts.connected) {
-        const insights = await fetchInstagramInsights();
-        setInstagramInsights(insights);
+      const selectedAccount = accounts.instagramAccounts.find((account) => account.id === selectedInstagramId)
+        || accounts.instagramAccounts[0];
+
+      if (accounts.connected && selectedAccount) {
+        setSelectedInstagramId(selectedAccount.id);
+        setInstagramInsights(await fetchInstagramInsights(selectedAccount.id));
       } else {
+        setSelectedInstagramId("");
         setInstagramInsights(null);
       }
     } catch (error) {
@@ -593,92 +759,490 @@ export function MarketingIntegrations() {
     refreshMetaStatus();
   }, []);
 
-  const connectedInstagram = metaHealth?.instagramAccounts[0];
+  const connectedInstagram = metaHealth?.instagramAccounts.find((account) => account.id === selectedInstagramId)
+    || metaHealth?.instagramAccounts[0];
   const metaConnected = Boolean(metaHealth?.connected);
-  const topMedia = instagramInsights?.media[0];
-  const latestReach = instagramInsights?.insights
-    .find((item) => item.name === "reach")
-    ?.values?.at(-1)?.value;
+
+  const getAccountMetric = (...names: string[]) => instagramInsights?.insights
+    .find((item) => names.includes(item.name))?.values?.at(-1)?.value;
+
+  const getMediaMetric = (media: NonNullable<InstagramInsights["media"]>[number], ...names: string[]) =>
+    media.insights?.data?.find((item) => names.includes(item.name))?.values?.at(-1)?.value;
+
+  const latestReach = getAccountMetric("reach", "accounts_reached");
+  const impressions = getAccountMetric("impressions", "views");
+  const profileViews = getAccountMetric("profile_views");
+  const websiteClicks = getAccountMetric("website_clicks");
+  const profile = instagramInsights?.profile;
+
+  const accountMetrics = [
+    { label: "Followers count", value: profile?.followers_count, detail: "Total followers akun saat ini" },
+    { label: "Followers growth", value: undefined, detail: "Perubahan harian, mingguan, dan bulanan" },
+    { label: "Follows count", value: profile?.follows_count, detail: "Jumlah akun yang diikuti" },
+    { label: "Profile views", value: profileViews, detail: "Jumlah kunjungan ke profil" },
+    { label: "Reach akun", value: latestReach, detail: "Akun unik yang melihat konten" },
+    { label: "Impressions akun", value: impressions, detail: "Total tayangan seluruh konten" },
+    { label: "Website clicks", value: websiteClicks, detail: "Klik pada tautan di bio" },
+    { label: "CTA clicks", value: getAccountMetric("email_contacts", "phone_call_clicks", "get_directions_clicks"), detail: "Email, telepon, dan petunjuk arah" },
+  ];
+
+  const trendMetrics: Record<string, string> = {
+    reach: "Reach",
+    accounts_reached: "Reach",
+    impressions: "Impressions",
+    views: "Impressions",
+    profile_views: "Profile Views",
+    website_clicks: "Website Clicks",
+  };
+  const trendByDate = new Map<string, Record<string, string | number>>();
+
+  for (const insight of instagramInsights?.insights || []) {
+    const metricLabel = trendMetrics[insight.name];
+
+    if (!metricLabel) continue;
+
+    for (const point of insight.values || []) {
+      const dateKey = point.end_time || "Periode terbaru";
+      const current = trendByDate.get(dateKey) || {
+        date: point.end_time ? new Date(point.end_time).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : dateKey,
+      };
+      current[metricLabel] = point.value;
+      trendByDate.set(dateKey, current);
+    }
+  }
+
+  const accountTrendData = Array.from(trendByDate.entries())
+    .sort(([first], [second]) => first.localeCompare(second))
+    .map(([, value]) => value);
+
+  const contentChartData = (instagramInsights?.media || []).slice(0, 8).reverse().map((media, index) => ({
+    name: `Post ${index + 1}`,
+    Reach: getMediaMetric(media, "reach", "accounts_reached") || 0,
+    Likes: media.like_count || 0,
+    Comments: media.comments_count || 0,
+    Saves: getMediaMetric(media, "saved", "saves") || 0,
+  }));
+
+  const interactionTotals = (instagramInsights?.media || []).reduce((totals, media) => ({
+    likes: totals.likes + (media.like_count || 0),
+    comments: totals.comments + (media.comments_count || 0),
+    shares: totals.shares + (getMediaMetric(media, "shares") || 0),
+    saves: totals.saves + (getMediaMetric(media, "saved", "saves") || 0),
+  }), { likes: 0, comments: 0, shares: 0, saves: 0 });
+  const interactionChartData = [
+    { name: "Likes", value: interactionTotals.likes, color: "#0F766E" },
+    { name: "Comments", value: interactionTotals.comments, color: "#2563EB" },
+    { name: "Shares", value: interactionTotals.shares, color: "#F59E0B" },
+    { name: "Saves", value: interactionTotals.saves, color: "#DB2777" },
+  ].filter((item) => item.value > 0);
+
+  const mediaAnalytics = (instagramInsights?.media || []).map((media) => {
+    const reach = getMediaMetric(media, "reach", "accounts_reached") || 0;
+    const shares = getMediaMetric(media, "shares") || 0;
+    const saves = getMediaMetric(media, "saved", "saves") || 0;
+    const interactions = getMediaMetric(media, "total_interactions")
+      ?? ((media.like_count || 0) + (media.comments_count || 0) + shares + saves);
+    const contentType = media.media_product_type === "REELS"
+      ? "Reels"
+      : media.media_product_type === "STORY"
+        ? "Story"
+        : media.media_type === "CAROUSEL_ALBUM"
+          ? "Carousel"
+          : "Feed";
+
+    return {
+      media,
+      reach,
+      interactions,
+      engagementRate: reach ? interactions / reach : undefined,
+      contentType,
+      postedAt: media.timestamp ? new Date(media.timestamp) : undefined,
+    };
+  });
+
+  const engagementRates = mediaAnalytics
+    .map((item) => item.engagementRate)
+    .filter((value): value is number => value !== undefined);
+  const averageEngagementRate = engagementRates.length
+    ? engagementRates.reduce((sum, value) => sum + value, 0) / engagementRates.length
+    : undefined;
+
+  const followerSeries = instagramInsights?.insights.find((item) => item.name === "follower_count")?.values || [];
+  const firstFollowerValue = followerSeries.at(0)?.value;
+  const lastFollowerValue = followerSeries.at(-1)?.value;
+  const followerGrowthRate = firstFollowerValue && lastFollowerValue !== undefined
+    ? (lastFollowerValue - firstFollowerValue) / firstFollowerValue
+    : undefined;
+
+  const contentTypeMap = new Map<string, { type: string; posts: number; reach: number; engagement: number; measured: number }>();
+  for (const item of mediaAnalytics) {
+    const current = contentTypeMap.get(item.contentType) || { type: item.contentType, posts: 0, reach: 0, engagement: 0, measured: 0 };
+    current.posts += 1;
+    current.reach += item.reach;
+    if (item.engagementRate !== undefined) {
+      current.engagement += item.engagementRate;
+      current.measured += 1;
+    }
+    contentTypeMap.set(item.contentType, current);
+  }
+  const contentTypePerformance = Array.from(contentTypeMap.values()).map((item) => ({
+    ...item,
+    averageReach: item.posts ? item.reach / item.posts : 0,
+    averageEngagement: item.measured ? item.engagement / item.measured : undefined,
+  }));
+
+  const timeSlotMap = new Map<string, { label: string; posts: number; reach: number; engagement: number; measured: number }>();
+  for (const item of mediaAnalytics) {
+    if (!item.postedAt) continue;
+    const label = item.postedAt.toLocaleDateString("id-ID", { weekday: "long", hour: "2-digit", timeZone: "Asia/Jakarta" });
+    const current = timeSlotMap.get(label) || { label, posts: 0, reach: 0, engagement: 0, measured: 0 };
+    current.posts += 1;
+    current.reach += item.reach;
+    if (item.engagementRate !== undefined) {
+      current.engagement += item.engagementRate;
+      current.measured += 1;
+    }
+    timeSlotMap.set(label, current);
+  }
+  const bestTimeSlots = Array.from(timeSlotMap.values())
+    .map((slot) => ({
+      ...slot,
+      averageReach: slot.posts ? slot.reach / slot.posts : 0,
+      averageEngagement: slot.measured ? slot.engagement / slot.measured : 0,
+    }))
+    .sort((first, second) => second.averageEngagement - first.averageEngagement || second.averageReach - first.averageReach)
+    .slice(0, 3);
+
+  const hashtagMap = new Map<string, { hashtag: string; posts: number; reach: number; engagement: number; measured: number }>();
+  for (const item of mediaAnalytics) {
+    const hashtags = Array.from(new Set((item.media.caption?.match(/#[\p{L}\p{N}_]+/gu) || []).map((tag) => tag.toLowerCase())));
+    for (const hashtag of hashtags) {
+      const current = hashtagMap.get(hashtag) || { hashtag, posts: 0, reach: 0, engagement: 0, measured: 0 };
+      current.posts += 1;
+      current.reach += item.reach;
+      if (item.engagementRate !== undefined) {
+        current.engagement += item.engagementRate;
+        current.measured += 1;
+      }
+      hashtagMap.set(hashtag, current);
+    }
+  }
+  const hashtagPerformance = Array.from(hashtagMap.values())
+    .map((item) => ({
+      ...item,
+      averageReach: item.posts ? item.reach / item.posts : 0,
+      averageEngagement: item.measured ? item.engagement / item.measured : undefined,
+    }))
+    .sort((first, second) => (second.averageEngagement || 0) - (first.averageEngagement || 0) || second.averageReach - first.averageReach)
+    .slice(0, 8);
+
+  const weeklyMap = new Map<string, { posts: number; engagement: number; measured: number }>();
+  for (const item of mediaAnalytics) {
+    if (!item.postedAt) continue;
+    const weekStart = new Date(item.postedAt);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const weekKey = weekStart.toISOString().slice(0, 10);
+    const current = weeklyMap.get(weekKey) || { posts: 0, engagement: 0, measured: 0 };
+    current.posts += 1;
+    if (item.engagementRate !== undefined) {
+      current.engagement += item.engagementRate;
+      current.measured += 1;
+    }
+    weeklyMap.set(weekKey, current);
+  }
+  const frequencyCorrelation = calculateCorrelation(Array.from(weeklyMap.values())
+    .filter((week) => week.measured > 0)
+    .map((week) => ({ x: week.posts, y: week.engagement / week.measured })));
+  const correlationLabel = frequencyCorrelation === undefined
+    ? "Belum cukup data"
+    : `${frequencyCorrelation >= 0 ? "+" : ""}${frequencyCorrelation.toFixed(2)}`;
+
+  const contentRows = (instagramInsights?.media || []).map((media) => {
+    const reach = getMediaMetric(media, "reach", "accounts_reached");
+    const likes = media.like_count;
+    const comments = media.comments_count;
+    const shares = getMediaMetric(media, "shares");
+    const saves = getMediaMetric(media, "saved", "saves");
+    const interactions = getMediaMetric(media, "total_interactions")
+      ?? ((likes || 0) + (comments || 0) + (shares || 0) + (saves || 0));
+    const engagementRate = reach ? interactions / reach : undefined;
+
+    return [
+      <div className="max-w-xs">
+        <p className="line-clamp-2 font-medium text-slate-900">{media.caption || "Konten tanpa caption"}</p>
+        <p className="mt-1 text-xs text-slate-500">{media.timestamp ? new Date(media.timestamp).toLocaleDateString("id-ID") : "-"}</p>
+      </div>,
+      <StatusBadge tone={media.media_type === "VIDEO" ? "blue" : "teal"}>{media.media_type || "POST"}</StatusBadge>,
+      formatNumber(reach),
+      formatNumber(getMediaMetric(media, "impressions", "views", "plays")),
+      formatNumber(likes),
+      formatNumber(comments),
+      formatNumber(shares),
+      formatNumber(saves),
+      formatPercent(engagementRate),
+      media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
+    ];
+  });
 
   return (
     <ModuleShell
       title="Marketing Integrations"
-      description="Pusat koneksi API untuk Google Search Console, Instagram, Google Ads, Meta Ads, dan AI engine agar data marketing bisa dipakai per website."
+      description="Pantau performa profil, audiens, dan konten seluruh akun Instagram Business yang terhubung."
+      toolbar={
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="w-full max-w-xl">
+              <label htmlFor="instagram-account" className="text-sm font-semibold text-slate-900">Akun Instagram</label>
+              <p className="mt-1 text-sm text-slate-500">Pilih akun yang datanya ingin ditampilkan pada dashboard.</p>
+              <select
+                id="instagram-account"
+                value={selectedInstagramId}
+                onChange={(event) => {
+                  setSelectedInstagramId(event.target.value);
+                  loadInstagramInsights(event.target.value);
+                }}
+                disabled={isMetaLoading || !metaHealth?.instagramAccounts.length}
+                className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {!metaHealth?.instagramAccounts.length && <option value="">Belum ada akun Instagram terhubung</option>}
+                {metaHealth?.instagramAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>@{account.username || account.id} - {account.pageName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={refreshMetaStatus} disabled={isMetaLoading} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:text-slate-400">
+                {isMetaLoading ? "Memuat data..." : "Refresh data"}
+              </button>
+              <button onClick={handleConnectMeta} disabled={isConnectingMeta} className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400">
+                <Plug className="h-4 w-4" />
+                {isConnectingMeta ? "Membuka Meta..." : metaConnected ? "Kelola koneksi" : "Hubungkan Meta"}
+              </button>
+            </div>
+          </div>
+        </section>
+      }
       stats={[
-        { label: "Meta status", value: isMetaLoading ? "Checking" : metaConnected ? "Connected" : "Not connected", detail: connectedInstagram?.username ? `@${connectedInstagram.username}` : "OAuth server-side" },
-        { label: "Instagram accounts", value: formatNumber(metaHealth?.instagramAccounts.length || 0), detail: metaConnected ? "Dari Graph API" : "Menunggu OAuth" },
-        { label: "Latest reach", value: formatNumber(latestReach || 0), detail: latestReach ? "Instagram insights" : "Belum ada data insights" },
-        { label: "Recent media", value: formatNumber(instagramInsights?.media.length || 0), detail: topMedia?.media_type || "Menunggu koneksi" },
+        { label: "Followers", value: formatNumber(profile?.followers_count), detail: connectedInstagram?.username ? `@${connectedInstagram.username}` : "Pilih akun Instagram" },
+        { label: "Reach", value: formatNumber(latestReach), detail: "Unique accounts dalam periode" },
+        { label: "Impressions", value: formatNumber(impressions), detail: "Total tayangan konten" },
+        { label: "Jumlah konten", value: formatNumber(profile?.media_count), detail: `${instagramInsights?.media.length || 0} konten terbaru dimuat` },
       ]}
     >
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-slate-950">Meta OAuth Connection</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Token disimpan di backend. Frontend hanya membaca status, akun Instagram Business, dan insight ringkas.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={refreshMetaStatus}
-            disabled={isMetaLoading}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-          >
-            {isMetaLoading ? "Checking..." : "Refresh status"}
-          </button>
-          <button
-            onClick={handleConnectMeta}
-            disabled={isConnectingMeta}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            <Plug className="h-4 w-4" />
-            {isConnectingMeta ? "Opening Meta..." : metaConnected ? "Reconnect Meta" : "Connect Meta"}
-          </button>
-        </div>
-      </div>
       {(metaError || metaHealth?.error) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
           {metaError || metaHealth?.error}
         </div>
       )}
-      <FeatureGrid
-        features={[
-          { icon: Search, title: "Google Search Console", text: "Ambil click, impression, CTR, average position, query, page, device, dan country per website." },
-          { icon: Instagram, title: "Instagram API", text: "Sinkronkan reach, engagement, follower growth, content performance, comment signal, dan campaign tag." },
-          { icon: Megaphone, title: "Ads Platforms", text: "Gabungkan Google Ads dan Meta Ads untuk spend, CPC, CTR, conversion, ROAS, dan audience performance." },
-          { icon: Bot, title: "AI Insight API", text: "Ubah data SEO, social, Ads, dan website menjadi rekomendasi aksi, report, content brief, dan prioritas campaign." },
-          { icon: Plug, title: "Connector Health", text: "Pantau token, permission scope, jadwal sync, error terakhir, dan data freshness per channel." },
-          { icon: Sparkles, title: "Marketing Automation", text: "Siapkan trigger untuk ranking turun, ads boros, konten viral, issue teknis, dan peluang keyword baru." },
-        ]}
-      />
-      <DataTable
-        columns={["Source", "Website", "Scope data", "Sync", "Status", "Next action"]}
-        rows={[
-          ["Google Search Console", "gmtlighting.id", "Query, page, CTR, position", "Daily 06:00", <StatusBadge tone="green">Connected</StatusBadge>, "Map query to landing page"],
-          [
-            "Instagram API",
-            connectedInstagram?.username ? `@${connectedInstagram.username}` : "No account",
-            "Profile, media, reach, engagement",
-            "On demand",
-            isMetaLoading ? <StatusBadge tone="blue">Checking</StatusBadge> : metaConnected ? <StatusBadge tone="green">Connected</StatusBadge> : <StatusBadge tone="slate">Not connected</StatusBadge>,
-            metaConnected ? "Review App permissions before public use" : "Complete OAuth",
-          ],
-          ["Google Ads", "GMT Group Ads", "Spend, conversion, ROAS", "Daily 07:00", <StatusBadge tone="yellow">Review scope</StatusBadge>, "Add conversion access"],
-          ["Meta Ads", "GMT Training", "Campaign, adset, leads", "Daily 07:30", metaConnected ? <StatusBadge tone="yellow">Needs ads endpoint</StatusBadge> : <StatusBadge tone="blue">Queued</StatusBadge>, metaConnected ? "Implement ad account reporting" : "Finish OAuth"],
-          ["AI Insight API", "All websites", "Summary and recommendation", "On demand", <StatusBadge tone="green">Ready</StatusBadge>, "Define prompt templates"],
-        ]}
-      />
-      <SectionCard icon={Instagram} title="Instagram API Health" description="Ringkasan akun dan data yang benar-benar dibaca dari endpoint Meta.">
-        <DataTable
-          columns={["Check", "Value", "Status", "Source"]}
-          rows={[
-            ["OAuth token", metaHealth?.savedAt || "-", metaConnected ? <StatusBadge tone="green">Stored server-side</StatusBadge> : <StatusBadge tone="slate">Missing</StatusBadge>, "/api/meta/accounts"],
-            ["Instagram Business Account", connectedInstagram?.username ? `@${connectedInstagram.username}` : "-", metaConnected ? <StatusBadge tone="green">Resolved</StatusBadge> : <StatusBadge tone="slate">Not resolved</StatusBadge>, "instagram_business_account"],
-            ["Insights", latestReach ? formatNumber(latestReach) : "-", latestReach ? <StatusBadge tone="green">Loaded</StatusBadge> : <StatusBadge tone="slate">Not loaded</StatusBadge>, "/api/meta/instagram-insights"],
-            ["Recent media", topMedia?.permalink || "-", topMedia ? <StatusBadge tone="green">Loaded</StatusBadge> : <StatusBadge tone="slate">Not loaded</StatusBadge>, "IG media edge"],
-          ]}
-        />
+      <SectionCard icon={Instagram} title="Account / Profile Level" description="Metrik profil dan aktivitas akun Instagram yang dipilih.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {accountMetrics.map((metric) => (
+            <div key={metric.label} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-600">{metric.label}</p>
+              <p className="mt-2 text-2xl font-bold text-slate-950">{formatNumber(metric.value)}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{metric.detail}</p>
+            </div>
+          ))}
+        </div>
       </SectionCard>
+
+      <SectionCard icon={TrendingUp} title="Tren Performa Akun" description="Pergerakan reach, impressions, profile views, dan website clicks berdasarkan periode dari Meta API.">
+        {accountTrendData.length ? (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={accountTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
+                <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} />
+                <Legend />
+                <Line type="monotone" dataKey="Reach" stroke="#0F766E" strokeWidth={3} dot={{ r: 3 }} connectNulls />
+                <Line type="monotone" dataKey="Impressions" stroke="#2563EB" strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="Profile Views" stroke="#DB2777" strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="Website Clicks" stroke="#F59E0B" strokeWidth={2} dot={false} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <EmptyState text={isMetaLoading ? "Sedang memuat tren performa..." : "Data tren belum tersedia untuk akun dan periode ini."} />
+        )}
+      </SectionCard>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SectionCard icon={TrendingUp} title="Online Followers" description="Waktu followers paling aktif untuk membantu penjadwalan konten.">
+          <EmptyState text="Data jam aktif followers belum tersedia dari permission Meta untuk akun ini." />
+        </SectionCard>
+        <SectionCard icon={BarChart3} title="Audience Demographics" description="Komposisi usia, gender, kota, dan negara followers.">
+          <div className="grid grid-cols-2 gap-3">
+            <MetricPill label="Usia" value="-" />
+            <MetricPill label="Gender" value="-" />
+            <MetricPill label="Kota teratas" value="-" />
+            <MetricPill label="Negara teratas" value="-" />
+          </div>
+        </SectionCard>
+      </div>
+
+      <SectionCard icon={Image} title="Content / Post Level" description="Performa Feed, Reels, Stories, dan Carousel dari konten terbaru.">
+        {contentRows.length ? (
+          <DataTable columns={["Konten", "Tipe", "Reach", "Views", "Likes", "Comments", "Shares", "Saves", "Eng. rate", "Link"]} rows={contentRows} />
+        ) : (
+          <EmptyState text={isMetaLoading ? "Sedang memuat konten Instagram..." : "Belum ada data konten untuk akun yang dipilih."} />
+        )}
+      </SectionCard>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+          <h2 className="text-lg font-semibold text-slate-950">Perbandingan Konten Terbaru</h2>
+          <p className="mt-1 text-sm text-slate-500">Reach dan interaksi dari maksimal delapan konten terbaru.</p>
+          {contentChartData.length ? (
+            <div className="mt-5 h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={contentChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
+                  <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} />
+                  <Legend />
+                  <Bar dataKey="Reach" fill="#0F766E" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Likes" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Comments" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Saves" fill="#DB2777" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="mt-5"><EmptyState text="Belum ada data konten untuk divisualisasikan." /></div>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-950">Komposisi Interaksi</h2>
+          <p className="mt-1 text-sm text-slate-500">Distribusi engagement seluruh konten yang dimuat.</p>
+          {interactionChartData.length ? (
+            <div className="mt-5 h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={interactionChartData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                    {interactionChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="mt-5"><EmptyState text="Belum ada interaksi untuk divisualisasikan." /></div>
+          )}
+        </section>
+      </div>
+
+      <SectionCard icon={Brain} title="Insight Turunan & Kalkulasi" description="Analisis otomatis dari histori akun dan konten yang sedang dimuat.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-600">Avg. engagement rate</p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">{formatPercent(averageEngagementRate)}</p>
+            <p className="mt-1 text-xs text-slate-500">Rata-rata dari {engagementRates.length} post dengan data reach</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-600">Follower growth rate</p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">{formatPercent(followerGrowthRate)}</p>
+            <p className="mt-1 text-xs text-slate-500">Perubahan titik awal ke akhir dari {followerSeries.length} periode</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-600">Best time to post</p>
+            <p className="mt-2 text-xl font-bold capitalize text-slate-950">{mediaAnalytics.length >= 3 ? bestTimeSlots[0]?.label || "-" : "-"}</p>
+            <p className="mt-1 text-xs text-slate-500">Berdasarkan rata-rata engagement lalu reach</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-600">Frequency correlation</p>
+            <p className="mt-2 text-2xl font-bold text-slate-950">{correlationLabel}</p>
+            <p className="mt-1 text-xs text-slate-500">Pearson r dari {weeklyMap.size} minggu posting vs engagement</p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div>
+            <h3 className="font-semibold text-slate-950">Best Time to Post</h3>
+            <p className="mt-1 text-sm text-slate-500">Slot waktu memakai zona Asia/Jakarta.</p>
+            {mediaAnalytics.length >= 3 && bestTimeSlots.length ? (
+              <div className="mt-4 space-y-3">
+                {bestTimeSlots.map((slot, index) => (
+                  <div key={slot.label} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-3">
+                    <div>
+                      <p className="font-semibold capitalize text-slate-900">#{index + 1} {slot.label}</p>
+                      <p className="mt-1 text-xs text-slate-500">{slot.posts} post dalam sampel</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-[#0F766E]">{formatPercent(slot.averageEngagement)}</p>
+                      <p className="text-xs text-slate-500">Avg reach {formatNumber(slot.averageReach)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4"><EmptyState text="Minimal tiga konten bertanggal diperlukan untuk rekomendasi waktu posting." /></div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-slate-950">Content Type Performance</h3>
+            <p className="mt-1 text-sm text-slate-500">Perbandingan Reels, Feed, Carousel, dan Story.</p>
+            <div className="mt-4">
+              {contentTypePerformance.length ? (
+                <DataTable
+                  columns={["Tipe", "Post", "Avg. reach", "Avg. engagement"]}
+                  rows={contentTypePerformance.map((item) => [
+                    <StatusBadge tone={item.type === "Reels" ? "blue" : "teal"}>{item.type}</StatusBadge>,
+                    formatNumber(item.posts),
+                    formatNumber(item.averageReach),
+                    formatPercent(item.averageEngagement),
+                  ])}
+                />
+              ) : (
+                <EmptyState text="Belum ada tipe konten untuk dibandingkan." />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="font-semibold text-slate-950">Hashtag Performance</h3>
+          <p className="mt-1 text-sm text-slate-500">Dihitung lokal dari hashtag pada caption konten, karena Meta API tidak menyediakan insight hashtag langsung.</p>
+          <div className="mt-4">
+            {hashtagPerformance.length ? (
+              <DataTable
+                columns={["Hashtag", "Dipakai", "Avg. reach", "Avg. engagement"]}
+                rows={hashtagPerformance.map((item) => [
+                  <span className="font-semibold text-[#0F766E]">{item.hashtag}</span>,
+                  `${item.posts} post`,
+                  formatNumber(item.averageReach),
+                  formatPercent(item.averageEngagement),
+                ])}
+              />
+            ) : (
+              <EmptyState text="Caption konten yang dimuat belum memiliki hashtag untuk dianalisis." />
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard icon={BarChart3} title="Video, Reels & Stories" description="Metrik khusus video dan Stories yang tersedia untuk akun terpilih.">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <MetricPill label="Video views" value="-" />
+          <MetricPill label="Avg. watch time" value="-" />
+          <MetricPill label="Reels plays" value="-" />
+          <MetricPill label="Sticker taps" value="-" />
+          <MetricPill label="Exits / Replies" value="-" />
+          <MetricPill label="Profile activity" value="-" />
+        </div>
+      </SectionCard>
+
+      {instagramInsights?.warnings?.length ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="font-semibold">Sebagian metrik belum dapat dimuat dari Meta API.</p>
+          <p className="mt-1">{instagramInsights.warnings.join(" ")}</p>
+        </div>
+      ) : null}
     </ModuleShell>
   );
 }

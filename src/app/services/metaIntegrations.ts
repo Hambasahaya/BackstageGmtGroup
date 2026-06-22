@@ -30,8 +30,13 @@ export type InstagramInsights = {
   profile?: {
     id: string;
     username?: string;
+    name?: string;
+    biography?: string;
     followers_count?: number;
+    follows_count?: number;
     media_count?: number;
+    profile_picture_url?: string;
+    website?: string;
   };
   insights: Array<{
     name: string;
@@ -42,10 +47,18 @@ export type InstagramInsights = {
     id: string;
     caption?: string;
     media_type?: string;
+    media_product_type?: string;
     permalink?: string;
     timestamp?: string;
     like_count?: number;
     comments_count?: number;
+    insights?: {
+      data?: Array<{
+        name: string;
+        period?: string;
+        values?: Array<{ value: number; end_time?: string }>;
+      }>;
+    };
   }>;
   warnings?: string[];
 };
@@ -72,8 +85,9 @@ export async function fetchMetaAccounts() {
   return payload as MetaAccountHealth;
 }
 
-export async function fetchInstagramInsights() {
-  const response = await fetch("/api/meta/instagram-insights");
+export async function fetchInstagramInsights(igUserId?: string) {
+  const query = igUserId ? `?igUserId=${encodeURIComponent(igUserId)}` : "";
+  const response = await fetch(`/api/meta/instagram-insights${query}`);
   const payload = await response.json();
 
   if (!response.ok) {

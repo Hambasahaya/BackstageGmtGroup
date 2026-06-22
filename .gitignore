@@ -1,0 +1,7 @@
+.env
+.env.production
+.env.local
+.env.*.local
+gmtgroup-498208-1233a8991761.json
+*-meta-token-store.json
+vite-*.log

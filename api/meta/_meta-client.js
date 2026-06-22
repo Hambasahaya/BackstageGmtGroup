@@ -49,6 +49,18 @@ export const getStoredTokenBundle = async () => {
     throw new Error("Meta is not connected yet. Open /api/meta/auth-url and complete OAuth first.");
   }
 
+  if (bundle.source === "env" && !bundle.pages?.length && bundle.userAccessToken) {
+    const pagesPayload = await metaFetch(
+      "/me/accounts",
+      {
+        fields: "name,access_token,tasks,instagram_business_account{id,username,profile_picture_url}",
+      },
+      bundle.userAccessToken,
+    );
+
+    return { ...bundle, pages: pagesPayload.data || [] };
+  }
+
   return bundle;
 };
 

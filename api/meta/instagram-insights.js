@@ -1,18 +1,29 @@
 import { findInstagramPage, getStoredTokenBundle, json, metaFetch } from "./_meta-client.js";
 
 const getInsightMetrics = async ({ igUserId, accessToken }) => {
-  try {
-    return await metaFetch(
-      `/${igUserId}/insights`,
-      {
-        metric: "reach,profile_views,website_clicks",
-        period: "day",
-      },
-      accessToken,
-    );
-  } catch (error) {
-    return { data: [], warning: error.message };
-  }
+  const metrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,follower_count")
+    .split(",")
+    .map((metric) => metric.trim())
+    .filter(Boolean);
+  const insightDays = Math.max(1, Math.min(Number(process.env.META_INSIGHT_DAYS || 30), 90));
+  const since = new Date(Date.now() - insightDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const results = await Promise.all(metrics.map(async (metric) => {
+    try {
+      const payload = await metaFetch(
+        `/${igUserId}/insights`,
+        { metric, period: "day", since },
+        accessToken,
+      );
+      return { data: payload.data || [], warning: null };
+    } catch (error) {
+      return { data: [], warning: `${metric}: ${error.message}` };
+    }
+  }));
+
+  return {
+    data: results.flatMap((result) => result.data),
+    warning: results.map((result) => result.warning).filter(Boolean).join(" | ") || null,
+  };
 };
 
 const getRecentMedia = async ({ igUserId, accessToken }) => {
@@ -21,8 +32,8 @@ const getRecentMedia = async ({ igUserId, accessToken }) => {
       `/${igUserId}/media`,
       {
         fields:
-          "id,caption,media_type,permalink,timestamp,like_count,comments_count,insights.metric(reach,total_interactions,saved)",
-        limit: 10,
+          "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,insights.metric(reach,total_interactions,saved)",
+        limit: Math.max(1, Math.min(Number(process.env.META_MEDIA_LIMIT || 25), 100)),
       },
       accessToken,
     );

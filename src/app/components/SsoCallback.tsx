@@ -15,7 +15,7 @@ export function SsoCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [message, setMessage] = useState("Menukar kode SSO Website A...");
+  const [message, setMessage] = useState("Tunggu Sebentar...");
 
   useEffect(() => {
     let isActive = true;
@@ -27,7 +27,7 @@ export function SsoCallback() {
 
       if (!code) {
         setStatus("error");
-        setMessage("Kode SSO tidak ditemukan di URL callback.");
+        setMessage("terjadi kesalahan");
         return;
       }
 
@@ -46,7 +46,7 @@ export function SsoCallback() {
           // SSO response still carries role for the normal redirect path.
         }
         setStatus("success");
-        setMessage("SSO berhasil. Mengarahkan ke dashboard...");
+        setMessage("Authentikasi berhasil! Mengarahkan ke halaman utama...");
         navigate(getRoleHomePath(user), { replace: true });
       } catch (error) {
         if (!isActive) {
