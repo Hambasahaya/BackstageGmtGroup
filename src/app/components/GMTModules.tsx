@@ -1103,54 +1103,75 @@ export function MarketingIntegrations() {
     .sort((first, second) => (second.averageEngagement || 0) - (first.averageEngagement || 0) || second.averageReach - first.averageReach)[0];
   const topHashtags = hashtagPerformance.slice(0, 4).map((item) => item.hashtag);
   const bestPostingTime = bestTimeSlots[0]?.label || "slot waktu dengan engagement tertinggi";
+  const videoMedia = (instagramInsights?.media || []).filter((media) => media.media_type === "VIDEO" || media.media_product_type === "REELS");
+  const storyMedia = (instagramInsights?.media || []).filter((media) => media.media_product_type === "STORY");
+  const videoViews = videoMedia.reduce((sum, media) => sum + (getMediaMetric(media, "views", "plays", "impressions") || 0), 0);
+  const reelsPlays = videoMedia
+    .filter((media) => media.media_product_type === "REELS")
+    .reduce((sum, media) => sum + (getMediaMetric(media, "plays", "views", "impressions") || 0), 0);
+  const profileActivityFromVideo = videoMedia.reduce((sum, media) => sum + (getMediaMetric(media, "profile_activity", "profile_visits") || 0), 0);
   const contentIdeas = [
     {
       day: "Hari 1",
       format: "Reels",
       idea: `Hook cepat: masalah utama audiens lalu tampilkan solusi dari ${connectedInstagram?.username ? `@${connectedInstagram.username}` : "brand"}.`,
+      formatGuide: "Video vertikal 9:16, durasi 12-20 detik. Struktur: 0-2 detik hook, 3-12 detik solusi/proof, 13-20 detik CTA.",
       action: `Posting di ${bestPostingTime}. Pakai opening 2 detik yang kuat, subtitle besar, dan CTA komentar.`,
+      reason: "Reels pendek cocok untuk reach karena mudah ditonton ulang, cepat dipahami, dan memberi sinyal retention lebih baik.",
       impact: "Berpotensi menaikkan reach karena format singkat lebih mudah didistribusikan dan memancing interaksi awal.",
     },
     {
       day: "Hari 2",
       format: "Story",
       idea: "Behind the scene, progress pekerjaan, atau aktivitas tim yang membuat brand terasa lebih dekat.",
+      formatGuide: "3-5 frame Story. Frame 1 teaser, frame 2-3 proses, frame 4 poll/quiz, frame 5 CTA reply atau DM.",
       action: "Gunakan poll/quiz sederhana, lalu follow-up dengan sticker pertanyaan.",
+      reason: "Story bagus untuk menjaga hubungan dengan followers aktif karena interaksi kecil seperti poll dan reply terasa ringan.",
       impact: "Meningkatkan reply dan sinyal relationship dengan followers aktif.",
     },
     {
       day: "Hari 3",
       format: bestContentType?.type || "Carousel",
       idea: "Konten edukasi: 3 kesalahan umum pelanggan dan cara menghindarinya.",
+      formatGuide: "Carousel 6-8 slide. Slide 1 judul kuat, slide 2-4 poin masalah, slide 5-7 solusi, slide terakhir CTA save/share.",
       action: `Buat slide/saveable content, tambahkan CTA save dan gunakan hashtag terbaik: ${topHashtags.length ? topHashtags.join(", ") : "hashtag niche brand"}.`,
+      reason: "Carousel memberi ruang edukasi tanpa terasa berat dan biasanya lebih mudah menghasilkan save karena bisa dibaca ulang.",
       impact: "Saves dan shares bisa naik karena konten terasa berguna dan mudah dijadikan referensi.",
     },
     {
       day: "Hari 4",
       format: "Reels",
       idea: "Before-after atau mini case study dari produk/proyek yang paling mudah divisualkan.",
+      formatGuide: "Video 15-30 detik. Buka dengan hasil akhir, lanjut before/process, tutup dengan detail hasil dan CTA lihat profil.",
       action: "Tampilkan hasil di awal, baru proses. Tutup dengan CTA klik profil atau DM.",
+      reason: "Before-after cepat memberi bukti visual, sehingga audiens tidak perlu membaca panjang untuk memahami value.",
       impact: "Mendorong profile activity dari user yang tertarik melihat portfolio lebih lanjut.",
     },
     {
       day: "Hari 5",
       format: "Story",
       idea: "Q&A singkat dari pertanyaan pelanggan atau objection yang sering muncul.",
+      formatGuide: "4-6 frame Story. Frame 1 pertanyaan, frame 2 jawaban pendek, frame 3 bukti/contoh, frame 4 sticker question, frame 5 CTA DM.",
       action: "Pakai 3-5 frame: pertanyaan, jawaban pendek, proof, CTA.",
+      reason: "Q&A menurunkan hambatan calon pelanggan karena objection dijawab sebelum mereka harus bertanya langsung.",
       impact: "Membantu konversi soft-selling karena menjawab hambatan sebelum audiens bertanya langsung.",
     },
     {
       day: "Hari 6",
       format: "Feed",
       idea: "Social proof: testimoni, angka pencapaian, atau highlight hasil kerja.",
+      formatGuide: "Single image atau 3-slide mini carousel. Visual utama berisi proof, caption 80-150 kata dengan problem, action, result.",
       action: "Gunakan caption storytelling pendek dengan struktur problem, action, result.",
+      reason: "Feed cocok untuk trust building karena tampil lebih stabil di profil dan mudah dipakai sebagai portfolio ringkas.",
       impact: "Memperkuat trust dan memberi bahan remarketing organik untuk audiens baru.",
     },
     {
       day: "Hari 7",
       format: "Reels",
       idea: "Recap mingguan: kompilasi 3 momen terbaik atau 3 insight paling berguna.",
+      formatGuide: "Video 20-35 detik. Buat 3 segmen cepat masing-masing 5-8 detik, gunakan teks nomor 1-3, tutup dengan CTA follow/save.",
       action: "Edit cepat, gunakan audio yang relevan, dan arahkan ke post terbaik minggu ini.",
+      reason: "Recap memperpanjang umur konten lama dan membantu audiens baru menangkap value akun dalam waktu singkat.",
       impact: "Memperpanjang umur konten yang sudah bagus dan membantu followers menangkap value utama minggu itu.",
     },
   ];
@@ -1397,42 +1418,77 @@ export function MarketingIntegrations() {
         </div>
       </SectionCard>
 
-      <SectionCard icon={Sparkles} title="Video, Reels & Stories" description="Brief ide konten 7 hari ke depan dari analisis performa akun. Disiapkan agar nanti bisa dihubungkan ke Cloud/Codex sebagai AI social media specialist.">
+      <SectionCard icon={BarChart3} title="Video, Reels & Stories" description="Metrik khusus video, Reels, dan Stories yang tersedia dari konten akun terpilih.">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <MetricPill label="Video views" value={formatNumber(videoViews)} />
+          <MetricPill label="Video/Reels loaded" value={formatNumber(videoMedia.length)} />
+          <MetricPill label="Reels plays" value={formatNumber(reelsPlays)} />
+          <MetricPill label="Stories loaded" value={formatNumber(storyMedia.length)} />
+          <MetricPill label="Profile activity" value={formatNumber(profileActivityFromVideo)} />
+          <MetricPill label="Avg. watch time" value="N/A" />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          Avg. watch time, sticker taps, exits, dan replies bergantung pada permission/metric Meta yang tersedia untuk akun. Jika API mengirim metric tersebut, card ini bisa diperluas tanpa mengubah layout.
+        </p>
+      </SectionCard>
+
+      <SectionCard icon={Sparkles} title="AI Content Brief 7 Hari" description="Rencana konten sederhana: lihat rekomendasi utama, ikuti checklist, lalu eksekusi kalender 7 hari.">
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            <MetricPill label="Best format" value={bestContentType?.type || "-"} />
-            <MetricPill label="Best post time" value={bestTimeSlots[0]?.label || "-"} />
-            <MetricPill label="Avg engagement" value={formatPercent(averageEngagementRate)} />
-            <MetricPill label="Top references" value={formatNumber(topContentReferences.length)} />
-            <MetricPill label="Hashtag signals" value={formatNumber(topHashtags.length)} />
-            <MetricPill label="Plan window" value="7 hari" />
+          <div className="rounded-xl border border-teal-100 bg-teal-50 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Rekomendasi utama</p>
+                <h3 className="mt-1 text-xl font-bold text-slate-950">
+                  Fokus ke {bestContentType?.type || "Reels"} di {bestTimeSlots[0]?.label || "jam performa terbaik"}.
+                </h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  Pakai konten referensi terbaik sebagai pola: hook cepat, visual jelas, caption singkat, dan CTA yang meminta komentar, save, atau DM.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:min-w-80">
+                <MetricPill label="Avg engagement" value={formatPercent(averageEngagementRate)} />
+                <MetricPill label="Referensi" value={formatNumber(topContentReferences.length)} />
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold text-slate-950">1. Buat Reels pendek</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Mulai dengan hasil/masalah di 2 detik pertama, lalu tutup dengan CTA jelas.</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold text-slate-950">2. Aktifkan Story harian</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Gunakan poll, quiz, Q&A, atau behind the scene untuk memancing reply.</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-sm font-bold text-slate-950">3. Ulangi pola terbaik</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Ambil format dari konten referensi, lalu buat variasi topik baru.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_0.8fr]">
             <div>
-              <h3 className="font-semibold text-slate-950">Content Idea Roadmap</h3>
-              <p className="mt-1 text-sm text-slate-500">Gunakan sebagai draft kalender konten. Saat integrasi AI aktif, blok ini bisa menjadi prompt context untuk generate caption, storyboard, dan shot list.</p>
-              <div className="mt-4 space-y-3">
+              <h3 className="font-semibold text-slate-950">Kalender Konten 7 Hari</h3>
+              <p className="mt-1 text-sm text-slate-500">Format dibuat ringkas supaya mudah dieksekusi tim social media.</p>
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 {contentIdeas.map((idea) => (
-                  <div key={idea.day} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2">
-                        <StatusBadge tone={idea.format === "Reels" ? "blue" : idea.format === "Story" ? "yellow" : "teal"}>{idea.day}</StatusBadge>
-                        <p className="font-semibold text-slate-950">{idea.format}</p>
-                      </div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Brief idea</p>
+                  <div key={idea.day} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <StatusBadge tone={idea.format === "Reels" ? "blue" : idea.format === "Story" ? "yellow" : "teal"}>{idea.day}</StatusBadge>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{idea.format}</span>
                     </div>
-                    <p className="mt-3 text-sm font-medium text-slate-900">{idea.idea}</p>
-                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                      <div className="rounded-lg border border-slate-200 bg-white p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Apa yang harus dilakukan</p>
-                        <p className="mt-1 text-sm leading-6 text-slate-700">{idea.action}</p>
-                      </div>
-                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Jika dilakukan</p>
-                        <p className="mt-1 text-sm leading-6 text-emerald-800">{idea.impact}</p>
-                      </div>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-slate-950">{idea.idea}</p>
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Format eksekusi</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-700">{idea.formatGuide}</p>
                     </div>
+                    <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Alasan format</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-700">{idea.reason}</p>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{idea.action}</p>
+                    <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">{idea.impact}</p>
                   </div>
                 ))}
               </div>
@@ -1440,21 +1496,21 @@ export function MarketingIntegrations() {
 
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-slate-950">Reference Content</h3>
-                <p className="mt-1 text-sm text-slate-500">Konten terbaik yang bisa dijadikan benchmark hook, format, caption, dan CTA.</p>
+                <h3 className="font-semibold text-slate-950">Referensi Terbaik</h3>
+                <p className="mt-1 text-sm text-slate-500">Pakai ini sebagai contoh hook dan gaya konten.</p>
               </div>
               {topContentReferences.length ? (
                 <div className="space-y-3">
                   {topContentReferences.map((item, index) => (
-                    <div key={item.media.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div key={item.media.id} className="rounded-lg border border-slate-200 bg-white p-3">
                       <div className="flex items-center justify-between gap-3">
                         <StatusBadge tone={index === 0 ? "green" : "teal"}>{`Ref ${index + 1}`}</StatusBadge>
                         <p className="text-xs text-slate-500">{item.contentType}</p>
                       </div>
-                      <p className="mt-3 line-clamp-3 text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <MetricPill label="Reach" value={formatNumber(item.reach)} />
-                        <MetricPill label="Engagement" value={formatPercent(item.engagementRate)} />
+                      <p className="mt-3 line-clamp-2 text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1">Reach {formatNumber(item.reach)}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1">Eng. {formatPercent(item.engagementRate)}</span>
                       </div>
                       {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">Buka referensi</a> : null}
                     </div>
@@ -1465,8 +1521,8 @@ export function MarketingIntegrations() {
               )}
 
               <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
-                <p className="font-semibold text-slate-950">AI Assistant Notes</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">Saat dihubungkan ke Cloud/Codex, gunakan data akun, top content references, best time, hashtag signals, dan content roadmap ini untuk membuat caption, storyboard Reels, script voice-over, shot list, serta checklist publish.</p>
+                <p className="font-semibold text-slate-950">Nanti untuk AI Assistant</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">Blok ini bisa dikirim ke Cloud/Codex sebagai konteks untuk membuat caption, storyboard, shot list, dan checklist publish.</p>
               </div>
             </div>
           </div>
