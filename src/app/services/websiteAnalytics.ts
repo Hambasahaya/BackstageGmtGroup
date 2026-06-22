@@ -16,6 +16,8 @@ export type WebsiteAnalyticsProperty = {
   sources: Array<{ channel: string; sourceMedium: string; sessions: number; users: number; engagedSessions: number }>;
   pages: Array<{ path: string; title: string; pageviews: number; users: number; engagementRate: number; averageSessionDuration: number }>;
   visitorTypes: Array<{ type: string; users: number; sessions: number }>;
+  keywordPerformance: Array<{ keyword: string; page: string; clicks: number; impressions: number; ctr: number; position: number }>;
+  keywordWarning?: string;
 };
 
 export type WebsiteAnalyticsResponse = {

@@ -29,7 +29,7 @@ const getServiceAccountToken = async (credential) => {
   const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = base64Url(JSON.stringify({
     iss: credential.client_email,
-    scope: "https://www.googleapis.com/auth/analytics.readonly",
+    scope: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly",
     aud: tokenUri,
     iat: now,
     exp: now + 3600,
@@ -88,6 +88,7 @@ const getProperties = async (accessToken) => {
       id: String(property.id || "").replace(/^properties\//, ""),
       name: String(property.name || property.domain || property.id || "GA4 Property"),
       domain: String(property.domain || property.name || property.id || ""),
+      gscSiteUrl: String(property.gscSiteUrl || property.searchConsoleSiteUrl || ""),
     })).filter((property) => property.id);
   }
 
@@ -97,7 +98,7 @@ const getProperties = async (accessToken) => {
     .filter(Boolean)
     .map((entry) => {
       const [id, domain] = entry.split(":").map((value) => value.trim());
-      return { id: id.replace(/^properties\//, ""), name: domain || id, domain: domain || id };
+      return { id: id.replace(/^properties\//, ""), name: domain || id, domain: domain || id, gscSiteUrl: process.env.GSC_SITE_URL || "" };
     });
 
   if (configuredProperties.length) return configuredProperties;
@@ -115,14 +116,47 @@ const getProperties = async (accessToken) => {
     id: String(property.property || "").replace(/^properties\//, ""),
     name: property.displayName || property.property,
     domain: property.displayName || property.property,
+    gscSiteUrl: process.env.GSC_SITE_URL || "",
   }))).filter((property) => property.id);
 };
 
 const numberValue = (row, index) => Number(row?.metricValues?.[index]?.value || 0);
 const dimensionValue = (row, index) => row?.dimensionValues?.[index]?.value || "";
 
+const fetchKeywordPerformance = async ({ property, accessToken, startDate, endDate }) => {
+  if (!property.gscSiteUrl) return [];
+
+  const response = await fetch(
+    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(property.gscSiteUrl)}/searchAnalytics/query`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        startDate,
+        endDate,
+        dimensions: ["query", "page"],
+        rowLimit: 50,
+        type: "web",
+        orderBy: [{ fieldName: "position", sortOrder: "ascending" }],
+      }),
+    },
+  );
+  const payload = await response.json();
+  if (!response.ok) throw new Error(`${property.domain} Search Console: ${payload.error?.message || "keyword report failed."}`);
+
+  return (payload.rows || []).map((row) => ({
+    keyword: row.keys?.[0] || "(not set)",
+    page: row.keys?.[1] || "",
+    clicks: Number(row.clicks || 0),
+    impressions: Number(row.impressions || 0),
+    ctr: Number(row.ctr || 0),
+    position: Number(row.position || 0),
+  }));
+};
+
 const fetchProperty = async ({ property, accessToken, startDate, endDate }) => {
-  const response = await fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${property.id}:batchRunReports`, {
+  const [ga4Result, keywordResult] = await Promise.allSettled([
+    fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${property.id}:batchRunReports`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -159,7 +193,12 @@ const fetchProperty = async ({ property, accessToken, startDate, endDate }) => {
         },
       ],
     }),
-  });
+  }),
+    fetchKeywordPerformance({ property, accessToken, startDate, endDate }),
+  ]);
+
+  if (ga4Result.status === "rejected") throw ga4Result.reason;
+  const response = ga4Result.value;
   const payload = await response.json();
   if (!response.ok) throw new Error(`${property.domain}: ${payload.error?.message || "GA4 report failed."}`);
 
@@ -175,6 +214,8 @@ const fetchProperty = async ({ property, accessToken, startDate, endDate }) => {
     sources: (sources?.rows || []).map((row) => ({ channel: dimensionValue(row, 0), sourceMedium: dimensionValue(row, 1), sessions: numberValue(row, 0), users: numberValue(row, 1), engagedSessions: numberValue(row, 2) })),
     pages: (pages?.rows || []).map((row) => ({ path: dimensionValue(row, 0), title: dimensionValue(row, 1), pageviews: numberValue(row, 0), users: numberValue(row, 1), engagementRate: numberValue(row, 2), averageSessionDuration: numberValue(row, 3) })),
     visitorTypes: (visitorTypes?.rows || []).map((row) => ({ type: dimensionValue(row, 0), users: numberValue(row, 0), sessions: numberValue(row, 1) })),
+    keywordPerformance: keywordResult.status === "fulfilled" ? keywordResult.value : [],
+    keywordWarning: keywordResult.status === "rejected" ? keywordResult.reason?.message || "Search Console keyword report failed." : "",
   };
 };
 
@@ -195,7 +236,10 @@ export default async function handler(request, response) {
     const startDate = start.toISOString().slice(0, 10);
     const results = await Promise.allSettled(properties.map((property) => fetchProperty({ property, accessToken, startDate, endDate })));
     const loaded = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
-    const warnings = results.filter((result) => result.status === "rejected").map((result) => result.reason?.message || "Property failed.");
+    const warnings = [
+      ...results.filter((result) => result.status === "rejected").map((result) => result.reason?.message || "Property failed."),
+      ...loaded.map((property) => property.keywordWarning).filter(Boolean),
+    ];
     if (!loaded.length) throw new Error(warnings.join(" | ") || "No GA4 property could be loaded.");
     json(response, 200, { startDate, endDate, properties: loaded, warnings });
   } catch (error) {

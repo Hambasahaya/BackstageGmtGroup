@@ -39,6 +39,14 @@ GA4_REPORT_DAYS=30
 
 Property dapat ditemukan otomatis. Untuk membatasi atau memberi nama domain secara manual, isi `GA4_PROPERTIES`. `id` adalah numeric **GA4 Property ID**, bukan Measurement ID seperti `G-XXXXXXXXXX`.
 
+Untuk card **Keyword Performance**, tambahkan `gscSiteUrl` pada website yang memiliki akses Google Search Console:
+
+```env
+GA4_PROPERTIES=[{"id":"123456789","name":"GMT Lighting","domain":"gmtlighting.id","gscSiteUrl":"https://gmtlighting.id/"},{"id":"987654321","name":"GMT Training","domain":"gmttraining.id"}]
+```
+
+Service account perlu ditambahkan juga sebagai user di Search Console property tersebut. Data keyword memakai `query` + `page` dari Search Console, dengan metrik clicks, impressions, CTR, dan average position.
+
 Jika platform deployment menyulitkan nilai JSON, gunakan format alternatif:
 
 ```env

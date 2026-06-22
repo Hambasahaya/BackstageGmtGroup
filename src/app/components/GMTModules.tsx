@@ -418,6 +418,9 @@ export function MultiWebsiteManagement() {
   const pageData = selectedProperties.flatMap((property) => property.pages.map((page) => ({ ...page, website: property.domain })))
     .sort((first, second) => second.pageviews - first.pageviews)
     .slice(0, 25);
+  const keywordData = selectedProperties.flatMap((property) => (property.keywordPerformance || []).map((keyword) => ({ ...keyword, website: property.domain })))
+    .sort((first, second) => first.position - second.position || second.clicks - first.clicks || second.impressions - first.impressions)
+    .slice(0, 25);
   const formatDuration = (seconds: number | undefined) => {
     if (seconds === undefined) return "-";
     const rounded = Math.round(seconds);
@@ -481,6 +484,19 @@ export function MultiWebsiteManagement() {
 
       <SectionCard icon={FileText} title="Page Performance" description="Pageviews, users, engagement rate, dan durasi rata-rata per halaman.">
         {pageData.length ? <DataTable columns={["Website", "Page", "Title", "Pageviews", "Users", "Engagement", "Avg. duration"]} rows={pageData.map((page) => [page.website, page.path, <span className="line-clamp-2 max-w-xs">{page.title}</span>, formatNumber(page.pageviews), formatNumber(page.users), formatPercent(page.engagementRate), formatDuration(page.averageSessionDuration)])} /> : <EmptyState text="Belum ada data halaman." />}
+      </SectionCard>
+
+      <SectionCard icon={Search} title="Keyword Performance" description="Keyword organik dari Search Console, diurutkan dari posisi terbaik. Clicks menunjukkan total kunjungan dari keyword tersebut.">
+        {keywordData.length ? <DataTable columns={["Rank", "Keyword", "Page", "Website", "Clicks / Views", "Impressions", "CTR", "Avg. position"]} rows={keywordData.map((keyword, index) => [
+          <StatusBadge tone={index === 0 ? "green" : index < 3 ? "teal" : "blue"}>{`Top ${index + 1}`}</StatusBadge>,
+          <span className="font-semibold text-slate-900">{keyword.keyword}</span>,
+          <span className="line-clamp-2 max-w-sm">{keyword.page}</span>,
+          keyword.website,
+          formatNumber(keyword.clicks),
+          formatNumber(keyword.impressions),
+          formatPercent(keyword.ctr),
+          `#${keyword.position.toFixed(1)}`,
+        ])} /> : <EmptyState text={isLoading ? "Sedang memuat keyword dari Search Console..." : "Belum ada data keyword. Pastikan GSC_SITE_URL atau gscSiteUrl di GA4_PROPERTIES sudah punya akses Search Console."} />}
       </SectionCard>
 
       <SectionCard icon={Globe2} title="Website Portfolio" description="Perbandingan performa seluruh property GA4 yang terhubung.">
