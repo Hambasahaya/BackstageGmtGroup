@@ -229,6 +229,38 @@ function MetricPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MiniBarList({
+  items,
+  color = "bg-[#0F766E]",
+  maxItems = 4,
+}: {
+  items: Array<{ label: string; value: number }>;
+  color?: string;
+  maxItems?: number;
+}) {
+  const visibleItems = items.slice(0, maxItems);
+  const maxValue = Math.max(...visibleItems.map((item) => item.value), 1);
+
+  return (
+    <div className="space-y-3">
+      {visibleItems.map((item) => (
+        <div key={item.label}>
+          <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+            <span className="truncate font-semibold text-slate-700">{item.label}</span>
+            <span className="shrink-0 font-bold text-slate-950">{formatNumber(item.value)}</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full ${color}`}
+              style={{ width: `${Math.max(8, (item.value / maxValue) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
@@ -860,6 +892,7 @@ export function MarketingIntegrations() {
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
   const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
+  const [contentSort, setContentSort] = useState<"newest" | "oldest" | "reach" | "views" | "engagement" | "likes" | "comments" | "saves">("newest");
   const [sinceDate, setSinceDate] = useState(defaultDateRange.since);
   const [untilDate, setUntilDate] = useState(defaultDateRange.until);
   const [appliedDateRange, setAppliedDateRange] = useState(defaultDateRange);
@@ -1185,16 +1218,99 @@ export function MarketingIntegrations() {
     ? "Belum cukup data"
     : `${frequencyCorrelation >= 0 ? "+" : ""}${frequencyCorrelation.toFixed(2)}`;
 
-  const contentRows = mediaItems.map((media) => {
+  const buildContentReasoning = ({
+    reach,
+    views,
+    interactions,
+    engagementRate,
+    saves,
+    shares,
+    contentType,
+  }: {
+    reach: number;
+    views: number;
+    interactions: number;
+    engagementRate?: number;
+    saves: number;
+    shares: number;
+    contentType: string;
+  }) => {
+    const notes: string[] = [];
+
+    if (engagementRate !== undefined) {
+      if (engagementRate >= 0.1) notes.push("Engagement tinggi; konten kuat untuk dijadikan referensi format berikutnya.");
+      else if (engagementRate >= 0.03) notes.push("Engagement cukup stabil; pertahankan tema dan optimalkan hook/caption.");
+      else notes.push("Engagement rendah; perlu perbaikan hook, visual awal, atau CTA.");
+    } else if (reach > 0) {
+      notes.push("Reach ada, tetapi interaksi terbatas sehingga kualitas respons audiens perlu dicek.");
+    } else {
+      notes.push("Data reach belum cukup; evaluasi setelah insight konten tersedia.");
+    }
+
+    if (views > reach && views > 0) notes.push("Views lebih besar dari reach, indikasi ada repeat view atau konsumsi ulang.");
+    else if (reach > 0 && interactions > 0) notes.push("Konten mendapat respons organik dari audiens yang melihat.");
+    if (saves > 0) notes.push("Ada saves, menandakan konten bernilai untuk disimpan.");
+    if (shares > 0) notes.push("Ada shares, menandakan konten cukup relevan untuk dibagikan.");
+    if (contentType === "Reels" && views === 0) notes.push("Reels belum punya views terukur dari API untuk periode ini.");
+
+    return notes.slice(0, 2).join(" ");
+  };
+
+  const contentTableItems = mediaItems.map((media) => {
     const reach = getMediaMetric(media, "reach", "accounts_reached");
     const likes = media.like_count;
     const comments = media.comments_count;
     const shares = getMediaMetric(media, "shares");
     const saves = getMediaMetric(media, "saved", "saves");
+    const views = getMediaMetric(media, "impressions", "views", "plays");
     const interactions = getMediaMetric(media, "total_interactions")
       ?? ((likes || 0) + (comments || 0) + (shares || 0) + (saves || 0));
     const engagementRate = reach ? interactions / reach : undefined;
+    const contentType = media.media_product_type === "REELS"
+      ? "Reels"
+      : media.media_product_type === "STORY"
+        ? "Story"
+        : media.media_type === "CAROUSEL_ALBUM"
+          ? "Carousel"
+          : media.media_type || "POST";
 
+    return {
+      media,
+      reach: reach || 0,
+      likes: likes || 0,
+      comments: comments || 0,
+      shares: shares || 0,
+      saves: saves || 0,
+      views: views || 0,
+      interactions,
+      engagementRate,
+      contentType,
+      postedAtTime: media.timestamp ? new Date(media.timestamp).getTime() : 0,
+      reasoning: buildContentReasoning({
+        reach: reach || 0,
+        views: views || 0,
+        interactions,
+        engagementRate,
+        saves: saves || 0,
+        shares: shares || 0,
+        contentType,
+      }),
+    };
+  });
+
+  const sortedContentTableItems = [...contentTableItems].sort((first, second) => {
+    if (contentSort === "oldest") return first.postedAtTime - second.postedAtTime;
+    if (contentSort === "reach") return second.reach - first.reach;
+    if (contentSort === "views") return second.views - first.views;
+    if (contentSort === "engagement") return (second.engagementRate || 0) - (first.engagementRate || 0);
+    if (contentSort === "likes") return second.likes - first.likes;
+    if (contentSort === "comments") return second.comments - first.comments;
+    if (contentSort === "saves") return second.saves - first.saves;
+    return second.postedAtTime - first.postedAtTime;
+  });
+
+  const contentRows = sortedContentTableItems.map((item) => {
+    const { media, reach, likes, comments, shares, saves, views, engagementRate, reasoning } = item;
     return [
       <div className="max-w-xs">
         <p className="line-clamp-2 font-medium text-slate-900">{media.caption || "Konten tanpa caption"}</p>
@@ -1202,12 +1318,13 @@ export function MarketingIntegrations() {
       </div>,
       <StatusBadge tone={media.media_type === "VIDEO" ? "blue" : "teal"}>{media.media_type || "POST"}</StatusBadge>,
       formatNumber(reach),
-      formatNumber(getMediaMetric(media, "impressions", "views", "plays")),
+      formatNumber(views),
       formatNumber(likes),
       formatNumber(comments),
       formatNumber(shares),
       formatNumber(saves),
       formatPercent(engagementRate),
+      <p className="max-w-sm text-xs leading-5 text-slate-600">{reasoning}</p>,
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
     ];
   });
@@ -1438,6 +1555,15 @@ export function MarketingIntegrations() {
         <SectionCard icon={TrendingUp} title="Online Followers" description="Waktu followers paling aktif untuk membantu penjadwalan konten.">
           {onlineFollowerDisplaySlots.length ? (
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 rounded-lg border border-slate-200 bg-white p-4">
+                <MiniBarList
+                  items={onlineFollowerDisplaySlots.map((slot, index) => ({
+                    label: `${index + 1}. ${slot.label}`,
+                    value: slot.value,
+                  }))}
+                  color={topOnlineFollowerSlots.length ? "bg-[#0F766E]" : "bg-sky-500"}
+                />
+              </div>
               {onlineFollowerDisplaySlots.map((slot, index) => (
                 <MetricPill
                   key={slot.label}
@@ -1456,6 +1582,24 @@ export function MarketingIntegrations() {
           )}
         </SectionCard>
         <SectionCard icon={BarChart3} title="Audience Demographics" description="Komposisi usia, gender, kota, dan negara followers.">
+          <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Usia</p>
+              {audience?.demographics?.age?.length ? <MiniBarList items={audience.demographics.age} color="bg-[#0F766E]" maxItems={3} /> : <MetricPill label="Usia" value={demographicAge} />}
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Gender</p>
+              {audience?.demographics?.gender?.length ? <MiniBarList items={audience.demographics.gender} color="bg-sky-500" maxItems={3} /> : <MetricPill label="Gender" value={demographicGender} />}
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Kota teratas</p>
+              {audience?.demographics?.city?.length ? <MiniBarList items={audience.demographics.city} color="bg-amber-500" maxItems={3} /> : <MetricPill label="Kota teratas" value={demographicCity} />}
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Negara teratas</p>
+              {audience?.demographics?.country?.length ? <MiniBarList items={audience.demographics.country} color="bg-pink-500" maxItems={3} /> : <MetricPill label="Negara teratas" value={demographicCountry} />}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <MetricPill label="Usia" value={demographicAge} />
             <MetricPill label="Gender" value={demographicGender} />
@@ -1470,7 +1614,32 @@ export function MarketingIntegrations() {
 
       <SectionCard icon={Image} title="Content / Post Level" description="Performa Feed, Reels, Stories, dan Carousel dari konten terbaru.">
         {contentRows.length ? (
-          <DataTable columns={["Konten", "Tipe", "Reach", "Views", "Likes", "Comments", "Shares", "Saves", "Eng. rate", "Link"]} rows={contentRows} />
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Filter & urutkan konten</p>
+                <p className="mt-1 text-xs text-slate-500">Menampilkan {formatNumber(contentRows.length)} konten berdasarkan pilihan sorting.</p>
+              </div>
+              <label className="text-sm font-semibold text-slate-900">
+                Urutkan data
+                <select
+                  value={contentSort}
+                  onChange={(event) => setContentSort(event.target.value as typeof contentSort)}
+                  className="mt-2 w-full min-w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                >
+                  <option value="newest">Terbaru</option>
+                  <option value="oldest">Terlama</option>
+                  <option value="reach">Reach tertinggi</option>
+                  <option value="views">Views tertinggi</option>
+                  <option value="engagement">Engagement rate tertinggi</option>
+                  <option value="likes">Likes tertinggi</option>
+                  <option value="comments">Comments tertinggi</option>
+                  <option value="saves">Saves tertinggi</option>
+                </select>
+              </label>
+            </div>
+            <DataTable columns={["Konten", "Tipe", "Reach", "Views", "Likes", "Comments", "Shares", "Saves", "Eng. rate", "Reasoning", "Link"]} rows={contentRows} />
+          </div>
         ) : (
           <EmptyState text={isMetaLoading ? "Sedang memuat konten Instagram..." : "Belum ada data konten untuk akun yang dipilih."} />
         )}
