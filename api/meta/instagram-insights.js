@@ -106,22 +106,20 @@ const getOnlineFollowers = async ({ igUserId, accessToken }) => {
     { metric: "online_followers", period: "lifetime" },
     { metric: "online_followers", period: "lifetime", metric_type: "total_value" },
     { metric: "online_followers", period: "day" },
-    { metric: "follower_online_followers", period: "lifetime" },
   ];
-  const errors = [];
 
   for (const params of attempts) {
     try {
       const payload = await metaFetch(`/${igUserId}/insights`, params, accessToken);
       const normalized = normalizeOnlineFollowers(payload);
       if (normalized.length) return { data: normalized, warning: null };
-      errors.push(`${params.metric}/${params.period}: empty`);
-    } catch (error) {
-      errors.push(`${params.metric}/${params.period}: ${error.message}`);
+    } catch {
+      // Some Meta accounts do not expose online followers. This is non-critical
+      // because the dashboard can fall back to best posting times from content.
     }
   }
 
-  return { data: [], warning: `online_followers: ${errors.join(" | ")}` };
+  return { data: [], warning: null };
 };
 
 const getFollowerDemographic = async ({ igUserId, accessToken, breakdown }) => {
@@ -276,7 +274,13 @@ const getMediaInsightMetrics = async ({ mediaId, accessToken, metrics }) => {
 
   return {
     data: results.flatMap((result) => result.data),
-    warnings: results.map((result) => result.warning).filter(Boolean),
+    warnings: results.map((result) => result.warning).filter((warning) => {
+      if (!warning) return false;
+      return ![
+        "does not support",
+        "must be one of the following values",
+      ].some((message) => warning.includes(message));
+    }),
   };
 };
 
@@ -286,14 +290,13 @@ const enrichMediaInsights = async (mediaItems, accessToken) => {
     "shares",
     "ig_reels_avg_watch_time",
     "ig_reels_video_view_total_time",
-    "profile_visits",
   ];
   const warnings = [];
   const enriched = await Promise.all(mediaItems.map(async (media) => {
     const isVideo = media.media_type === "VIDEO" || media.media_product_type === "REELS";
     const isStory = media.media_product_type === "STORY";
     const metrics = isStory
-      ? ["views", "reach", "replies", "profile_visits"]
+      ? ["views", "reach", "replies"]
       : isVideo
         ? videoMetrics
         : ["views", "shares"];
