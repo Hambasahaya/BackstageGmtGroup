@@ -135,7 +135,7 @@ const fetchKeywordPerformance = async ({ property, accessToken, startDate, endDa
         startDate,
         endDate,
         dimensions: ["query", "page"],
-        rowLimit: 50,
+        rowLimit: 250,
         type: "web",
         orderBy: [{ fieldName: "position", sortOrder: "ascending" }],
       }),

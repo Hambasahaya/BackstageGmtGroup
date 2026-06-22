@@ -421,6 +421,40 @@ export function MultiWebsiteManagement() {
   const keywordData = selectedProperties.flatMap((property) => (property.keywordPerformance || []).map((keyword) => ({ ...keyword, website: property.domain })))
     .sort((first, second) => first.position - second.position || second.clicks - first.clicks || second.impressions - first.impressions)
     .slice(0, 25);
+  const allKeywordData = selectedProperties.flatMap((property) => (property.keywordPerformance || []).map((keyword) => ({ ...keyword, website: property.domain })));
+  const keywordTotals = allKeywordData.reduce((summary, keyword) => ({
+    clicks: summary.clicks + keyword.clicks,
+    impressions: summary.impressions + keyword.impressions,
+    weightedPosition: summary.weightedPosition + (keyword.position * Math.max(keyword.impressions, 1)),
+    positionWeight: summary.positionWeight + Math.max(keyword.impressions, 1),
+  }), { clicks: 0, impressions: 0, weightedPosition: 0, positionWeight: 0 });
+  const keywordAveragePosition = keywordTotals.positionWeight ? keywordTotals.weightedPosition / keywordTotals.positionWeight : undefined;
+  const keywordCtr = keywordTotals.impressions ? keywordTotals.clicks / keywordTotals.impressions : undefined;
+  const topKeyword = allKeywordData.length ? [...allKeywordData].sort((first, second) => second.clicks - first.clicks || first.position - second.position)[0] : undefined;
+  const keywordPositionData = [
+    { bucket: "Top 1-3", keywords: allKeywordData.filter((keyword) => keyword.position <= 3).length, fill: "#0F766E" },
+    { bucket: "Top 4-10", keywords: allKeywordData.filter((keyword) => keyword.position > 3 && keyword.position <= 10).length, fill: "#2563EB" },
+    { bucket: "Top 11-20", keywords: allKeywordData.filter((keyword) => keyword.position > 10 && keyword.position <= 20).length, fill: "#DB2777" },
+    { bucket: "Top 20+", keywords: allKeywordData.filter((keyword) => keyword.position > 20).length, fill: "#F59E0B" },
+  ].filter((bucket) => bucket.keywords > 0);
+  const keywordPageMap = new Map<string, { page: string; website: string; clicks: number; impressions: number; keywords: Set<string>; bestPosition: number }>();
+  for (const keyword of allKeywordData) {
+    const key = `${keyword.website}|${keyword.page}`;
+    const current = keywordPageMap.get(key) || { page: keyword.page, website: keyword.website, clicks: 0, impressions: 0, keywords: new Set<string>(), bestPosition: Number.POSITIVE_INFINITY };
+    current.clicks += keyword.clicks;
+    current.impressions += keyword.impressions;
+    current.keywords.add(keyword.keyword);
+    current.bestPosition = Math.min(current.bestPosition, keyword.position);
+    keywordPageMap.set(key, current);
+  }
+  const keywordPageData = Array.from(keywordPageMap.values())
+    .map((page) => ({ ...page, keywordCount: page.keywords.size }))
+    .sort((first, second) => second.clicks - first.clicks || second.impressions - first.impressions)
+    .slice(0, 8);
+  const keywordOpportunityData = allKeywordData
+    .filter((keyword) => keyword.position > 3 && keyword.position <= 20 && keyword.impressions > 0)
+    .sort((first, second) => second.impressions - first.impressions || first.position - second.position)
+    .slice(0, 8);
   const formatDuration = (seconds: number | undefined) => {
     if (seconds === undefined) return "-";
     const rounded = Math.round(seconds);
@@ -486,17 +520,80 @@ export function MultiWebsiteManagement() {
         {pageData.length ? <DataTable columns={["Website", "Page", "Title", "Pageviews", "Users", "Engagement", "Avg. duration"]} rows={pageData.map((page) => [page.website, page.path, <span className="line-clamp-2 max-w-xs">{page.title}</span>, formatNumber(page.pageviews), formatNumber(page.users), formatPercent(page.engagementRate), formatDuration(page.averageSessionDuration)])} /> : <EmptyState text="Belum ada data halaman." />}
       </SectionCard>
 
-      <SectionCard icon={Search} title="Keyword Performance" description="Keyword organik dari Search Console, diurutkan dari posisi terbaik. Clicks menunjukkan total kunjungan dari keyword tersebut.">
-        {keywordData.length ? <DataTable columns={["Rank", "Keyword", "Page", "Website", "Clicks / Views", "Impressions", "CTR", "Avg. position"]} rows={keywordData.map((keyword, index) => [
-          <StatusBadge tone={index === 0 ? "green" : index < 3 ? "teal" : "blue"}>{`Top ${index + 1}`}</StatusBadge>,
-          <span className="font-semibold text-slate-900">{keyword.keyword}</span>,
-          <span className="line-clamp-2 max-w-sm">{keyword.page}</span>,
-          keyword.website,
-          formatNumber(keyword.clicks),
-          formatNumber(keyword.impressions),
-          formatPercent(keyword.ctr),
-          `#${keyword.position.toFixed(1)}`,
-        ])} /> : <EmptyState text={isLoading ? "Sedang memuat keyword dari Search Console..." : "Belum ada data keyword. Pastikan GSC_SITE_URL atau gscSiteUrl di GA4_PROPERTIES sudah punya akses Search Console."} />}
+      <SectionCard icon={Search} title="Keyword Performance" description="Keyword organik dari Search Console, lengkap dengan ranking, halaman tujuan, clicks/views, impressions, CTR, dan peluang optimasi.">
+        {allKeywordData.length ? <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <MetricPill label="Tracked keywords" value={formatNumber(allKeywordData.length)} />
+            <MetricPill label="Total clicks/views" value={formatNumber(keywordTotals.clicks)} />
+            <MetricPill label="Total impressions" value={formatNumber(keywordTotals.impressions)} />
+            <MetricPill label="Avg. CTR" value={formatPercent(keywordCtr)} />
+            <MetricPill label="Avg. position" value={keywordAveragePosition === undefined ? "-" : `#${keywordAveragePosition.toFixed(1)}`} />
+          </div>
+
+          {topKeyword && (
+            <div className="rounded-lg border border-teal-100 bg-teal-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Top traffic keyword</p>
+              <div className="mt-2 grid gap-3 lg:grid-cols-[1.2fr_2fr] lg:items-center">
+                <div>
+                  <p className="text-xl font-bold text-slate-950">{topKeyword.keyword}</p>
+                  <p className="mt-1 text-sm text-slate-600">{topKeyword.website} • posisi #{topKeyword.position.toFixed(1)}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <MetricPill label="Clicks/views" value={formatNumber(topKeyword.clicks)} />
+                  <MetricPill label="Impressions" value={formatNumber(topKeyword.impressions)} />
+                  <MetricPill label="CTR" value={formatPercent(topKeyword.ctr)} />
+                </div>
+              </div>
+              <p className="mt-3 line-clamp-2 text-sm text-slate-600">{topKeyword.page}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Ranking Distribution</h3>
+              {keywordPositionData.length ? <div className="h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={keywordPositionData} dataKey="keywords" nameKey="bucket" innerRadius={58} outerRadius={95} paddingAngle={3}>{keywordPositionData.map((entry) => <Cell key={entry.bucket} fill={entry.fill} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></div> : <EmptyState text="Belum ada distribusi ranking." />}
+            </div>
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Top SEO Landing Pages</h3>
+              {keywordPageData.length ? <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={keywordPageData} layout="vertical" margin={{ left: 18 }}><CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" horizontal={false} /><XAxis type="number" /><YAxis dataKey="page" type="category" width={120} tick={{ fontSize: 11 }} /><Tooltip /><Bar dataKey="clicks" name="Clicks / views" fill="#0F766E" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div> : <EmptyState text="Belum ada landing page SEO." />}
+            </div>
+          </div>
+
+          <DataTable columns={["Rank", "Keyword", "Page", "Website", "Clicks / Views", "Impressions", "CTR", "Avg. position"]} rows={keywordData.map((keyword, index) => [
+            <StatusBadge tone={index === 0 ? "green" : index < 3 ? "teal" : "blue"}>{`Top ${index + 1}`}</StatusBadge>,
+            <span className="font-semibold text-slate-900">{keyword.keyword}</span>,
+            <span className="line-clamp-2 max-w-sm">{keyword.page}</span>,
+            keyword.website,
+            formatNumber(keyword.clicks),
+            formatNumber(keyword.impressions),
+            formatPercent(keyword.ctr),
+            `#${keyword.position.toFixed(1)}`,
+          ])} />
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Page Keyword Summary</h3>
+              <DataTable columns={["Page", "Website", "Keywords", "Clicks", "Impressions", "Best position"]} rows={keywordPageData.map((page) => [
+                <span className="line-clamp-2 max-w-sm">{page.page}</span>,
+                page.website,
+                formatNumber(page.keywordCount),
+                formatNumber(page.clicks),
+                formatNumber(page.impressions),
+                page.bestPosition === Number.POSITIVE_INFINITY ? "-" : `#${page.bestPosition.toFixed(1)}`,
+              ])} />
+            </div>
+            <div>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Optimization Opportunities</h3>
+              {keywordOpportunityData.length ? <DataTable columns={["Keyword", "Page", "Impressions", "Clicks", "Position"]} rows={keywordOpportunityData.map((keyword) => [
+                <span className="font-semibold text-slate-900">{keyword.keyword}</span>,
+                <span className="line-clamp-2 max-w-xs">{keyword.page}</span>,
+                formatNumber(keyword.impressions),
+                formatNumber(keyword.clicks),
+                `#${keyword.position.toFixed(1)}`,
+              ])} /> : <EmptyState text="Belum ada keyword posisi 4-20 yang bisa diprioritaskan." />}
+            </div>
+          </div>
+        </div> : <EmptyState text={isLoading ? "Sedang memuat keyword dari Search Console..." : "Belum ada data keyword. Pastikan GSC_SITE_URL atau gscSiteUrl di GA4_PROPERTIES sudah punya akses Search Console."} />}
       </SectionCard>
 
       <SectionCard icon={Globe2} title="Website Portfolio" description="Perbandingan performa seluruh property GA4 yang terhubung.">
