@@ -880,24 +880,45 @@ export function MarketingIntegrations() {
   const getAccountMetric = (...names: string[]) => instagramInsights?.insights
     .find((item) => names.includes(item.name))?.values?.at(-1)?.value;
 
+  const getAccountMetricTotal = (...names: string[]) => {
+    const insight = instagramInsights?.insights.find((item) => names.includes(item.name));
+    return insight?.values?.length
+      ? insight.values.reduce((total, point) => total + (Number(point.value) || 0), 0)
+      : undefined;
+  };
+
   const getMediaMetric = (media: NonNullable<InstagramInsights["media"]>[number], ...names: string[]) =>
     media.insights?.data?.find((item) => names.includes(item.name))?.values?.at(-1)?.value;
 
   const latestReach = getAccountMetric("reach", "accounts_reached");
   const impressions = getAccountMetric("impressions", "views");
   const profileViews = getAccountMetric("profile_views");
-  const websiteClicks = getAccountMetric("website_clicks");
+  const websiteClicks = getAccountMetricTotal("profile_links_taps", "website_clicks");
+  const ctaMetricNames = ["email_contacts", "phone_call_clicks", "text_message_clicks", "get_directions_clicks"];
+  const ctaValues = ctaMetricNames
+    .map((name) => getAccountMetricTotal(name))
+    .filter((value): value is number => value !== undefined);
+  const ctaClicks = ctaValues.length ? ctaValues.reduce((total, value) => total + value, 0) : undefined;
   const profile = instagramInsights?.profile;
+  const followerSeries = instagramInsights?.insights.find((item) => item.name === "follower_count")?.values || [];
+  const firstFollowerValue = followerSeries.at(0)?.value;
+  const lastFollowerValue = followerSeries.at(-1)?.value;
+  const followerGrowth = firstFollowerValue !== undefined && lastFollowerValue !== undefined
+    ? lastFollowerValue - firstFollowerValue
+    : undefined;
+  const followerGrowthRate = firstFollowerValue && lastFollowerValue !== undefined
+    ? followerGrowth! / firstFollowerValue
+    : undefined;
 
   const accountMetrics = [
     { label: "Followers count", value: profile?.followers_count, detail: "Total followers akun saat ini" },
-    { label: "Followers growth", value: undefined, detail: "Perubahan harian, mingguan, dan bulanan" },
+    { label: "Followers growth", value: followerGrowth, detail: followerGrowthRate !== undefined ? `${formatPercent(followerGrowthRate)} dalam periode data` : "Perubahan harian, mingguan, dan bulanan" },
     { label: "Follows count", value: profile?.follows_count, detail: "Jumlah akun yang diikuti" },
     { label: "Profile views", value: profileViews, detail: "Jumlah kunjungan ke profil" },
     { label: "Reach akun", value: latestReach, detail: "Akun unik yang melihat konten" },
     { label: "Impressions akun", value: impressions, detail: "Total tayangan seluruh konten" },
-    { label: "Website clicks", value: websiteClicks, detail: "Klik pada tautan di bio" },
-    { label: "CTA clicks", value: getAccountMetric("email_contacts", "phone_call_clicks", "get_directions_clicks"), detail: "Email, telepon, dan petunjuk arah" },
+    { label: "Website clicks", value: websiteClicks, detail: "Total klik tautan bio dalam periode" },
+    { label: "CTA clicks", value: ctaClicks, detail: "Total email, telepon, SMS, dan petunjuk arah" },
   ];
 
   const trendMetrics: Record<string, string> = {
@@ -907,6 +928,7 @@ export function MarketingIntegrations() {
     views: "Impressions",
     profile_views: "Profile Views",
     website_clicks: "Website Clicks",
+    profile_links_taps: "Website Clicks",
   };
   const trendByDate = new Map<string, Record<string, string | number>>();
 
@@ -979,13 +1001,6 @@ export function MarketingIntegrations() {
     .filter((value): value is number => value !== undefined);
   const averageEngagementRate = engagementRates.length
     ? engagementRates.reduce((sum, value) => sum + value, 0) / engagementRates.length
-    : undefined;
-
-  const followerSeries = instagramInsights?.insights.find((item) => item.name === "follower_count")?.values || [];
-  const firstFollowerValue = followerSeries.at(0)?.value;
-  const lastFollowerValue = followerSeries.at(-1)?.value;
-  const followerGrowthRate = firstFollowerValue && lastFollowerValue !== undefined
-    ? (lastFollowerValue - firstFollowerValue) / firstFollowerValue
     : undefined;
 
   const contentTypeMap = new Map<string, { type: string; posts: number; reach: number; engagement: number; measured: number }>();
@@ -1111,6 +1126,15 @@ export function MarketingIntegrations() {
     .filter((media) => media.media_product_type === "REELS")
     .reduce((sum, media) => sum + (getMediaMetric(media, "plays", "views", "impressions") || 0), 0);
   const profileActivityFromVideo = videoMedia.reduce((sum, media) => sum + (getMediaMetric(media, "profile_activity", "profile_visits") || 0), 0);
+  const watchTimeValues = videoMedia
+    .map((media) => getMediaMetric(media, "ig_reels_avg_watch_time", "average_watch_time"))
+    .filter((value): value is number => value !== undefined);
+  const averageWatchTimeMs = watchTimeValues.length
+    ? watchTimeValues.reduce((sum, value) => sum + value, 0) / watchTimeValues.length
+    : undefined;
+  const averageWatchTime = averageWatchTimeMs !== undefined
+    ? `${(averageWatchTimeMs / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} dtk`
+    : "-";
   const contentIdeas = [
     {
       day: "Hari 1",
@@ -1434,10 +1458,10 @@ export function MarketingIntegrations() {
           <MetricPill label="Reels plays" value={formatNumber(reelsPlays)} />
           <MetricPill label="Stories loaded" value={formatNumber(storyMedia.length)} />
           <MetricPill label="Profile activity" value={formatNumber(profileActivityFromVideo)} />
-          <MetricPill label="Avg. watch time" value="N/A" />
+          <MetricPill label="Avg. watch time" value={averageWatchTime} />
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-500">
-          Avg. watch time, sticker taps, exits, dan replies bergantung pada permission/metric Meta yang tersedia untuk akun. Jika API mengirim metric tersebut, card ini bisa diperluas tanpa mengubah layout.
+          Views, plays, profile activity, dan watch time dibaca per konten. Stories hanya menampilkan konten yang masih aktif dan dapat diakses oleh Meta API.
         </p>
       </SectionCard>
 
