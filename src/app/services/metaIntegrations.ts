@@ -24,6 +24,10 @@ export type MetaAccountHealth = {
 export type InstagramInsights = {
   connected: boolean;
   error?: string;
+  dateRange?: {
+    since: string;
+    until: string;
+  };
   page?: {
     id: string;
     name: string;
@@ -42,7 +46,7 @@ export type InstagramInsights = {
   insights: Array<{
     name: string;
     period: string;
-    values: Array<{ value: number; end_time: string }>;
+    values: Array<{ value: number | Record<string, unknown>; end_time: string }>;
   }>;
   media: Array<{
     id: string;
@@ -57,10 +61,19 @@ export type InstagramInsights = {
       data?: Array<{
         name: string;
         period?: string;
-        values?: Array<{ value: number; end_time?: string }>;
+        values?: Array<{ value: number | Record<string, unknown>; end_time?: string }>;
       }>;
     };
   }>;
+  audience?: {
+    onlineFollowers?: Array<{ label: string; value: number }>;
+    demographics?: {
+      age?: Array<{ label: string; value: number }>;
+      gender?: Array<{ label: string; value: number }>;
+      city?: Array<{ label: string; value: number }>;
+      country?: Array<{ label: string; value: number }>;
+    };
+  };
   warnings?: string[];
 };
 
@@ -86,8 +99,15 @@ export async function fetchMetaAccounts() {
   return payload as MetaAccountHealth;
 }
 
-export async function fetchInstagramInsights(igUserId?: string) {
-  const query = igUserId ? `?igUserId=${encodeURIComponent(igUserId)}` : "";
+export async function fetchInstagramInsights(
+  igUserId?: string,
+  dateRange?: { since: string; until: string },
+) {
+  const params = new URLSearchParams();
+  if (igUserId) params.set("igUserId", igUserId);
+  if (dateRange?.since) params.set("since", dateRange.since);
+  if (dateRange?.until) params.set("until", dateRange.until);
+  const query = params.size ? `?${params.toString()}` : "";
   const response = await fetch(`/api/meta/instagram-insights${query}`);
   const payload = await response.json();
 

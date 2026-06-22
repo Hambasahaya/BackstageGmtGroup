@@ -253,6 +253,45 @@ const formatPercent = (value: number | null | undefined) => {
   return `${Math.round(value * 1000) / 10}%`;
 };
 
+const toNumber = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (value && typeof value === "object" && "value" in value) {
+    return toNumber((value as { value?: unknown }).value);
+  }
+  return undefined;
+};
+
+const sumNumbers = (values: Array<number | undefined>) => {
+  const available = values.filter((value): value is number => value !== undefined);
+  return available.length ? available.reduce((total, value) => total + value, 0) : undefined;
+};
+
+const formatRankedValue = (items: Array<{ label: string; value: number }> | undefined, fallback = "-") => {
+  const top = items?.find((item) => item.label);
+  return top ? `${top.label} (${formatNumber(top.value)})` : fallback;
+};
+
+const formatRankedList = (items: Array<{ label: string; value: number }> | undefined, limit = 3) =>
+  items?.slice(0, limit).map((item) => `${item.label} (${formatNumber(item.value)})`).join(", ") || "-";
+
+const formatDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDefaultInstagramDateRange = () => {
+  const until = new Date();
+  const since = new Date(until);
+  since.setDate(since.getDate() - 29);
+  return { since: formatDateInput(since), until: formatDateInput(until) };
+};
+
 const calculateCorrelation = (points: Array<{ x: number; y: number }>) => {
   if (points.length < 3) return undefined;
 
@@ -809,6 +848,7 @@ export function SeoManagement() {
 }
 
 export function MarketingIntegrations() {
+  const defaultDateRange = getDefaultInstagramDateRange();
   const [metaHealth, setMetaHealth] = useState<MetaAccountHealth | null>(null);
   const [instagramInsights, setInstagramInsights] = useState<InstagramInsights | null>(null);
   const [selectedInstagramId, setSelectedInstagramId] = useState("");
@@ -816,13 +856,20 @@ export function MarketingIntegrations() {
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
   const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
+  const [sinceDate, setSinceDate] = useState(defaultDateRange.since);
+  const [untilDate, setUntilDate] = useState(defaultDateRange.until);
+  const [appliedDateRange, setAppliedDateRange] = useState(defaultDateRange);
+  const [dateFilterError, setDateFilterError] = useState("");
 
-  const loadInstagramInsights = async (igUserId: string) => {
+  const loadInstagramInsights = async (
+    igUserId: string,
+    dateRange = appliedDateRange,
+  ) => {
     setIsMetaLoading(true);
     setMetaError("");
 
     try {
-      setInstagramInsights(await fetchInstagramInsights(igUserId));
+      setInstagramInsights(await fetchInstagramInsights(igUserId, dateRange));
     } catch (error) {
       setInstagramInsights(null);
       setMetaError(error instanceof Error ? error.message : "Gagal membaca insight Instagram.");
@@ -844,7 +891,7 @@ export function MarketingIntegrations() {
 
       if (accounts.connected && selectedAccount) {
         setSelectedInstagramId(selectedAccount.id);
-        setInstagramInsights(await fetchInstagramInsights(selectedAccount.id));
+        setInstagramInsights(await fetchInstagramInsights(selectedAccount.id, appliedDateRange));
       } else {
         setSelectedInstagramId("");
         setInstagramInsights(null);
@@ -869,6 +916,27 @@ export function MarketingIntegrations() {
     }
   };
 
+  const applyDateFilter = () => {
+    const sinceTime = Date.parse(`${sinceDate}T00:00:00`);
+    const untilTime = Date.parse(`${untilDate}T00:00:00`);
+    const rangeDays = Math.floor((untilTime - sinceTime) / (24 * 60 * 60 * 1000)) + 1;
+
+    if (!sinceDate || !untilDate || !Number.isFinite(rangeDays) || rangeDays < 1) {
+      setDateFilterError("Tanggal mulai tidak boleh melewati tanggal akhir.");
+      return;
+    }
+
+    if (rangeDays > 90) {
+      setDateFilterError("Rentang tanggal maksimal 90 hari.");
+      return;
+    }
+
+    const nextRange = { since: sinceDate, until: untilDate };
+    setDateFilterError("");
+    setAppliedDateRange(nextRange);
+    if (selectedInstagramId) loadInstagramInsights(selectedInstagramId, nextRange);
+  };
+
   useEffect(() => {
     refreshMetaStatus();
   }, []);
@@ -877,32 +945,49 @@ export function MarketingIntegrations() {
     || metaHealth?.instagramAccounts[0];
   const metaConnected = Boolean(metaHealth?.connected);
 
-  const getAccountMetric = (...names: string[]) => instagramInsights?.insights
-    .find((item) => names.includes(item.name))?.values?.at(-1)?.value;
+  const hasInstagramData = Boolean(instagramInsights);
+
+  const getAccountMetric = (...names: string[]) => {
+    const insight = instagramInsights?.insights.find((item) => names.includes(item.name));
+    return toNumber(insight?.values?.at(-1)?.value);
+  };
 
   const getAccountMetricTotal = (...names: string[]) => {
     const insight = instagramInsights?.insights.find((item) => names.includes(item.name));
     return insight?.values?.length
-      ? insight.values.reduce((total, point) => total + (Number(point.value) || 0), 0)
+      ? insight.values.reduce((total, point) => total + (toNumber(point.value) || 0), 0)
       : undefined;
   };
 
   const getMediaMetric = (media: NonNullable<InstagramInsights["media"]>[number], ...names: string[]) =>
-    media.insights?.data?.find((item) => names.includes(item.name))?.values?.at(-1)?.value;
+    toNumber(media.insights?.data?.find((item) => names.includes(item.name))?.values?.at(-1)?.value);
 
-  const latestReach = getAccountMetric("reach", "accounts_reached");
-  const impressions = getAccountMetric("impressions", "views");
-  const profileViews = getAccountMetric("profile_views");
-  const websiteClicks = getAccountMetricTotal("profile_links_taps", "website_clicks");
+  const mediaItems = instagramInsights?.media || [];
+  const sumMediaMetric = (...names: string[]) => sumNumbers(mediaItems.map((media) => getMediaMetric(media, ...names)));
+  const mediaReachTotal = sumMediaMetric("reach", "accounts_reached");
+  const mediaViewsTotal = sumMediaMetric("views", "plays", "impressions");
+  const mediaProfileActivityTotal = sumMediaMetric("profile_activity", "profile_visits");
+
+  const latestReach = getAccountMetricTotal("reach", "accounts_reached") ?? mediaReachTotal;
+  const impressions = getAccountMetricTotal("impressions", "views") ?? mediaViewsTotal;
+  const profileViews = getAccountMetricTotal("profile_views") ?? mediaProfileActivityTotal;
+  const websiteClicks = getAccountMetricTotal("profile_links_taps", "website_clicks") ?? (hasInstagramData ? 0 : undefined);
   const ctaMetricNames = ["email_contacts", "phone_call_clicks", "text_message_clicks", "get_directions_clicks"];
   const ctaValues = ctaMetricNames
     .map((name) => getAccountMetricTotal(name))
     .filter((value): value is number => value !== undefined);
-  const ctaClicks = ctaValues.length ? ctaValues.reduce((total, value) => total + value, 0) : undefined;
+  const ctaClicks = ctaValues.length ? ctaValues.reduce((total, value) => total + value, 0) : (hasInstagramData ? 0 : undefined);
   const profile = instagramInsights?.profile;
+  const audience = instagramInsights?.audience;
+  const onlineFollowerSlots = audience?.onlineFollowers || [];
+  const topOnlineFollowerSlots = onlineFollowerSlots.slice(0, 4);
+  const demographicAge = formatRankedValue(audience?.demographics?.age);
+  const demographicGender = formatRankedValue(audience?.demographics?.gender);
+  const demographicCity = formatRankedValue(audience?.demographics?.city);
+  const demographicCountry = formatRankedValue(audience?.demographics?.country);
   const followerSeries = instagramInsights?.insights.find((item) => item.name === "follower_count")?.values || [];
-  const firstFollowerValue = followerSeries.at(0)?.value;
-  const lastFollowerValue = followerSeries.at(-1)?.value;
+  const firstFollowerValue = toNumber(followerSeries.at(0)?.value);
+  const lastFollowerValue = toNumber(followerSeries.at(-1)?.value);
   const followerGrowth = firstFollowerValue !== undefined && lastFollowerValue !== undefined
     ? lastFollowerValue - firstFollowerValue
     : undefined;
@@ -914,9 +999,9 @@ export function MarketingIntegrations() {
     { label: "Followers count", value: profile?.followers_count, detail: "Total followers akun saat ini" },
     { label: "Followers growth", value: followerGrowth, detail: followerGrowthRate !== undefined ? `${formatPercent(followerGrowthRate)} dalam periode data` : "Perubahan harian, mingguan, dan bulanan" },
     { label: "Follows count", value: profile?.follows_count, detail: "Jumlah akun yang diikuti" },
-    { label: "Profile views", value: profileViews, detail: "Jumlah kunjungan ke profil" },
-    { label: "Reach akun", value: latestReach, detail: "Akun unik yang melihat konten" },
-    { label: "Impressions akun", value: impressions, detail: "Total tayangan seluruh konten" },
+    { label: "Profile views", value: profileViews, detail: mediaProfileActivityTotal !== undefined && getAccountMetricTotal("profile_views") === undefined ? "Estimasi dari profile activity konten" : "Jumlah kunjungan ke profil" },
+    { label: "Reach akun", value: latestReach, detail: mediaReachTotal !== undefined && getAccountMetricTotal("reach", "accounts_reached") === undefined ? "Akumulasi reach konten yang dimuat" : "Akun unik yang melihat konten" },
+    { label: "Impressions akun", value: impressions, detail: mediaViewsTotal !== undefined && getAccountMetricTotal("impressions", "views") === undefined ? "Fallback dari views/plays konten" : "Total tayangan seluruh konten" },
     { label: "Website clicks", value: websiteClicks, detail: "Total klik tautan bio dalam periode" },
     { label: "CTA clicks", value: ctaClicks, detail: "Total email, telepon, SMS, dan petunjuk arah" },
   ];
@@ -942,7 +1027,7 @@ export function MarketingIntegrations() {
       const current = trendByDate.get(dateKey) || {
         date: point.end_time ? new Date(point.end_time).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : dateKey,
       };
-      current[metricLabel] = point.value;
+      current[metricLabel] = toNumber(point.value) || 0;
       trendByDate.set(dateKey, current);
     }
   }
@@ -951,7 +1036,7 @@ export function MarketingIntegrations() {
     .sort(([first], [second]) => first.localeCompare(second))
     .map(([, value]) => value);
 
-  const contentChartData = (instagramInsights?.media || []).slice(0, 8).reverse().map((media, index) => ({
+  const contentChartData = mediaItems.slice(0, 8).reverse().map((media, index) => ({
     name: `Post ${index + 1}`,
     Reach: getMediaMetric(media, "reach", "accounts_reached") || 0,
     Likes: media.like_count || 0,
@@ -959,7 +1044,7 @@ export function MarketingIntegrations() {
     Saves: getMediaMetric(media, "saved", "saves") || 0,
   }));
 
-  const interactionTotals = (instagramInsights?.media || []).reduce((totals, media) => ({
+  const interactionTotals = mediaItems.reduce((totals, media) => ({
     likes: totals.likes + (media.like_count || 0),
     comments: totals.comments + (media.comments_count || 0),
     shares: totals.shares + (getMediaMetric(media, "shares") || 0),
@@ -972,7 +1057,7 @@ export function MarketingIntegrations() {
     { name: "Saves", value: interactionTotals.saves, color: "#DB2777" },
   ].filter((item) => item.value > 0);
 
-  const mediaAnalytics = (instagramInsights?.media || []).map((media) => {
+  const mediaAnalytics = mediaItems.map((media) => {
     const reach = getMediaMetric(media, "reach", "accounts_reached") || 0;
     const shares = getMediaMetric(media, "shares") || 0;
     const saves = getMediaMetric(media, "saved", "saves") || 0;
@@ -1086,7 +1171,7 @@ export function MarketingIntegrations() {
     ? "Belum cukup data"
     : `${frequencyCorrelation >= 0 ? "+" : ""}${frequencyCorrelation.toFixed(2)}`;
 
-  const contentRows = (instagramInsights?.media || []).map((media) => {
+  const contentRows = mediaItems.map((media) => {
     const reach = getMediaMetric(media, "reach", "accounts_reached");
     const likes = media.like_count;
     const comments = media.comments_count;
@@ -1119,8 +1204,8 @@ export function MarketingIntegrations() {
     .sort((first, second) => (second.averageEngagement || 0) - (first.averageEngagement || 0) || second.averageReach - first.averageReach)[0];
   const topHashtags = hashtagPerformance.slice(0, 4).map((item) => item.hashtag);
   const bestPostingTime = bestTimeSlots[0]?.label || "slot waktu dengan engagement tertinggi";
-  const videoMedia = (instagramInsights?.media || []).filter((media) => media.media_type === "VIDEO" || media.media_product_type === "REELS");
-  const storyMedia = (instagramInsights?.media || []).filter((media) => media.media_product_type === "STORY");
+  const videoMedia = mediaItems.filter((media) => media.media_type === "VIDEO" || media.media_product_type === "REELS");
+  const storyMedia = mediaItems.filter((media) => media.media_product_type === "STORY");
   const videoViews = videoMedia.reduce((sum, media) => sum + (getMediaMetric(media, "views", "plays", "impressions") || 0), 0);
   const reelsPlays = videoMedia
     .filter((media) => media.media_product_type === "REELS")
@@ -1208,8 +1293,8 @@ export function MarketingIntegrations() {
       description="Pantau performa profil, audiens, dan konten seluruh akun Instagram Business yang terhubung."
       toolbar={
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="w-full max-w-xl">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="w-full max-w-md">
               <label htmlFor="instagram-account" className="text-sm font-semibold text-slate-900">Akun Instagram</label>
               <p className="mt-1 text-sm text-slate-500">Pilih akun yang datanya ingin ditampilkan pada dashboard.</p>
               <select
@@ -1228,6 +1313,36 @@ export function MarketingIntegrations() {
                 ))}
               </select>
             </div>
+            <div className="grid w-full gap-3 sm:grid-cols-[1fr_1fr_auto] xl:max-w-2xl">
+              <label className="text-sm font-semibold text-slate-900">
+                Tanggal mulai
+                <input
+                  type="date"
+                  value={sinceDate}
+                  max={untilDate}
+                  onChange={(event) => setSinceDate(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                />
+              </label>
+              <label className="text-sm font-semibold text-slate-900">
+                Tanggal akhir
+                <input
+                  type="date"
+                  value={untilDate}
+                  min={sinceDate}
+                  max={formatDateInput(new Date())}
+                  onChange={(event) => setUntilDate(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                />
+              </label>
+              <button
+                onClick={applyDateFilter}
+                disabled={isMetaLoading || !selectedInstagramId}
+                className="self-end rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400"
+              >
+                Terapkan
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={refreshMetaStatus} disabled={isMetaLoading} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:text-slate-400">
                 {isMetaLoading ? "Memuat data..." : "Refresh data"}
@@ -1244,6 +1359,10 @@ export function MarketingIntegrations() {
                 </button>
               )}
             </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <span>Periode aktif: {appliedDateRange.since} sampai {appliedDateRange.until} (maksimal 90 hari).</span>
+            {dateFilterError && <span className="font-semibold text-rose-600">{dateFilterError}</span>}
           </div>
         </section>
       }
@@ -1295,15 +1414,26 @@ export function MarketingIntegrations() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <SectionCard icon={TrendingUp} title="Online Followers" description="Waktu followers paling aktif untuk membantu penjadwalan konten.">
-          <EmptyState text="Data jam aktif followers belum tersedia dari permission Meta untuk akun ini." />
+          {topOnlineFollowerSlots.length ? (
+            <div className="grid grid-cols-2 gap-3">
+              {topOnlineFollowerSlots.map((slot, index) => (
+                <MetricPill key={slot.label} label={`Jam aktif #${index + 1}`} value={`${slot.label} · ${formatNumber(slot.value)}`} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState text={isMetaLoading ? "Sedang memuat jam aktif followers..." : "Data jam aktif followers belum dikirim Meta untuk akun/permission ini."} />
+          )}
         </SectionCard>
         <SectionCard icon={BarChart3} title="Audience Demographics" description="Komposisi usia, gender, kota, dan negara followers.">
           <div className="grid grid-cols-2 gap-3">
-            <MetricPill label="Usia" value="-" />
-            <MetricPill label="Gender" value="-" />
-            <MetricPill label="Kota teratas" value="-" />
-            <MetricPill label="Negara teratas" value="-" />
+            <MetricPill label="Usia" value={demographicAge} />
+            <MetricPill label="Gender" value={demographicGender} />
+            <MetricPill label="Kota teratas" value={demographicCity} />
+            <MetricPill label="Negara teratas" value={demographicCountry} />
           </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">
+            Top 3: usia {formatRankedList(audience?.demographics?.age)}, gender {formatRankedList(audience?.demographics?.gender)}, kota {formatRankedList(audience?.demographics?.city)}, negara {formatRankedList(audience?.demographics?.country)}.
+          </p>
         </SectionCard>
       </div>
 

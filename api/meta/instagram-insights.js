@@ -1,7 +1,148 @@
 import { findInstagramPage, getStoredTokenBundle, json, metaFetch } from "./_meta-client.js";
 
-const getInsightMetrics = async ({ igUserId, accessToken }) => {
-  const configuredMetrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,profile_links_taps,email_contacts,phone_call_clicks,text_message_clicks,get_directions_clicks,follower_count,views")
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const getDefaultDateRange = () => {
+  const insightDays = Math.max(1, Math.min(Number(process.env.META_INSIGHT_DAYS || 30), 90));
+  const untilDate = new Date();
+  const sinceDate = new Date(untilDate);
+  sinceDate.setUTCDate(sinceDate.getUTCDate() - (insightDays - 1));
+
+  return {
+    since: sinceDate.toISOString().slice(0, 10),
+    until: untilDate.toISOString().slice(0, 10),
+  };
+};
+
+const parseDateRange = (requestUrl) => {
+  const defaults = getDefaultDateRange();
+  const since = requestUrl.searchParams.get("since") || defaults.since;
+  const until = requestUrl.searchParams.get("until") || defaults.until;
+
+  if (!DATE_PATTERN.test(since) || !DATE_PATTERN.test(until)) {
+    throw new Error("Format tanggal harus YYYY-MM-DD.");
+  }
+
+  const sinceTime = Date.parse(`${since}T00:00:00Z`);
+  const untilTime = Date.parse(`${until}T00:00:00Z`);
+  const rangeDays = Math.floor((untilTime - sinceTime) / (24 * 60 * 60 * 1000)) + 1;
+
+  if (!Number.isFinite(sinceTime) || !Number.isFinite(untilTime) || rangeDays < 1) {
+    throw new Error("Tanggal mulai tidak boleh melewati tanggal akhir.");
+  }
+
+  if (rangeDays > 90) {
+    throw new Error("Rentang tanggal maksimal 90 hari.");
+  }
+
+  return { since, until };
+};
+
+const normalizeInsightItem = (item, until) => {
+  const totalValue = item.total_value?.value ?? item.total_value;
+  const values = item.values?.length
+    ? item.values
+    : totalValue !== undefined
+      ? [{ value: totalValue, end_time: `${until}T00:00:00+0000` }]
+      : [];
+
+  return { ...item, values };
+};
+
+const normalizeInsightPayload = (payload, until) =>
+  (payload.data || []).map((item) => normalizeInsightItem(item, until));
+
+const getBreakdownResults = (payload) => {
+  const breakdowns = payload.data?.[0]?.total_value?.breakdowns || [];
+  return breakdowns.flatMap((breakdown) => breakdown.results || []);
+};
+
+const sortBreakdown = (items) =>
+  items
+    .filter((item) => item.label && Number.isFinite(item.value))
+    .sort((first, second) => second.value - first.value);
+
+const getFollowerDemographic = async ({ igUserId, accessToken, breakdown }) => {
+  const payload = await metaFetch(
+    `/${igUserId}/insights`,
+    {
+      metric: "follower_demographics",
+      period: "lifetime",
+      metric_type: "total_value",
+      breakdown,
+    },
+    accessToken,
+  );
+
+  return getBreakdownResults(payload);
+};
+
+const getAudienceInsights = async ({ igUserId, accessToken }) => {
+  const warnings = [];
+  const demographics = {
+    age: [],
+    gender: [],
+    city: [],
+    country: [],
+  };
+  let onlineFollowers = [];
+
+  try {
+    const payload = await metaFetch(
+      `/${igUserId}/insights`,
+      { metric: "online_followers", period: "lifetime" },
+      accessToken,
+    );
+    const onlineValue = payload.data?.[0]?.values?.at(-1)?.value || payload.data?.[0]?.total_value?.value || {};
+    onlineFollowers = Object.entries(onlineValue)
+      .map(([hour, value]) => ({
+        label: `${String(hour).padStart(2, "0")}:00`,
+        value: Number(value) || 0,
+      }))
+      .filter((item) => item.value > 0)
+      .sort((first, second) => second.value - first.value);
+  } catch (error) {
+    warnings.push(`online_followers: ${error.message}`);
+  }
+
+  try {
+    const ageGender = await getFollowerDemographic({ igUserId, accessToken, breakdown: "age,gender" });
+    const ageMap = new Map();
+    const genderMap = new Map();
+
+    for (const item of ageGender) {
+      const [age, gender] = item.dimension_values || [];
+      const value = Number(item.value) || 0;
+      if (age) ageMap.set(age, (ageMap.get(age) || 0) + value);
+      if (gender) genderMap.set(gender, (genderMap.get(gender) || 0) + value);
+    }
+
+    demographics.age = sortBreakdown(Array.from(ageMap.entries()).map(([label, value]) => ({ label, value })));
+    demographics.gender = sortBreakdown(Array.from(genderMap.entries()).map(([label, value]) => ({ label, value })));
+  } catch (error) {
+    warnings.push(`follower_demographics age,gender: ${error.message}`);
+  }
+
+  for (const breakdown of ["city", "country"]) {
+    try {
+      const results = await getFollowerDemographic({ igUserId, accessToken, breakdown });
+      demographics[breakdown] = sortBreakdown(results.map((item) => ({
+        label: item.dimension_values?.[0],
+        value: Number(item.value) || 0,
+      })));
+    } catch (error) {
+      warnings.push(`follower_demographics ${breakdown}: ${error.message}`);
+    }
+  }
+
+  return {
+    data: { onlineFollowers, demographics },
+    warning: warnings.length ? warnings.join(" | ") : null,
+  };
+};
+
+const getInsightMetrics = async ({ igUserId, accessToken, since, until }) => {
+  const configuredMetrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,profile_links_taps,email_contacts,phone_call_clicks,text_message_clicks,get_directions_clicks,follower_count,views,impressions")
     .split(",")
     .map((metric) => metric.trim())
     .filter(Boolean);
@@ -10,7 +151,10 @@ const getInsightMetrics = async ({ igUserId, accessToken }) => {
   // include the values needed by the dashboard cards.
   const dashboardMetrics = [
     "follower_count",
+    "reach",
     "views",
+    "impressions",
+    "profile_views",
     "website_clicks",
     "profile_links_taps",
     "email_contacts",
@@ -19,16 +163,14 @@ const getInsightMetrics = async ({ igUserId, accessToken }) => {
     "get_directions_clicks",
   ];
   const metrics = [...new Set([...configuredMetrics, ...dashboardMetrics])];
-  const insightDays = Math.max(1, Math.min(Number(process.env.META_INSIGHT_DAYS || 30), 90));
-  const since = new Date(Date.now() - insightDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const results = await Promise.all(metrics.map(async (metric) => {
     try {
       const payload = await metaFetch(
         `/${igUserId}/insights`,
-        { metric, period: "day", since },
+        { metric, period: "day", since, until },
         accessToken,
       );
-      return { data: payload.data || [], warning: null };
+      return { data: normalizeInsightPayload(payload, until), warning: null };
     } catch (error) {
       return { data: [], warning: `${metric}: ${error.message}` };
     }
@@ -44,7 +186,7 @@ const getMediaInsightMetrics = async ({ mediaId, accessToken, metrics }) => {
   const results = await Promise.all(metrics.map(async (metric) => {
     try {
       const payload = await metaFetch(`/${mediaId}/insights`, { metric }, accessToken);
-      return { data: payload.data || [], warning: null };
+      return { data: normalizeInsightPayload(payload, new Date().toISOString().slice(0, 10)), warning: null };
     } catch (error) {
       return { data: [], warning: `${metric}: ${error.message}` };
     }
@@ -57,9 +199,10 @@ const getMediaInsightMetrics = async ({ mediaId, accessToken, metrics }) => {
 };
 
 const enrichMediaInsights = async (mediaItems, accessToken) => {
-  const extraMetrics = [
+  const videoMetrics = [
     "views",
     "plays",
+    "shares",
     "ig_reels_avg_watch_time",
     "ig_reels_video_view_total_time",
     "profile_activity",
@@ -68,11 +211,11 @@ const enrichMediaInsights = async (mediaItems, accessToken) => {
   const enriched = await Promise.all(mediaItems.map(async (media) => {
     const isVideo = media.media_type === "VIDEO" || media.media_product_type === "REELS";
     const isStory = media.media_product_type === "STORY";
-    if (!isVideo && !isStory) return media;
-
     const metrics = isStory
       ? ["views", "reach", "replies", "profile_activity"]
-      : extraMetrics;
+      : isVideo
+        ? videoMetrics
+        : ["views", "shares"];
     const extra = await getMediaInsightMetrics({ mediaId: media.id, accessToken, metrics });
     warnings.push(...extra.warnings);
     const existing = media.insights?.data || [];
@@ -87,7 +230,7 @@ const enrichMediaInsights = async (mediaItems, accessToken) => {
   return { data: enriched, warnings };
 };
 
-const getRecentMedia = async ({ igUserId, accessToken }) => {
+const getRecentMedia = async ({ igUserId, accessToken, since, until }) => {
   try {
     const [mediaPayload, storiesPayload] = await Promise.all([
       metaFetch(
@@ -96,6 +239,8 @@ const getRecentMedia = async ({ igUserId, accessToken }) => {
         fields:
           "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,insights.metric(reach,total_interactions,saved)",
         limit: Math.max(1, Math.min(Number(process.env.META_MEDIA_LIMIT || 25), 100)),
+        since,
+        until,
       },
       accessToken,
       ),
@@ -105,10 +250,15 @@ const getRecentMedia = async ({ igUserId, accessToken }) => {
         accessToken,
       ).catch((error) => ({ data: [], warning: `stories: ${error.message}` })),
     ]);
-    const media = mediaPayload.data || [];
+    const isInsideRange = (item) => {
+      const date = item.timestamp?.slice(0, 10);
+      return !date || (date >= since && date <= until);
+    };
+    const media = (mediaPayload.data || []).filter(isInsideRange);
     const knownIds = new Set(media.map((item) => item.id));
     const stories = (storiesPayload.data || [])
       .filter((item) => !knownIds.has(item.id))
+      .filter(isInsideRange)
       .map((item) => ({ ...item, media_product_type: "STORY" }));
     const enriched = await enrichMediaInsights([...media, ...stories], accessToken);
     const uniqueWarnings = [...new Set([
@@ -141,6 +291,7 @@ export default async function handler(request, response) {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
     const pageId = requestUrl.searchParams.get("pageId");
     const igUserIdParam = requestUrl.searchParams.get("igUserId");
+    const dateRange = parseDateRange(requestUrl);
     const bundle = await getStoredTokenBundle();
     const page = findInstagramPage(bundle, pageId, igUserIdParam);
 
@@ -153,7 +304,7 @@ export default async function handler(request, response) {
     }
 
     const igUserId = page.instagram_business_account.id;
-    const [profile, insights, media] = await Promise.all([
+    const [profile, insights, media, audience] = await Promise.all([
       metaFetch(
         `/${igUserId}`,
         {
@@ -161,8 +312,9 @@ export default async function handler(request, response) {
         },
         page.access_token,
       ),
-      getInsightMetrics({ igUserId, accessToken: page.access_token }),
-      getRecentMedia({ igUserId, accessToken: page.access_token }),
+      getInsightMetrics({ igUserId, accessToken: page.access_token, ...dateRange }),
+      getRecentMedia({ igUserId, accessToken: page.access_token, ...dateRange }),
+      getAudienceInsights({ igUserId, accessToken: page.access_token }),
     ]);
 
     json(response, 200, {
@@ -172,9 +324,11 @@ export default async function handler(request, response) {
         name: page.name,
       },
       profile,
+      dateRange,
       insights: insights.data || [],
       media: media.data || [],
-      warnings: [insights.warning, media.warning].filter(Boolean),
+      audience: audience.data,
+      warnings: [insights.warning, media.warning, audience.warning].filter(Boolean),
     });
   } catch (error) {
     json(response, 500, { connected: false, error: error.message || "Instagram insights request failed." });

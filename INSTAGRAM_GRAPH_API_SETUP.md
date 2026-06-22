@@ -11,7 +11,7 @@ META_ACCESS_TOKEN=your_long_lived_user_access_token
 META_GRAPH_VERSION=v22.0
 META_INSIGHT_DAYS=30
 META_MEDIA_LIMIT=25
-META_ACCOUNT_INSIGHT_METRICS=reach,profile_views,website_clicks,profile_links_taps,email_contacts,phone_call_clicks,text_message_clicks,get_directions_clicks,follower_count,views
+META_ACCOUNT_INSIGHT_METRICS=reach,profile_views,website_clicks,profile_links_taps,email_contacts,phone_call_clicks,text_message_clicks,get_directions_clicks,follower_count,views,impressions
 ```
 
 Token membutuhkan permission berikut:
