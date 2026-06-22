@@ -1096,6 +1096,64 @@ export function MarketingIntegrations() {
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
     ];
   });
+  const topContentReferences = [...mediaAnalytics]
+    .sort((first, second) => (second.engagementRate || 0) - (first.engagementRate || 0) || second.reach - first.reach)
+    .slice(0, 3);
+  const bestContentType = [...contentTypePerformance]
+    .sort((first, second) => (second.averageEngagement || 0) - (first.averageEngagement || 0) || second.averageReach - first.averageReach)[0];
+  const topHashtags = hashtagPerformance.slice(0, 4).map((item) => item.hashtag);
+  const bestPostingTime = bestTimeSlots[0]?.label || "slot waktu dengan engagement tertinggi";
+  const contentIdeas = [
+    {
+      day: "Hari 1",
+      format: "Reels",
+      idea: `Hook cepat: masalah utama audiens lalu tampilkan solusi dari ${connectedInstagram?.username ? `@${connectedInstagram.username}` : "brand"}.`,
+      action: `Posting di ${bestPostingTime}. Pakai opening 2 detik yang kuat, subtitle besar, dan CTA komentar.`,
+      impact: "Berpotensi menaikkan reach karena format singkat lebih mudah didistribusikan dan memancing interaksi awal.",
+    },
+    {
+      day: "Hari 2",
+      format: "Story",
+      idea: "Behind the scene, progress pekerjaan, atau aktivitas tim yang membuat brand terasa lebih dekat.",
+      action: "Gunakan poll/quiz sederhana, lalu follow-up dengan sticker pertanyaan.",
+      impact: "Meningkatkan reply dan sinyal relationship dengan followers aktif.",
+    },
+    {
+      day: "Hari 3",
+      format: bestContentType?.type || "Carousel",
+      idea: "Konten edukasi: 3 kesalahan umum pelanggan dan cara menghindarinya.",
+      action: `Buat slide/saveable content, tambahkan CTA save dan gunakan hashtag terbaik: ${topHashtags.length ? topHashtags.join(", ") : "hashtag niche brand"}.`,
+      impact: "Saves dan shares bisa naik karena konten terasa berguna dan mudah dijadikan referensi.",
+    },
+    {
+      day: "Hari 4",
+      format: "Reels",
+      idea: "Before-after atau mini case study dari produk/proyek yang paling mudah divisualkan.",
+      action: "Tampilkan hasil di awal, baru proses. Tutup dengan CTA klik profil atau DM.",
+      impact: "Mendorong profile activity dari user yang tertarik melihat portfolio lebih lanjut.",
+    },
+    {
+      day: "Hari 5",
+      format: "Story",
+      idea: "Q&A singkat dari pertanyaan pelanggan atau objection yang sering muncul.",
+      action: "Pakai 3-5 frame: pertanyaan, jawaban pendek, proof, CTA.",
+      impact: "Membantu konversi soft-selling karena menjawab hambatan sebelum audiens bertanya langsung.",
+    },
+    {
+      day: "Hari 6",
+      format: "Feed",
+      idea: "Social proof: testimoni, angka pencapaian, atau highlight hasil kerja.",
+      action: "Gunakan caption storytelling pendek dengan struktur problem, action, result.",
+      impact: "Memperkuat trust dan memberi bahan remarketing organik untuk audiens baru.",
+    },
+    {
+      day: "Hari 7",
+      format: "Reels",
+      idea: "Recap mingguan: kompilasi 3 momen terbaik atau 3 insight paling berguna.",
+      action: "Edit cepat, gunakan audio yang relevan, dan arahkan ke post terbaik minggu ini.",
+      impact: "Memperpanjang umur konten yang sudah bagus dan membantu followers menangkap value utama minggu itu.",
+    },
+  ];
 
   return (
     <ModuleShell
@@ -1339,14 +1397,79 @@ export function MarketingIntegrations() {
         </div>
       </SectionCard>
 
-      <SectionCard icon={BarChart3} title="Video, Reels & Stories" description="Metrik khusus video dan Stories yang tersedia untuk akun terpilih.">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <MetricPill label="Video views" value="-" />
-          <MetricPill label="Avg. watch time" value="-" />
-          <MetricPill label="Reels plays" value="-" />
-          <MetricPill label="Sticker taps" value="-" />
-          <MetricPill label="Exits / Replies" value="-" />
-          <MetricPill label="Profile activity" value="-" />
+      <SectionCard icon={Sparkles} title="Video, Reels & Stories" description="Brief ide konten 7 hari ke depan dari analisis performa akun. Disiapkan agar nanti bisa dihubungkan ke Cloud/Codex sebagai AI social media specialist.">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <MetricPill label="Best format" value={bestContentType?.type || "-"} />
+            <MetricPill label="Best post time" value={bestTimeSlots[0]?.label || "-"} />
+            <MetricPill label="Avg engagement" value={formatPercent(averageEngagementRate)} />
+            <MetricPill label="Top references" value={formatNumber(topContentReferences.length)} />
+            <MetricPill label="Hashtag signals" value={formatNumber(topHashtags.length)} />
+            <MetricPill label="Plan window" value="7 hari" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+            <div>
+              <h3 className="font-semibold text-slate-950">Content Idea Roadmap</h3>
+              <p className="mt-1 text-sm text-slate-500">Gunakan sebagai draft kalender konten. Saat integrasi AI aktif, blok ini bisa menjadi prompt context untuk generate caption, storyboard, dan shot list.</p>
+              <div className="mt-4 space-y-3">
+                {contentIdeas.map((idea) => (
+                  <div key={idea.day} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge tone={idea.format === "Reels" ? "blue" : idea.format === "Story" ? "yellow" : "teal"}>{idea.day}</StatusBadge>
+                        <p className="font-semibold text-slate-950">{idea.format}</p>
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Brief idea</p>
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-slate-900">{idea.idea}</p>
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Apa yang harus dilakukan</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-700">{idea.action}</p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Jika dilakukan</p>
+                        <p className="mt-1 text-sm leading-6 text-emerald-800">{idea.impact}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-slate-950">Reference Content</h3>
+                <p className="mt-1 text-sm text-slate-500">Konten terbaik yang bisa dijadikan benchmark hook, format, caption, dan CTA.</p>
+              </div>
+              {topContentReferences.length ? (
+                <div className="space-y-3">
+                  {topContentReferences.map((item, index) => (
+                    <div key={item.media.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <StatusBadge tone={index === 0 ? "green" : "teal"}>{`Ref ${index + 1}`}</StatusBadge>
+                        <p className="text-xs text-slate-500">{item.contentType}</p>
+                      </div>
+                      <p className="mt-3 line-clamp-3 text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <MetricPill label="Reach" value={formatNumber(item.reach)} />
+                        <MetricPill label="Engagement" value={formatPercent(item.engagementRate)} />
+                      </div>
+                      {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">Buka referensi</a> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState text="Belum ada konten referensi. Muat data Instagram atau pilih akun lain untuk membuat brief yang lebih akurat." />
+              )}
+
+              <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
+                <p className="font-semibold text-slate-950">AI Assistant Notes</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">Saat dihubungkan ke Cloud/Codex, gunakan data akun, top content references, best time, hashtag signals, dan content roadmap ini untuk membuat caption, storyboard Reels, script voice-over, shot list, serta checklist publish.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </SectionCard>
 
