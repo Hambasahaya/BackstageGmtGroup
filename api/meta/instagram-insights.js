@@ -39,7 +39,13 @@ const parseDateRange = (requestUrl) => {
 };
 
 const normalizeInsightItem = (item, until) => {
-  const totalValue = item.total_value?.value ?? item.total_value;
+  const breakdownTotal = item.total_value?.breakdowns
+    ?.flatMap((breakdown) => breakdown.results || [])
+    .reduce((total, result) => total + (Number(result.value) || 0), 0);
+  const objectValueTotal = item.total_value?.value && typeof item.total_value.value === "object"
+    ? Object.values(item.total_value.value).reduce((total, value) => total + (Number(value) || 0), 0)
+    : undefined;
+  const totalValue = breakdownTotal ?? objectValueTotal ?? item.total_value?.value ?? item.total_value;
   const values = item.values?.length
     ? item.values
     : totalValue !== undefined
@@ -61,6 +67,62 @@ const sortBreakdown = (items) =>
   items
     .filter((item) => item.label && Number.isFinite(item.value))
     .sort((first, second) => second.value - first.value);
+
+const normalizeOnlineFollowers = (payload) => {
+  const insight = payload.data?.[0] || {};
+  const directValue = insight.values?.at(-1)?.value
+    ?? insight.total_value?.value
+    ?? insight.total_value;
+  const breakdownResults = getBreakdownResults(payload);
+
+  if (breakdownResults.length) {
+    return breakdownResults
+      .map((item) => {
+        const hour = item.dimension_values?.at(-1) ?? item.dimension_values?.[0] ?? item.label;
+        return {
+          label: `${String(hour).padStart(2, "0")}:00`,
+          value: Number(item.value) || 0,
+        };
+      })
+      .filter((item) => item.value > 0)
+      .sort((first, second) => second.value - first.value);
+  }
+
+  if (directValue && typeof directValue === "object") {
+    return Object.entries(directValue)
+      .map(([hour, value]) => ({
+        label: `${String(hour).padStart(2, "0")}:00`,
+        value: Number(value) || 0,
+      }))
+      .filter((item) => item.value > 0)
+      .sort((first, second) => second.value - first.value);
+  }
+
+  return [];
+};
+
+const getOnlineFollowers = async ({ igUserId, accessToken }) => {
+  const attempts = [
+    { metric: "online_followers", period: "lifetime" },
+    { metric: "online_followers", period: "lifetime", metric_type: "total_value" },
+    { metric: "online_followers", period: "day" },
+    { metric: "follower_online_followers", period: "lifetime" },
+  ];
+  const errors = [];
+
+  for (const params of attempts) {
+    try {
+      const payload = await metaFetch(`/${igUserId}/insights`, params, accessToken);
+      const normalized = normalizeOnlineFollowers(payload);
+      if (normalized.length) return { data: normalized, warning: null };
+      errors.push(`${params.metric}/${params.period}: empty`);
+    } catch (error) {
+      errors.push(`${params.metric}/${params.period}: ${error.message}`);
+    }
+  }
+
+  return { data: [], warning: `online_followers: ${errors.join(" | ")}` };
+};
 
 const getFollowerDemographic = async ({ igUserId, accessToken, breakdown }) => {
   const payload = await metaFetch(
@@ -87,23 +149,9 @@ const getAudienceInsights = async ({ igUserId, accessToken }) => {
   };
   let onlineFollowers = [];
 
-  try {
-    const payload = await metaFetch(
-      `/${igUserId}/insights`,
-      { metric: "online_followers", period: "lifetime" },
-      accessToken,
-    );
-    const onlineValue = payload.data?.[0]?.values?.at(-1)?.value || payload.data?.[0]?.total_value?.value || {};
-    onlineFollowers = Object.entries(onlineValue)
-      .map(([hour, value]) => ({
-        label: `${String(hour).padStart(2, "0")}:00`,
-        value: Number(value) || 0,
-      }))
-      .filter((item) => item.value > 0)
-      .sort((first, second) => second.value - first.value);
-  } catch (error) {
-    warnings.push(`online_followers: ${error.message}`);
-  }
+  const onlineResult = await getOnlineFollowers({ igUserId, accessToken });
+  onlineFollowers = onlineResult.data;
+  if (onlineResult.warning) warnings.push(onlineResult.warning);
 
   try {
     const ageGender = await getFollowerDemographic({ igUserId, accessToken, breakdown: "age,gender" });
@@ -142,32 +190,51 @@ const getAudienceInsights = async ({ igUserId, accessToken }) => {
 };
 
 const getInsightMetrics = async ({ igUserId, accessToken, since, until }) => {
-  const configuredMetrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,profile_links_taps,email_contacts,phone_call_clicks,text_message_clicks,get_directions_clicks,follower_count,views,impressions")
+  const validAccountMetrics = new Set([
+    "reach",
+    "follower_count",
+    "website_clicks",
+    "profile_views",
+    "online_followers",
+    "accounts_engaged",
+    "total_interactions",
+    "likes",
+    "comments",
+    "shares",
+    "saves",
+    "replies",
+    "engaged_audience_demographics",
+    "reached_audience_demographics",
+    "follower_demographics",
+    "follows_and_unfollows",
+    "profile_links_taps",
+    "views",
+    "content_views",
+  ]);
+  const configuredMetrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,profile_links_taps,follower_count,views")
     .split(",")
     .map((metric) => metric.trim())
-    .filter(Boolean);
-  // `views` replaces the legacy `impressions` account metric on newer Graph API
-  // versions. Keep both requested metrics when explicitly configured, but always
-  // include the values needed by the dashboard cards.
+    .filter((metric) => validAccountMetrics.has(metric));
+  // `views` replaces the legacy `impressions` account metric on newer Graph API versions.
   const dashboardMetrics = [
     "follower_count",
     "reach",
     "views",
-    "impressions",
     "profile_views",
     "website_clicks",
     "profile_links_taps",
-    "email_contacts",
-    "phone_call_clicks",
-    "text_message_clicks",
-    "get_directions_clicks",
   ];
   const metrics = [...new Set([...configuredMetrics, ...dashboardMetrics])];
   const results = await Promise.all(metrics.map(async (metric) => {
     try {
       const payload = await metaFetch(
         `/${igUserId}/insights`,
-        { metric, period: "day", since, until },
+        {
+          metric,
+          period: "day",
+          since,
+          until,
+        },
         accessToken,
       );
       return { data: normalizeInsightPayload(payload, until), warning: null };
@@ -201,18 +268,17 @@ const getMediaInsightMetrics = async ({ mediaId, accessToken, metrics }) => {
 const enrichMediaInsights = async (mediaItems, accessToken) => {
   const videoMetrics = [
     "views",
-    "plays",
     "shares",
     "ig_reels_avg_watch_time",
     "ig_reels_video_view_total_time",
-    "profile_activity",
+    "profile_visits",
   ];
   const warnings = [];
   const enriched = await Promise.all(mediaItems.map(async (media) => {
     const isVideo = media.media_type === "VIDEO" || media.media_product_type === "REELS";
     const isStory = media.media_product_type === "STORY";
     const metrics = isStory
-      ? ["views", "reach", "replies", "profile_activity"]
+      ? ["views", "reach", "replies", "profile_visits"]
       : isVideo
         ? videoMetrics
         : ["views", "shares"];
