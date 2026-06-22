@@ -1,4 +1,4 @@
-# Instagram Graph API Setup
+<!-- # Instagram Graph API Setup
 
 Dashboard dapat berjalan hanya dengan environment variables. Token selalu dibaca di backend dan tidak pernah dikirim ke browser.
 
@@ -66,4 +66,4 @@ Setelah env diterapkan dan server dijalankan ulang:
 2. Buka `/api/meta/instagram-insights?igUserId=ID_AKUN`. Respons harus memiliki `profile`, `insights`, dan `media`.
 3. Buka menu **Marketing Integrations** dan pilih akun melalui dropdown.
 
-Metrik yang tidak tersedia karena jenis akun, jumlah followers, App Review, atau versi Graph API akan dikembalikan sebagai peringatan tanpa menggagalkan metrik lainnya.
+Metrik yang tidak tersedia karena jenis akun, jumlah followers, App Review, atau versi Graph API akan dikembalikan sebagai peringatan tanpa menggagalkan metrik lainnya. -->
