@@ -815,6 +815,7 @@ export function MarketingIntegrations() {
   const [metaError, setMetaError] = useState("");
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
+  const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
 
   const loadInstagramInsights = async (igUserId: string) => {
     setIsMetaLoading(true);
@@ -1175,6 +1176,7 @@ export function MarketingIntegrations() {
       impact: "Memperpanjang umur konten yang sudah bagus dan membantu followers menangkap value utama minggu itu.",
     },
   ];
+  const selectedContentIdea = contentIdeas[Math.min(selectedContentIdeaIndex, contentIdeas.length - 1)] || contentIdeas[0];
 
   return (
     <ModuleShell
@@ -1467,30 +1469,87 @@ export function MarketingIntegrations() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_0.8fr]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_0.8fr]">
             <div>
               <h3 className="font-semibold text-slate-950">Kalender Konten 7 Hari</h3>
-              <p className="mt-1 text-sm text-slate-500">Format dibuat ringkas supaya mudah dieksekusi tim social media.</p>
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {contentIdeas.map((idea) => (
-                  <div key={idea.day} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <StatusBadge tone={idea.format === "Reels" ? "blue" : idea.format === "Story" ? "yellow" : "teal"}>{idea.day}</StatusBadge>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{idea.format}</span>
+              <p className="mt-1 text-sm text-slate-500">Pilih hari untuk melihat brief detail. Ini lebih enak dipakai saat meeting atau eksekusi harian.</p>
+              <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr]">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
+                  {contentIdeas.map((idea, index) => {
+                    const isSelected = selectedContentIdeaIndex === index;
+
+                    return (
+                      <button
+                        key={idea.day}
+                        type="button"
+                        onClick={() => setSelectedContentIdeaIndex(index)}
+                        className={`rounded-lg border px-3 py-3 text-left transition ${isSelected ? "border-[#0F766E] bg-teal-50 shadow-sm" : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"}`}
+                      >
+                        <span className={`text-xs font-semibold ${isSelected ? "text-[#0F766E]" : "text-slate-500"}`}>{idea.day}</span>
+                        <span className="mt-1 block text-sm font-bold text-slate-950">{idea.format}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <StatusBadge tone={selectedContentIdea.format === "Reels" ? "blue" : selectedContentIdea.format === "Story" ? "yellow" : "teal"}>{selectedContentIdea.day}</StatusBadge>
+                      <h4 className="mt-3 text-xl font-bold text-slate-950">{selectedContentIdea.format}</h4>
                     </div>
-                    <p className="mt-3 text-sm font-semibold leading-6 text-slate-950">{idea.idea}</p>
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Format eksekusi</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-700">{idea.formatGuide}</p>
+                    <div className="text-left sm:text-right">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Siap dieksekusi</span>
+                      <p className="mt-2 text-xs text-slate-500">Hari {selectedContentIdeaIndex + 1} dari {contentIdeas.length}</p>
                     </div>
-                    <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Alasan format</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-700">{idea.reason}</p>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{idea.action}</p>
-                    <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">{idea.impact}</p>
                   </div>
-                ))}
+
+                  <div className="mt-5 rounded-lg bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ide utama</p>
+                    <p className="mt-2 text-base font-semibold leading-7 text-slate-950">{selectedContentIdea.idea}</p>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Format eksekusi</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.formatGuide}</p>
+                    </div>
+                    <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Kenapa format ini</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.reason}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Yang dilakukan</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.action}</p>
+                    </div>
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Dampaknya</p>
+                      <p className="mt-2 text-sm leading-6 text-emerald-800">{selectedContentIdea.impact}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedContentIdeaIndex((current) => Math.max(0, current - 1))}
+                      disabled={selectedContentIdeaIndex === 0}
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Sebelumnya
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedContentIdeaIndex((current) => Math.min(contentIdeas.length - 1, current + 1))}
+                      disabled={selectedContentIdeaIndex === contentIdeas.length - 1}
+                      className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1502,18 +1561,24 @@ export function MarketingIntegrations() {
               {topContentReferences.length ? (
                 <div className="space-y-3">
                   {topContentReferences.map((item, index) => (
-                    <div key={item.media.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <StatusBadge tone={index === 0 ? "green" : "teal"}>{`Ref ${index + 1}`}</StatusBadge>
-                        <p className="text-xs text-slate-500">{item.contentType}</p>
+                    <details key={item.media.id} open={index === 0} className="group rounded-lg border border-slate-200 bg-white">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3">
+                        <div className="flex items-center gap-2">
+                          <StatusBadge tone={index === 0 ? "green" : "teal"}>{`Ref ${index + 1}`}</StatusBadge>
+                          <span className="text-sm font-semibold text-slate-900">{item.contentType}</span>
+                        </div>
+                        <span className="text-xs font-semibold text-[#0F766E] group-open:hidden">Lihat</span>
+                        <span className="hidden text-xs font-semibold text-slate-500 group-open:inline">Tutup</span>
+                      </summary>
+                      <div className="border-t border-slate-100 px-3 pb-3">
+                        <p className="mt-3 line-clamp-3 text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Reach {formatNumber(item.reach)}</span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Eng. {formatPercent(item.engagementRate)}</span>
+                        </div>
+                        {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">Buka referensi</a> : null}
                       </div>
-                      <p className="mt-3 line-clamp-2 text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1">Reach {formatNumber(item.reach)}</span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1">Eng. {formatPercent(item.engagementRate)}</span>
-                      </div>
-                      {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">Buka referensi</a> : null}
-                    </div>
+                    </details>
                   ))}
                 </div>
               ) : (
