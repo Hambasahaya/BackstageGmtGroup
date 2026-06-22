@@ -1208,10 +1208,17 @@ export function MarketingIntegrations() {
               <button onClick={refreshMetaStatus} disabled={isMetaLoading} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:text-slate-400">
                 {isMetaLoading ? "Memuat data..." : "Refresh data"}
               </button>
-              <button onClick={handleConnectMeta} disabled={isConnectingMeta} className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400">
-                <Plug className="h-4 w-4" />
-                {isConnectingMeta ? "Membuka Meta..." : metaConnected ? "Kelola koneksi" : "Hubungkan Meta"}
-              </button>
+              {metaConnected && metaHealth?.source === "env" ? (
+                <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+                  <Plug className="h-4 w-4" />
+                  Token Instagram aktif
+                </span>
+              ) : (
+                <button onClick={handleConnectMeta} disabled={isConnectingMeta} className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400">
+                  <Plug className="h-4 w-4" />
+                  {isConnectingMeta ? "Membuka Meta..." : metaConnected ? "Kelola koneksi" : "Hubungkan Meta"}
+                </button>
+              )}
             </div>
           </div>
         </section>

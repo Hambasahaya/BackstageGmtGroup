@@ -1,5 +1,6 @@
 export type MetaAccountHealth = {
   connected: boolean;
+  source?: "env" | "file" | "server";
   error?: string;
   savedAt?: string | null;
   expiresAt?: string | null;

@@ -2,6 +2,17 @@ import { readTokenBundle } from "./_token-store.js";
 
 export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v22.0";
 export const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
+export const INSTAGRAM_GRAPH_BASE_URL = `https://graph.instagram.com/${GRAPH_VERSION}`;
+
+const getGraphBaseUrl = (token) => {
+  const mode = (process.env.META_API_MODE || "").toLowerCase();
+
+  if (mode === "instagram" || token?.startsWith("IGA")) {
+    return INSTAGRAM_GRAPH_BASE_URL;
+  }
+
+  return GRAPH_BASE_URL;
+};
 
 export const json = (response, statusCode, body) => {
   response.statusCode = statusCode;
@@ -20,7 +31,7 @@ export const getRequiredConfig = () => {
 };
 
 export const metaFetch = async (endpoint, params = {}, token) => {
-  const url = new URL(`${GRAPH_BASE_URL}${endpoint}`);
+  const url = new URL(`${getGraphBaseUrl(token)}${endpoint}`);
 
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") {

@@ -11,25 +11,28 @@ const envTokenBundle = () => {
     META_ACCESS_TOKEN,
     META_USER_ACCESS_TOKEN,
     META_PAGE_ACCESS_TOKEN,
+    META_IG_ACCESS_TOKEN,
     META_PAGE_ID,
     META_IG_USER_ID,
     META_IG_USERNAME,
   } = process.env;
   const userAccessToken = META_USER_ACCESS_TOKEN || META_ACCESS_TOKEN || "";
+  const directInstagramToken = META_IG_ACCESS_TOKEN || "";
+  const directAccessToken = directInstagramToken || META_PAGE_ACCESS_TOKEN || "";
 
-  if (!userAccessToken && !META_PAGE_ACCESS_TOKEN) {
+  if (!userAccessToken && !directAccessToken) {
     return null;
   }
 
   return {
     userAccessToken,
     pages:
-      META_PAGE_ACCESS_TOKEN && META_IG_USER_ID
+      directAccessToken && META_IG_USER_ID
         ? [
             {
               id: META_PAGE_ID || META_IG_USER_ID,
-              name: "Env configured Page",
-              access_token: META_PAGE_ACCESS_TOKEN,
+              name: META_IG_USERNAME ? `@${META_IG_USERNAME}` : "Direct Instagram account",
+              access_token: directAccessToken,
               instagram_business_account: {
                 id: META_IG_USER_ID,
                 username: META_IG_USERNAME || undefined,
