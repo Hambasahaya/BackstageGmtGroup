@@ -242,9 +242,24 @@ const getInsightMetrics = async ({ igUserId, accessToken, since, until }) => {
       return { data: [], warning: `${metric}: ${error.message}` };
     }
   }));
+  const profileViewAttempts = [
+    { metric: "profile_views", period: "day", since, until, metric_type: "total_value" },
+    { metric: "profile_views", period: "lifetime", metric_type: "total_value" },
+  ];
+  const profileViewResults = await Promise.all(profileViewAttempts.map(async (params) => {
+    try {
+      const payload = await metaFetch(`/${igUserId}/insights`, params, accessToken);
+      return { data: normalizeInsightPayload(payload, until), warning: null };
+    } catch {
+      return { data: [], warning: null };
+    }
+  }));
 
   return {
-    data: results.flatMap((result) => result.data),
+    data: [
+      ...results.flatMap((result) => result.data),
+      ...profileViewResults.flatMap((result) => result.data),
+    ],
     warning: results.map((result) => result.warning).filter(Boolean).join(" | ") || null,
   };
 };

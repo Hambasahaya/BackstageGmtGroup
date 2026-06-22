@@ -951,13 +951,16 @@ export function MarketingIntegrations() {
 
   const hasInstagramData = Boolean(instagramInsights);
 
+  const findInsightWithValues = (...names: string[]) =>
+    instagramInsights?.insights.find((item) => names.includes(item.name) && item.values?.some((point) => toNumber(point.value) !== undefined));
+
   const getAccountMetric = (...names: string[]) => {
-    const insight = instagramInsights?.insights.find((item) => names.includes(item.name));
+    const insight = findInsightWithValues(...names);
     return toNumber(insight?.values?.at(-1)?.value);
   };
 
   const getAccountMetricTotal = (...names: string[]) => {
-    const insight = instagramInsights?.insights.find((item) => names.includes(item.name));
+    const insight = findInsightWithValues(...names);
     return insight?.values?.length
       ? insight.values.reduce((total, point) => total + (toNumber(point.value) || 0), 0)
       : undefined;
@@ -970,7 +973,7 @@ export function MarketingIntegrations() {
   const sumMediaMetric = (...names: string[]) => sumNumbers(mediaItems.map((media) => getMediaMetric(media, ...names)));
   const mediaReachTotal = sumMediaMetric("reach", "accounts_reached");
   const mediaViewsTotal = sumMediaMetric("views", "impressions");
-  const mediaProfileActivityTotal = sumMediaMetric("profile_activity", "profile_visits");
+  const mediaProfileActivityTotal = sumMediaMetric("profile_visits");
 
   const latestReach = getAccountMetricTotal("reach", "accounts_reached") ?? mediaReachTotal;
   const impressions = getAccountMetricTotal("views") ?? mediaViewsTotal;
