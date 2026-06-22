@@ -893,6 +893,8 @@ export function MarketingIntegrations() {
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
   const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
   const [contentSort, setContentSort] = useState<"newest" | "oldest" | "reach" | "views" | "engagement" | "likes" | "comments" | "saves">("newest");
+  const [accountTrendChartType, setAccountTrendChartType] = useState<"line" | "bar">("line");
+  const [visibleAccountTrendMetrics, setVisibleAccountTrendMetrics] = useState(["Reach", "Impressions", "Profile Views", "Website Clicks"]);
   const [sinceDate, setSinceDate] = useState(defaultDateRange.since);
   const [untilDate, setUntilDate] = useState(defaultDateRange.until);
   const [appliedDateRange, setAppliedDateRange] = useState(defaultDateRange);
@@ -1075,6 +1077,24 @@ export function MarketingIntegrations() {
   const accountTrendData = Array.from(trendByDate.entries())
     .sort(([first], [second]) => first.localeCompare(second))
     .map(([, value]) => value);
+  const accountTrendMetricConfig = [
+    { key: "Reach", color: "#0F766E" },
+    { key: "Impressions", color: "#2563EB" },
+    { key: "Profile Views", color: "#DB2777" },
+    { key: "Website Clicks", color: "#F59E0B" },
+  ];
+  const toggleAccountTrendMetric = (metric: string) => {
+    setVisibleAccountTrendMetrics((current) => {
+      if (current.includes(metric)) {
+        return current.length > 1 ? current.filter((item) => item !== metric) : current;
+      }
+      return [...current, metric];
+    });
+  };
+  const accountTrendSummary = accountTrendMetricConfig.map((metric) => ({
+    ...metric,
+    total: accountTrendData.reduce((sum, point) => sum + (toNumber(point[metric.key]) || 0), 0),
+  }));
 
   const contentChartData = mediaItems.slice(0, 8).reverse().map((media, index) => ({
     name: `Post ${index + 1}`,
@@ -1531,20 +1551,68 @@ export function MarketingIntegrations() {
 
       <SectionCard icon={TrendingUp} title="Tren Performa Akun" description="Pergerakan reach, impressions, profile views, dan website clicks berdasarkan periode dari Meta API.">
         {accountTrendData.length ? (
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={accountTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
-                <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} />
-                <Legend />
-                <Line type="monotone" dataKey="Reach" stroke="#0F766E" strokeWidth={3} dot={{ r: 3 }} connectNulls />
-                <Line type="monotone" dataKey="Impressions" stroke="#2563EB" strokeWidth={2} dot={false} connectNulls />
-                <Line type="monotone" dataKey="Profile Views" stroke="#DB2777" strokeWidth={2} dot={false} connectNulls />
-                <Line type="monotone" dataKey="Website Clicks" stroke="#F59E0B" strokeWidth={2} dot={false} connectNulls />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {accountTrendSummary.map((metric) => {
+                  const isActive = visibleAccountTrendMetrics.includes(metric.key);
+                  return (
+                    <button
+                      key={metric.key}
+                      type="button"
+                      onClick={() => toggleAccountTrendMetric(metric.key)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${isActive ? "bg-white text-slate-950 ring-slate-300 shadow-sm" : "bg-slate-100 text-slate-500 ring-slate-200"}`}
+                    >
+                      <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: metric.color }} />
+                      {metric.key}: {formatNumber(metric.total)}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => setAccountTrendChartType("line")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${accountTrendChartType === "line" ? "bg-[#0F766E] text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  Line
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountTrendChartType("bar")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${accountTrendChartType === "bar" ? "bg-[#0F766E] text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                >
+                  Bar
+                </button>
+              </div>
+            </div>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {accountTrendChartType === "line" ? (
+                  <LineChart data={accountTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
+                    <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} formatter={(value) => formatNumber(toNumber(value))} />
+                    <Legend />
+                    {accountTrendMetricConfig.filter((metric) => visibleAccountTrendMetrics.includes(metric.key)).map((metric) => (
+                      <Line key={metric.key} type="monotone" dataKey={metric.key} stroke={metric.color} strokeWidth={metric.key === "Reach" ? 3 : 2} dot={{ r: 3 }} activeDot={{ r: 6 }} connectNulls />
+                    ))}
+                  </LineChart>
+                ) : (
+                  <BarChart data={accountTrendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                    <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
+                    <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} formatter={(value) => formatNumber(toNumber(value))} />
+                    <Legend />
+                    {accountTrendMetricConfig.filter((metric) => visibleAccountTrendMetrics.includes(metric.key)).map((metric) => (
+                      <Bar key={metric.key} dataKey={metric.key} fill={metric.color} radius={[4, 4, 0, 0]} />
+                    ))}
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </div>
           </div>
         ) : (
           <EmptyState text={isMetaLoading ? "Sedang memuat tren performa..." : "Data tren belum tersedia untuk akun dan periode ini."} />
