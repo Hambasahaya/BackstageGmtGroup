@@ -2085,6 +2085,13 @@ export function MarketingIntegrations() {
 
       <SectionCard icon={Sparkles} title="AI Content Brief 7 Hari" description="Rencana konten sederhana: lihat rekomendasi utama, ikuti checklist, lalu eksekusi kalender 7 hari.">
         <div className="space-y-6">
+          {instagramInsights?.warnings?.some((warning) => warning.toLowerCase().includes("alibaba")) ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <p className="font-semibold">Alibaba Model Studio belum berhasil dipakai.</p>
+              <p className="mt-1">{instagramInsights.warnings.filter((warning) => warning.toLowerCase().includes("alibaba")).join(" ")}</p>
+            </div>
+          ) : null}
+
           <div className="rounded-xl border border-teal-100 bg-teal-50 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>

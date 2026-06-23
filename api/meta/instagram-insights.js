@@ -186,7 +186,7 @@ const callAiJson = async ({ prompt, temperature, maxTokens }) => {
   const config = getAiProviderConfig();
   if (!config) return { parsed: null, source: "local" };
 
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+  const requestAi = async (useResponseFormat) => fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
@@ -204,12 +204,33 @@ const callAiJson = async ({ prompt, temperature, maxTokens }) => {
           content: prompt,
         },
       ],
-      response_format: { type: "json_object" },
+      ...(useResponseFormat ? { response_format: { type: "json_object" } } : {}),
       temperature,
       max_tokens: maxTokens,
     }),
   });
-  const payload = await response.json();
+
+  const readPayload = async (response) => {
+    const text = await response.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return { message: text };
+    }
+  };
+
+  let response = await requestAi(true);
+  let payload = await readPayload(response);
+
+  if (!response.ok) {
+    const message = payload.error?.message || payload.message || "";
+    const shouldRetryWithoutJsonMode = /response_format|json_object|unsupported|invalid parameter/i.test(message);
+
+    if (shouldRetryWithoutJsonMode) {
+      response = await requestAi(false);
+      payload = await readPayload(response);
+    }
+  }
 
   if (!response.ok) {
     throw new Error(payload.error?.message || payload.message || "Alibaba Model Studio request failed.");
