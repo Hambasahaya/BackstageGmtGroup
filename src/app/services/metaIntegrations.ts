@@ -60,7 +60,7 @@ export type InstagramInsights = {
     ai_reasoning?: string;
     ai_action?: string;
     ai_angle?: string;
-    ai_reasoning_source?: "gemini" | "local";
+    ai_reasoning_source?: "alibaba" | "local";
     insights?: {
       data?: Array<{
         name: string;
@@ -79,7 +79,7 @@ export type InstagramInsights = {
     };
   };
   contentBrief?: {
-    source: "gemini";
+    source: "alibaba";
     summary?: string;
     items: Array<{
       day: string;
@@ -124,6 +124,21 @@ export type InstagramInsights = {
       };
     }>;
   } | null;
+  contentReferences?: Array<{
+    id: string;
+    url?: string;
+    accountUrl?: string;
+    contentType?: string;
+    title?: string;
+    caption?: string;
+    note?: string;
+    hook?: string;
+    style?: string;
+    reasoning?: string;
+    action?: string;
+    pillar?: string;
+    source?: "alibaba" | "local";
+  }>;
   warnings?: string[];
 };
 

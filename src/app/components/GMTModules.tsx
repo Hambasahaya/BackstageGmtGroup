@@ -1380,14 +1380,40 @@ export function MarketingIntegrations() {
       formatPercent(engagementRate),
       <div className="max-w-sm space-y-2">
         <p className="text-xs leading-5 text-slate-600">{reasoning}</p>
-        <StatusBadge tone={media.ai_reasoning_source === "gemini" ? "blue" : "slate"}>{media.ai_reasoning_source === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+        <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>{media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Alibaba" : "Local"}</StatusBadge>
       </div>,
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
     ];
   });
-  const topContentReferences = [...contentTableItems]
+  const customContentReferences = (instagramInsights?.contentReferences || []).map((reference, index) => ({
+    id: reference.id || `custom-reference-${index + 1}`,
+    sourceType: "custom" as const,
+    media: {
+      id: reference.id || `custom-reference-${index + 1}`,
+      caption: reference.caption || reference.title || reference.hook || reference.url || "Referensi custom",
+      permalink: reference.url || reference.accountUrl,
+      timestamp: undefined,
+      ai_reasoning_source: reference.source,
+    },
+    reach: undefined,
+    likes: undefined,
+    comments: undefined,
+    shares: undefined,
+    saves: undefined,
+    views: undefined,
+    engagementRate: undefined,
+    contentType: reference.contentType || "Reference",
+    reasoning: reference.reasoning || reference.note || "Referensi custom untuk akun ini.",
+    hook: reference.hook,
+    style: reference.style,
+    action: reference.action,
+    pillar: reference.pillar,
+  }));
+  const localContentReferences = [...contentTableItems]
     .sort((first, second) => (second.engagementRate || 0) - (first.engagementRate || 0) || second.reach - first.reach || second.views - first.views)
-    .slice(0, 3);
+    .slice(0, 3)
+    .map((item) => ({ ...item, sourceType: "local" as const }));
+  const topContentReferences = customContentReferences.length ? customContentReferences : localContentReferences;
   const bestContentType = [...contentTypePerformance]
     .sort((first, second) => (second.averageEngagement || 0) - (first.averageEngagement || 0) || second.averageReach - first.averageReach)[0];
   const topHashtags = hashtagPerformance.slice(0, 4).map((item) => item.hashtag);
@@ -1473,12 +1499,12 @@ export function MarketingIntegrations() {
       impact: "Memperpanjang umur konten yang sudah bagus dan membantu followers menangkap value utama minggu itu.",
     },
   ];
-  const geminiContentIdeas = instagramInsights?.contentBrief?.items?.length === 7
+  const aiContentIdeas = instagramInsights?.contentBrief?.items?.length === 7
     ? instagramInsights.contentBrief.items
     : [];
-  const contentIdeas = geminiContentIdeas.length ? geminiContentIdeas : fallbackContentIdeas;
-  const contentBriefSource = geminiContentIdeas.length ? "gemini" : "local";
-  const contentBriefSummary = geminiContentIdeas.length
+  const contentIdeas = aiContentIdeas.length ? aiContentIdeas : fallbackContentIdeas;
+  const contentBriefSource = aiContentIdeas.length ? instagramInsights?.contentBrief?.source || "alibaba" : "local";
+  const contentBriefSummary = aiContentIdeas.length
     ? instagramInsights?.contentBrief?.summary
     : `Fokus ke ${bestContentType?.type || "Reels"} di ${bestTimeSlots[0]?.label || "jam performa terbaik"}.`;
   const selectedContentIdea = contentIdeas[Math.min(selectedContentIdeaIndex, contentIdeas.length - 1)] || contentIdeas[0];
@@ -1597,6 +1623,7 @@ export function MarketingIntegrations() {
     },
     referencePosts: topContentReferences.map((item) => ({
       id: item.media.id,
+      sourceType: item.sourceType,
       contentType: item.contentType,
       postedAt: item.media.timestamp,
       caption: item.media.caption || "",
@@ -1608,6 +1635,10 @@ export function MarketingIntegrations() {
       saves: item.saves,
       engagementRate: formatPercent(item.engagementRate),
       reasoning: item.reasoning,
+      hook: item.hook,
+      style: item.style,
+      action: item.action,
+      pillar: item.pillar,
       permalink: item.media.permalink,
     })),
     outputRequirements: [
@@ -2059,7 +2090,7 @@ export function MarketingIntegrations() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Rekomendasi utama</p>
-                  <StatusBadge tone={contentBriefSource === "gemini" ? "blue" : "slate"}>{contentBriefSource === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+                  <StatusBadge tone={contentBriefSource !== "local" ? "blue" : "slate"}>{contentBriefSource !== "local" ? "Alibaba" : "Local"}</StatusBadge>
                 </div>
                 <h3 className="mt-1 text-xl font-bold text-slate-950">
                   {contentBriefSummary}
@@ -2203,7 +2234,7 @@ export function MarketingIntegrations() {
                       <summary className="flex cursor-pointer list-none flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <StatusBadge tone={index === 0 ? "green" : "teal"}>{`Ref ${index + 1}`}</StatusBadge>
-                          <StatusBadge tone={item.media.ai_reasoning_source === "gemini" ? "blue" : "slate"}>{item.media.ai_reasoning_source === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+                          <StatusBadge tone={item.media.ai_reasoning_source && item.media.ai_reasoning_source !== "local" ? "blue" : "slate"}>{item.media.ai_reasoning_source && item.media.ai_reasoning_source !== "local" ? "Alibaba" : "Local"}</StatusBadge>
                           <span className="min-w-0 text-sm font-semibold text-slate-900">{item.contentType}</span>
                           <span className="text-xs text-slate-500">{item.media.timestamp ? new Date(item.media.timestamp).toLocaleDateString("id-ID") : "-"}</span>
                         </div>
@@ -2212,15 +2243,24 @@ export function MarketingIntegrations() {
                       </summary>
                       <div className="border-t border-slate-100 px-3 pb-3">
                         <p className="mt-3 line-clamp-4 break-words text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Reach {formatNumber(item.reach)}</span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Views {formatNumber(item.views)}</span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Likes {formatNumber(item.likes)}</span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Saves {formatNumber(item.saves)}</span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Eng. {formatPercent(item.engagementRate)}</span>
-                        </div>
+                        {item.sourceType === "custom" ? (
+                          <div className="mt-3 space-y-2 text-xs leading-5 text-slate-600">
+                            {item.hook ? <p><span className="font-semibold text-slate-900">Hook:</span> {item.hook}</p> : null}
+                            {item.style ? <p><span className="font-semibold text-slate-900">Style:</span> {item.style}</p> : null}
+                            {item.action ? <p><span className="font-semibold text-slate-900">Adaptasi:</span> {item.action}</p> : null}
+                            {item.pillar ? <StatusBadge tone="teal">{item.pillar}</StatusBadge> : null}
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1">Reach {formatNumber(item.reach)}</span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1">Views {formatNumber(item.views)}</span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1">Likes {formatNumber(item.likes)}</span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1">Saves {formatNumber(item.saves)}</span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1">Eng. {formatPercent(item.engagementRate)}</span>
+                          </div>
+                        )}
                         <p className="mt-3 break-words text-xs leading-5 text-slate-600">{item.reasoning}</p>
-                        {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">Buka referensi</a> : null}
+                        {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">{item.sourceType === "custom" ? "Buka link referensi" : "Buka referensi"}</a> : null}
                       </div>
                     </details>
                   ))}
@@ -2233,7 +2273,7 @@ export function MarketingIntegrations() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">Nanti untuk AI Assistant</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">Output siap pakai dari Gemini untuk caption, storyboard, shot list, dan checklist publish sesuai format konten.</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">Output siap pakai dari Alibaba Model Studio untuk caption, storyboard, shot list, dan checklist publish sesuai format konten.</p>
                   </div>
                   <button
                     type="button"
@@ -2247,7 +2287,7 @@ export function MarketingIntegrations() {
                 <div className="mt-4 space-y-3">
                   <div className="rounded-lg border border-sky-100 bg-white p-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge tone={contentBriefSource === "gemini" ? "blue" : "slate"}>{contentBriefSource === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+                      <StatusBadge tone={contentBriefSource !== "local" ? "blue" : "slate"}>{contentBriefSource !== "local" ? "Alibaba" : "Local"}</StatusBadge>
                       <StatusBadge tone={aiAssistantPackage.formatType === "video" ? "blue" : aiAssistantPackage.formatType === "story" ? "yellow" : "teal"}>{aiAssistantPackage.formatType || selectedFormatType}</StatusBadge>
                     </div>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">

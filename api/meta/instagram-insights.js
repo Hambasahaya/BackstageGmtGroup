@@ -165,13 +165,66 @@ const extractJsonObject = (text) => {
   return JSON.parse(candidate.slice(start, end + 1));
 };
 
-const callGeminiForContentReasoning = async ({ profile, dateRange, mediaPayload }) => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey || !mediaPayload.length) return { items: [], warning: null, source: "local" };
+const getAiProviderConfig = () => {
+  const apiKey =
+    process.env.ALIBABA_MODEL_STUDIO_API_KEY ||
+    process.env.ALIBABA_API_KEY ||
+    process.env.DASHSCOPE_API_KEY;
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
-  url.searchParams.set("key", apiKey);
+  if (!apiKey) return null;
+
+  return {
+    apiKey,
+    baseUrl: (process.env.ALIBABA_MODEL_STUDIO_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/$/, ""),
+    model: process.env.ALIBABA_MODEL || "qwen-plus",
+    source: "alibaba",
+  };
+};
+
+const callAiJson = async ({ prompt, temperature, maxTokens }) => {
+  const config = getAiProviderConfig();
+  if (!config) return { parsed: null, source: "local" };
+
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        {
+          role: "system",
+          content: "You are a social media strategist. Return only valid JSON.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || payload.message || "Alibaba Model Studio request failed.");
+  }
+
+  const text = payload.choices?.[0]?.message?.content || "";
+  const parsed = extractJsonObject(text);
+  if (!parsed) {
+    throw new Error("Alibaba Model Studio returned an invalid JSON payload.");
+  }
+
+  return { parsed, source: config.source };
+};
+
+const callAlibabaForContentReasoning = async ({ profile, dateRange, mediaPayload }) => {
+  if (!mediaPayload.length) return { items: [], warning: null, source: "local" };
 
   const prompt = [
     "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
@@ -193,31 +246,134 @@ const callGeminiForContentReasoning = async ({ profile, dateRange, mediaPayload 
     }),
   ].join("\n");
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.35,
-        maxOutputTokens: 4096,
-      },
-    }),
-  });
-  const payload = await response.json();
+  const { parsed, source } = await callAiJson({ prompt, temperature: 0.35, maxTokens: 4096 });
+  if (source === "local") return { items: [], warning: null, source };
 
-  if (!response.ok) {
-    throw new Error(payload.error?.message || "Gemini content reasoning request failed.");
-  }
-
-  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("\n");
-  const parsed = extractJsonObject(text);
   if (!Array.isArray(parsed?.items)) {
-    throw new Error("Gemini returned an invalid content reasoning payload.");
+    throw new Error("Alibaba Model Studio returned an invalid content reasoning payload.");
   }
 
-  return { items: parsed.items, warning: null, source: "gemini" };
+  return { items: parsed.items, warning: null, source };
+};
+
+const normalizeReferenceItem = (reference, index) => {
+  if (typeof reference === "string") {
+    return {
+      id: `reference-${index + 1}`,
+      url: reference,
+      contentType: reference.includes("/reel/") ? "Reels" : reference.includes("/stories/") ? "Story" : "Reference",
+      note: "",
+    };
+  }
+
+  if (!reference || typeof reference !== "object") return null;
+
+  return {
+    id: reference.id || `reference-${index + 1}`,
+    url: reference.url || reference.permalink || reference.accountUrl || "",
+    accountUrl: reference.accountUrl || "",
+    contentType: reference.contentType || reference.type || (reference.url?.includes("/reel/") ? "Reels" : "Reference"),
+    title: reference.title || "",
+    caption: reference.caption || "",
+    note: reference.note || reference.reason || "",
+  };
+};
+
+const getConfiguredReferences = ({ igUserId, username }) => {
+  const raw = process.env.META_CONTENT_REFERENCES || process.env.INSTAGRAM_CONTENT_REFERENCES || "";
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    const usernameKey = username?.toLowerCase();
+    const candidates = Array.isArray(parsed)
+      ? parsed
+      : [
+          ...(parsed[igUserId] || []),
+          ...(usernameKey ? parsed[usernameKey] || [] : []),
+          ...(username ? parsed[`@${usernameKey}`] || [] : []),
+        ];
+    const references = Array.isArray(parsed)
+      ? candidates
+          .filter((group) => {
+            if (!group || typeof group !== "object") return false;
+            const groupUsername = String(group.username || "").replace(/^@/, "").toLowerCase();
+            return group.igUserId === igUserId || group.instagramUserId === igUserId || groupUsername === usernameKey;
+          })
+          .flatMap((group) => group.references || group.links || [])
+      : candidates;
+
+    return references
+      .map(normalizeReferenceItem)
+      .filter((item) => item?.url || item?.caption || item?.note)
+      .slice(0, 6);
+  } catch {
+    return [];
+  }
+};
+
+const getReferenceInsights = async ({ profile, igUserId, recentPosts }) => {
+  const references = getConfiguredReferences({ igUserId, username: profile?.username });
+  if (!references.length) return { data: [], warning: null };
+
+  const prompt = [
+    "You are applying the Social Media Manager skill for an Indonesian Instagram dashboard.",
+    "Analyze the provided reference Instagram content/account links for the selected account.",
+    "Important: if a reference only has a URL and no caption/note, do not pretend you can see the post. Infer only format from the URL when possible and give a practical creative-use reason.",
+    "Return only valid JSON. No markdown. No commentary.",
+    "Schema: {\"items\":[{\"id\":\"reference id\",\"title\":\"short title\",\"contentType\":\"Reels|Carousel|Story|Feed|Account\",\"hook\":\"hook/style to borrow\",\"style\":\"visual/copy style\",\"reasoning\":\"1-2 Indonesian sentences why this is useful for the selected account\",\"action\":\"how to adapt it\",\"pillar\":\"content pillar\"}]}",
+    "Keep reasoning under 240 characters. Use Bahasa Indonesia.",
+    JSON.stringify({
+      selectedAccount: {
+        igUserId,
+        username: profile?.username,
+        name: profile?.name,
+        biography: profile?.biography,
+      },
+      references,
+      recentPosts: recentPosts.slice(0, 6),
+    }),
+  ].join("\n");
+
+  try {
+    const { parsed, source } = await callAiJson({ prompt, temperature: 0.35, maxTokens: 4096 });
+    if (source === "local") return { data: [], warning: null };
+
+    const items = Array.isArray(parsed?.items) ? parsed.items : [];
+    const byId = new Map(items.map((item) => [item.id, item]));
+
+    return {
+      data: references.map((reference, index) => {
+        const insight = byId.get(reference.id) || {};
+        return {
+          ...reference,
+          title: insight.title || reference.title || `Referensi ${index + 1}`,
+          contentType: insight.contentType || reference.contentType || "Reference",
+          hook: insight.hook || "",
+          style: insight.style || "",
+          reasoning: insight.reasoning || reference.note || "Referensi custom untuk menjaga arah hook, gaya visual, dan angle konten akun ini.",
+          action: insight.action || "",
+          pillar: insight.pillar || "",
+          source,
+        };
+      }),
+      warning: null,
+    };
+  } catch (error) {
+    return {
+      data: references.map((reference, index) => ({
+        ...reference,
+        title: reference.title || `Referensi ${index + 1}`,
+        hook: "",
+        style: "",
+        reasoning: reference.note || "Referensi custom tersedia, tetapi analisis Alibaba belum berhasil dimuat.",
+        action: "",
+        pillar: "",
+        source: "local",
+      })),
+      warning: `Alibaba reference fallback: ${error.message}`,
+    };
+  }
 };
 
 const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
@@ -225,9 +381,9 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
   const fallbackById = new Map(mediaPayload.map((item) => [item.id, item.fallbackReasoning]));
 
   try {
-    const gemini = await callGeminiForContentReasoning({ profile, dateRange, mediaPayload });
+    const ai = await callAlibabaForContentReasoning({ profile, dateRange, mediaPayload });
     const reasoningById = new Map(
-      gemini.items
+      ai.items
         .filter((item) => item?.id && typeof item.reasoning === "string")
         .map((item) => [item.id, item]),
     );
@@ -240,10 +396,10 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
           ai_reasoning: reasoning?.reasoning || fallbackById.get(media.id),
           ai_action: reasoning?.action,
           ai_angle: reasoning?.angle,
-          ai_reasoning_source: reasoning?.reasoning ? "gemini" : "local",
+          ai_reasoning_source: reasoning?.reasoning ? ai.source : "local",
         };
       }),
-      warning: gemini.source === "gemini" ? null : null,
+      warning: ai.source === "alibaba" ? null : null,
     };
   } catch (error) {
     return {
@@ -252,18 +408,13 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
         ai_reasoning: fallbackById.get(media.id),
         ai_reasoning_source: "local",
       })),
-      warning: `Gemini reasoning fallback: ${error.message}`,
+      warning: `Alibaba reasoning fallback: ${error.message}`,
     };
   }
 };
 
-const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, audience }) => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey || !mediaPayload.length) return { contentBrief: null, warning: null };
-
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
-  url.searchParams.set("key", apiKey);
+const callAlibabaForContentBrief = async ({ profile, dateRange, mediaPayload, audience }) => {
+  if (!mediaPayload.length) return { contentBrief: null, warning: null };
 
   const prompt = [
     "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
@@ -271,7 +422,7 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
     "Use the Social Media Manager skill principles: content pillars, audience value, growth objective, format fit, cadence, hook strategy, CTA, platform-native execution, and publish QA.",
     "Make the assistant package format-aware: Reels/video must include script and shot list; Carousel must include slide-by-slide outline; Story must include frame sequence; Feed/static must include visual direction.",
     "Return only valid JSON. No markdown. No commentary.",
-    "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"gemini\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"publishChecklist\":[\"\"],\"postPublishChecklist\":[\"\"]}}]}",
+    "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"alibaba\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"publishChecklist\":[\"\"],\"postPublishChecklist\":[\"\"]}}]}",
     "Exactly 7 items. Keep every field practical, specific, and in Indonesian. Do not invent metrics not present in the input.",
     "For non-matching fields, return an empty array rather than irrelevant content. Example: carouselSlides can be empty for Reels.",
     "Prefer GMT/brand-relevant ideas over generic social media advice.",
@@ -297,30 +448,13 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
     }),
   ].join("\n");
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.45,
-        maxOutputTokens: 8192,
-      },
-    }),
-  });
-  const payload = await response.json();
+  const { parsed, source } = await callAiJson({ prompt, temperature: 0.45, maxTokens: 8192 });
+  if (source === "local") return { contentBrief: null, warning: null };
 
-  if (!response.ok) {
-    throw new Error(payload.error?.message || "Gemini content brief request failed.");
-  }
-
-  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("\n");
-  const parsed = extractJsonObject(text);
   const items = Array.isArray(parsed?.items) ? parsed.items.slice(0, 7) : [];
 
   if (items.length !== 7) {
-    throw new Error("Gemini returned an invalid 7-day content brief payload.");
+    throw new Error("Alibaba Model Studio returned an invalid 7-day content brief payload.");
   }
 
   const cleanStringArray = (value) =>
@@ -365,7 +499,7 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
 
   return {
     contentBrief: {
-      source: "gemini",
+      source,
       summary: typeof parsed.summary === "string" ? parsed.summary : "",
       items: items.map((item, index) => ({
         day: typeof item.day === "string" ? item.day : `Hari ${index + 1}`,
@@ -386,7 +520,7 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
 
 const getContentBrief = async ({ profile, dateRange, mediaItems, audience }) => {
   try {
-    return await callGeminiForContentBrief({
+    return await callAlibabaForContentBrief({
       profile,
       dateRange,
       mediaPayload: getMediaReasoningPayload(mediaItems),
@@ -395,7 +529,7 @@ const getContentBrief = async ({ profile, dateRange, mediaItems, audience }) => 
   } catch (error) {
     return {
       contentBrief: null,
-      warning: `Gemini content brief fallback: ${error.message}`,
+      warning: `Alibaba content brief fallback: ${error.message}`,
     };
   }
 };
@@ -744,6 +878,11 @@ export default async function handler(request, response) {
       mediaItems: mediaWithReasoning.data || [],
       audience: audience.data,
     });
+    const contentReferences = await getReferenceInsights({
+      profile,
+      igUserId,
+      recentPosts: getMediaReasoningPayload(mediaWithReasoning.data || []),
+    });
 
     json(response, 200, {
       connected: true,
@@ -757,7 +896,8 @@ export default async function handler(request, response) {
       media: mediaWithReasoning.data || [],
       audience: audience.data,
       contentBrief: contentBrief.contentBrief,
-      warnings: [insights.warning, media.warning, mediaWithReasoning.warning, contentBrief.warning, audience.warning].filter(Boolean),
+      contentReferences: contentReferences.data,
+      warnings: [insights.warning, media.warning, mediaWithReasoning.warning, contentBrief.warning, contentReferences.warning, audience.warning].filter(Boolean),
     });
   } catch (error) {
     json(response, 500, { connected: false, error: error.message || "Instagram insights request failed." });
