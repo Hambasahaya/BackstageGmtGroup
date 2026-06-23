@@ -267,11 +267,13 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
 
   const prompt = [
     "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
-    "Create a tactical 7-day content brief from the account profile, audience signals, and recent post metrics.",
-    "Use content pillars, format mix, cadence, hook strategy, CTA, audience value, and measurable objective.",
+    "Create a tactical 7-day content brief and production-ready assistant package from the account profile, audience signals, and recent post metrics.",
+    "Use the Social Media Manager skill principles: content pillars, audience value, growth objective, format fit, cadence, hook strategy, CTA, platform-native execution, and publish QA.",
+    "Make the assistant package format-aware: Reels/video must include script and shot list; Carousel must include slide-by-slide outline; Story must include frame sequence; Feed/static must include visual direction.",
     "Return only valid JSON. No markdown. No commentary.",
-    "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"gemini\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\"}]}",
+    "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"gemini\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"publishChecklist\":[\"\"],\"postPublishChecklist\":[\"\"]}}]}",
     "Exactly 7 items. Keep every field practical, specific, and in Indonesian. Do not invent metrics not present in the input.",
+    "For non-matching fields, return an empty array rather than irrelevant content. Example: carouselSlides can be empty for Reels.",
     "Prefer GMT/brand-relevant ideas over generic social media advice.",
     JSON.stringify({
       account: {
@@ -321,6 +323,46 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
     throw new Error("Gemini returned an invalid 7-day content brief payload.");
   }
 
+  const cleanStringArray = (value) =>
+    Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim()).slice(0, 12) : [];
+  const cleanObjectArray = (value, shape) =>
+    Array.isArray(value)
+      ? value.slice(0, 12).map((item) => Object.fromEntries(
+        Object.keys(shape).map((key) => [key, typeof item?.[key] === "string" ? item[key] : ""]),
+      ))
+      : [];
+  const normalizeAssistantPackage = (assistant = {}) => ({
+    formatType: typeof assistant.formatType === "string" ? assistant.formatType : "",
+    caption: {
+      hook: typeof assistant.caption?.hook === "string" ? assistant.caption.hook : "",
+      body: typeof assistant.caption?.body === "string" ? assistant.caption.body : "",
+      cta: typeof assistant.caption?.cta === "string" ? assistant.caption.cta : "",
+      hashtags: cleanStringArray(assistant.caption?.hashtags),
+    },
+    script: cleanObjectArray(assistant.script, {
+      timecode: "",
+      visual: "",
+      voiceOver: "",
+      onScreenText: "",
+    }),
+    carouselSlides: cleanObjectArray(assistant.carouselSlides, {
+      slide: "",
+      headline: "",
+      visual: "",
+      copy: "",
+    }),
+    storyFrames: cleanObjectArray(assistant.storyFrames, {
+      frame: "",
+      visual: "",
+      text: "",
+      stickerOrCta: "",
+    }),
+    visualDirection: typeof assistant.visualDirection === "string" ? assistant.visualDirection : "",
+    shotList: cleanStringArray(assistant.shotList),
+    publishChecklist: cleanStringArray(assistant.publishChecklist),
+    postPublishChecklist: cleanStringArray(assistant.postPublishChecklist),
+  });
+
   return {
     contentBrief: {
       source: "gemini",
@@ -335,6 +377,7 @@ const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, aud
         action: typeof item.action === "string" ? item.action : "",
         reason: typeof item.reason === "string" ? item.reason : "",
         impact: typeof item.impact === "string" ? item.impact : "",
+        assistant: normalizeAssistantPackage(item.assistant),
       })),
     },
     warning: null,

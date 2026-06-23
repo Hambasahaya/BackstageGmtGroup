@@ -91,6 +91,37 @@ export type InstagramInsights = {
       action: string;
       reason: string;
       impact: string;
+      assistant?: {
+        formatType?: string;
+        caption?: {
+          hook?: string;
+          body?: string;
+          cta?: string;
+          hashtags?: string[];
+        };
+        script?: Array<{
+          timecode?: string;
+          visual?: string;
+          voiceOver?: string;
+          onScreenText?: string;
+        }>;
+        carouselSlides?: Array<{
+          slide?: string;
+          headline?: string;
+          visual?: string;
+          copy?: string;
+        }>;
+        storyFrames?: Array<{
+          frame?: string;
+          visual?: string;
+          text?: string;
+          stickerOrCta?: string;
+        }>;
+        visualDirection?: string;
+        shotList?: string[];
+        publishChecklist?: string[];
+        postPublishChecklist?: string[];
+      };
     }>;
   } | null;
   warnings?: string[];

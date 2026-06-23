@@ -1385,8 +1385,8 @@ export function MarketingIntegrations() {
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
     ];
   });
-  const topContentReferences = [...mediaAnalytics]
-    .sort((first, second) => (second.engagementRate || 0) - (first.engagementRate || 0) || second.reach - first.reach)
+  const topContentReferences = [...contentTableItems]
+    .sort((first, second) => (second.engagementRate || 0) - (first.engagementRate || 0) || second.reach - first.reach || second.views - first.views)
     .slice(0, 3);
   const bestContentType = [...contentTypePerformance]
     .sort((first, second) => (second.averageEngagement || 0) - (first.averageEngagement || 0) || second.averageReach - first.averageReach)[0];
@@ -1482,9 +1482,95 @@ export function MarketingIntegrations() {
     ? instagramInsights?.contentBrief?.summary
     : `Fokus ke ${bestContentType?.type || "Reels"} di ${bestTimeSlots[0]?.label || "jam performa terbaik"}.`;
   const selectedContentIdea = contentIdeas[Math.min(selectedContentIdeaIndex, contentIdeas.length - 1)] || contentIdeas[0];
+  const selectedFormatType = (() => {
+    const format = selectedContentIdea.format.toLowerCase();
+    const guide = selectedContentIdea.formatGuide.toLowerCase();
+    if (format.includes("reels") || format.includes("video") || guide.includes("video")) return "video";
+    if (format.includes("carousel") || guide.includes("carousel") || guide.includes("slide")) return "carousel";
+    if (format.includes("story")) return "story";
+    return "feed";
+  })();
+  const buildFallbackAssistantPackage = () => {
+    const hashtags = topHashtags.length ? topHashtags : ["#GMTGroup"];
+    const baseCaption = {
+      hook: selectedContentIdea.idea,
+      body: `${selectedContentIdea.reason} ${selectedContentIdea.impact}`,
+      cta: selectedFormatType === "story" ? "Reply atau DM untuk diskusi lebih lanjut." : "Save konten ini dan hubungi tim GMT untuk kebutuhan proyek berikutnya.",
+      hashtags,
+    };
+
+    if (selectedFormatType === "video") {
+      return {
+        formatType: "video",
+        caption: baseCaption,
+        script: [
+          { timecode: "0-3s", visual: "Tampilkan masalah atau hasil akhir paling kuat.", voiceOver: selectedContentIdea.idea, onScreenText: "Masalah utama audiens" },
+          { timecode: "4-15s", visual: "Tampilkan proses, demo, atau bukti teknis.", voiceOver: selectedContentIdea.formatGuide, onScreenText: "Solusi singkat" },
+          { timecode: "16-25s", visual: "Tutup dengan brand/project proof dan CTA.", voiceOver: selectedContentIdea.action, onScreenText: "Save / DM GMT" },
+        ],
+        carouselSlides: [],
+        storyFrames: [],
+        visualDirection: "Video vertikal 9:16, teks overlay jelas, opening cepat, dan visual proof terlihat dalam 2 detik pertama.",
+        shotList: ["Opening problem/result", "Detail proses atau demo", "Close-up proof", "Brand/CTA end frame"],
+        publishChecklist: ["Cek hook 2 detik pertama", "Pastikan subtitle terbaca", "Tambahkan CTA", "Gunakan hashtag relevan", "Posting di jam rekomendasi"],
+        postPublishChecklist: ["Balas komentar awal", "Pantau saves/shares", "Catat retention/reach", "Simpan sebagai referensi format berikutnya"],
+      };
+    }
+
+    if (selectedFormatType === "carousel") {
+      return {
+        formatType: "carousel",
+        caption: baseCaption,
+        script: [],
+        carouselSlides: [
+          { slide: "1", headline: selectedContentIdea.idea, visual: "Cover kuat dengan satu masalah atau janji manfaat.", copy: "Buat audiens paham value dalam satu kalimat." },
+          { slide: "2-4", headline: "Masalah dan insight", visual: "Foto/proyek/diagram pendukung.", copy: selectedContentIdea.reason },
+          { slide: "5-6", headline: "Solusi GMT", visual: "Detail eksekusi, before-after, atau workflow.", copy: selectedContentIdea.formatGuide },
+          { slide: "7", headline: "CTA", visual: "Brand frame dan kontak/DM cue.", copy: selectedContentIdea.action },
+        ],
+        storyFrames: [],
+        visualDirection: "Carousel 6-8 slide, headline pendek, visual konsisten, dan slide terakhir mengajak save/share/DM.",
+        shotList: ["Cover visual", "Detail masalah", "Proof/proses", "Hasil akhir", "CTA frame"],
+        publishChecklist: ["Cek urutan slide", "Pastikan teks tiap slide ringkas", "Tambahkan CTA save/share", "Cek caption dan hashtag", "Preview crop feed"],
+        postPublishChecklist: ["Pantau saves", "Balas komentar pertanyaan", "Share ke Story", "Catat slide/topik yang paling banyak direspons"],
+      };
+    }
+
+    if (selectedFormatType === "story") {
+      return {
+        formatType: "story",
+        caption: baseCaption,
+        script: [],
+        carouselSlides: [],
+        storyFrames: [
+          { frame: "1", visual: "Hook visual atau pertanyaan.", text: selectedContentIdea.idea, stickerOrCta: "Poll/Quiz" },
+          { frame: "2-3", visual: "Proses, BTS, atau proof.", text: selectedContentIdea.formatGuide, stickerOrCta: "Tap next" },
+          { frame: "4", visual: "Kesimpulan dan ajakan.", text: selectedContentIdea.action, stickerOrCta: "Question sticker / DM" },
+        ],
+        visualDirection: "Story 3-5 frame, ritme cepat, teks besar, dan gunakan sticker untuk memancing reply.",
+        shotList: ["Frame hook", "Frame proses/proof", "Frame interaksi", "Frame CTA"],
+        publishChecklist: ["Cek teks tidak tertutup UI Story", "Tambahkan sticker interaktif", "Pastikan urutan frame jelas", "Tambahkan CTA reply/DM"],
+        postPublishChecklist: ["Balas reply", "Screenshot insight Story", "Catat sticker response", "Simpan pertanyaan audiens untuk konten berikutnya"],
+      };
+    }
+
+    return {
+      formatType: "feed",
+      caption: baseCaption,
+      script: [],
+      carouselSlides: [],
+      storyFrames: [],
+      visualDirection: `Single image atau feed post dengan visual proof. ${selectedContentIdea.formatGuide}`,
+      shotList: ["Hero visual", "Detail proof", "Brand/CTA version"],
+      publishChecklist: ["Cek crop feed", "Cek caption problem-action-result", "Tambahkan CTA", "Gunakan hashtag relevan"],
+      postPublishChecklist: ["Pantau komentar", "Share ke Story", "Catat profile activity", "Gunakan ulang angle jika engagement bagus"],
+    };
+  };
+  const aiAssistantPackage = (selectedContentIdea as { assistant?: ReturnType<typeof buildFallbackAssistantPackage> }).assistant || buildFallbackAssistantPackage();
   const aiAssistantContext = JSON.stringify({
     task: "Buat caption, storyboard, shot list, dan checklist publish untuk konten Instagram.",
     language: "Bahasa Indonesia",
+    generationMode: "Gunakan output format-aware. Jika Reels/video, buat script dan shot list. Jika Carousel, buat slide outline. Jika Story, buat frame sequence. Jika Feed/static, buat visual direction dan caption.",
     account: {
       username: connectedInstagram?.username ? `@${connectedInstagram.username}` : undefined,
       name: profile?.name,
@@ -1496,6 +1582,7 @@ export function MarketingIntegrations() {
     source: contentBriefSource,
     mainRecommendation: contentBriefSummary,
     selectedBrief: selectedContentIdea,
+    assistantPackage: aiAssistantPackage,
     performanceSignals: {
       averageEngagementRate: formatPercent(averageEngagementRate),
       bestPostingTime: mediaAnalytics.length >= 3 ? bestTimeSlots[0]?.label || undefined : undefined,
@@ -1509,11 +1596,18 @@ export function MarketingIntegrations() {
       },
     },
     referencePosts: topContentReferences.map((item) => ({
+      id: item.media.id,
       contentType: item.contentType,
+      postedAt: item.media.timestamp,
       caption: item.media.caption || "",
       reach: item.reach,
+      views: item.views,
+      likes: item.likes,
+      comments: item.comments,
+      shares: item.shares,
+      saves: item.saves,
       engagementRate: formatPercent(item.engagementRate),
-      reasoning: item.media.ai_reasoning,
+      reasoning: item.reasoning,
       permalink: item.media.permalink,
     })),
     outputRequirements: [
@@ -1996,8 +2090,8 @@ export function MarketingIntegrations() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_0.8fr]">
-            <div>
+          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+            <div className="min-w-0">
               <h3 className="font-semibold text-slate-950">Kalender Konten 7 Hari</h3>
               <p className="mt-1 text-sm text-slate-500">Pilih hari untuk melihat brief detail. Ini lebih enak dipakai saat meeting atau eksekusi harian.</p>
               <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr]">
@@ -2097,7 +2191,7 @@ export function MarketingIntegrations() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <div>
                 <h3 className="font-semibold text-slate-950">Referensi Terbaik</h3>
                 <p className="mt-1 text-sm text-slate-500">Pakai ini sebagai contoh hook dan gaya konten.</p>
@@ -2105,21 +2199,27 @@ export function MarketingIntegrations() {
               {topContentReferences.length ? (
                 <div className="space-y-3">
                   {topContentReferences.map((item, index) => (
-                    <details key={item.media.id} open={index === 0} className="group rounded-lg border border-slate-200 bg-white">
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3">
-                        <div className="flex items-center gap-2">
+                    <details key={item.media.id} open={index === 0} className="group min-w-0 rounded-lg border border-slate-200 bg-white">
+                      <summary className="flex cursor-pointer list-none flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <StatusBadge tone={index === 0 ? "green" : "teal"}>{`Ref ${index + 1}`}</StatusBadge>
-                          <span className="text-sm font-semibold text-slate-900">{item.contentType}</span>
+                          <StatusBadge tone={item.media.ai_reasoning_source === "gemini" ? "blue" : "slate"}>{item.media.ai_reasoning_source === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+                          <span className="min-w-0 text-sm font-semibold text-slate-900">{item.contentType}</span>
+                          <span className="text-xs text-slate-500">{item.media.timestamp ? new Date(item.media.timestamp).toLocaleDateString("id-ID") : "-"}</span>
                         </div>
-                        <span className="text-xs font-semibold text-[#0F766E] group-open:hidden">Lihat</span>
-                        <span className="hidden text-xs font-semibold text-slate-500 group-open:inline">Tutup</span>
+                        <span className="text-xs font-semibold text-[#0F766E] group-open:hidden sm:shrink-0">Lihat</span>
+                        <span className="hidden text-xs font-semibold text-slate-500 group-open:inline sm:shrink-0">Tutup</span>
                       </summary>
                       <div className="border-t border-slate-100 px-3 pb-3">
-                        <p className="mt-3 line-clamp-3 text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                        <p className="mt-3 line-clamp-4 break-words text-sm font-medium text-slate-900">{item.media.caption || "Konten tanpa caption"}</p>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
                           <span className="rounded-full bg-slate-100 px-2.5 py-1">Reach {formatNumber(item.reach)}</span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Views {formatNumber(item.views)}</span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Likes {formatNumber(item.likes)}</span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1">Saves {formatNumber(item.saves)}</span>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1">Eng. {formatPercent(item.engagementRate)}</span>
                         </div>
+                        <p className="mt-3 break-words text-xs leading-5 text-slate-600">{item.reasoning}</p>
                         {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">Buka referensi</a> : null}
                       </div>
                     </details>
@@ -2133,7 +2233,7 @@ export function MarketingIntegrations() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">Nanti untuk AI Assistant</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">Konteks siap pakai untuk caption, storyboard, shot list, dan checklist publish.</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">Output siap pakai dari Gemini untuk caption, storyboard, shot list, dan checklist publish sesuai format konten.</p>
                   </div>
                   <button
                     type="button"
@@ -2143,6 +2243,91 @@ export function MarketingIntegrations() {
                     {isAssistantContextCopied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
                     {isAssistantContextCopied ? "Tersalin" : "Salin"}
                   </button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-lg border border-sky-100 bg-white p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge tone={contentBriefSource === "gemini" ? "blue" : "slate"}>{contentBriefSource === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+                      <StatusBadge tone={aiAssistantPackage.formatType === "video" ? "blue" : aiAssistantPackage.formatType === "story" ? "yellow" : "teal"}>{aiAssistantPackage.formatType || selectedFormatType}</StatusBadge>
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                      <p><span className="font-semibold text-slate-950">Hook:</span> {aiAssistantPackage.caption?.hook || selectedContentIdea.idea}</p>
+                      <p><span className="font-semibold text-slate-950">Body:</span> {aiAssistantPackage.caption?.body || selectedContentIdea.reason}</p>
+                      <p><span className="font-semibold text-slate-950">CTA:</span> {aiAssistantPackage.caption?.cta || selectedContentIdea.action}</p>
+                      {aiAssistantPackage.caption?.hashtags?.length ? (
+                        <p className="break-words"><span className="font-semibold text-slate-950">Hashtag:</span> {aiAssistantPackage.caption.hashtags.join(" ")}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {aiAssistantPackage.formatType === "video" && aiAssistantPackage.script?.length ? (
+                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Script video / Reels</p>
+                      <div className="mt-3 space-y-2">
+                        {aiAssistantPackage.script.map((step, index) => (
+                          <div key={`${step.timecode}-${index}`} className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                            <p className="font-semibold text-slate-950">{step.timecode || `Scene ${index + 1}`}</p>
+                            <p><span className="font-medium">Visual:</span> {step.visual}</p>
+                            <p><span className="font-medium">VO:</span> {step.voiceOver}</p>
+                            <p><span className="font-medium">Text:</span> {step.onScreenText}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {aiAssistantPackage.formatType === "carousel" && aiAssistantPackage.carouselSlides?.length ? (
+                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outline carousel</p>
+                      <div className="mt-3 space-y-2">
+                        {aiAssistantPackage.carouselSlides.map((slide, index) => (
+                          <div key={`${slide.slide}-${index}`} className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                            <p className="font-semibold text-slate-950">Slide {slide.slide || index + 1}: {slide.headline}</p>
+                            <p><span className="font-medium">Visual:</span> {slide.visual}</p>
+                            <p><span className="font-medium">Copy:</span> {slide.copy}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {aiAssistantPackage.formatType === "story" && aiAssistantPackage.storyFrames?.length ? (
+                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Frame Story</p>
+                      <div className="mt-3 space-y-2">
+                        {aiAssistantPackage.storyFrames.map((frame, index) => (
+                          <div key={`${frame.frame}-${index}`} className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                            <p className="font-semibold text-slate-950">Frame {frame.frame || index + 1}</p>
+                            <p><span className="font-medium">Visual:</span> {frame.visual}</p>
+                            <p><span className="font-medium">Text:</span> {frame.text}</p>
+                            <p><span className="font-medium">Sticker/CTA:</span> {frame.stickerOrCta}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {aiAssistantPackage.visualDirection ? (
+                    <div className="rounded-lg border border-sky-100 bg-white p-3 text-sm leading-6 text-slate-700">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visual direction</p>
+                      <p className="mt-2">{aiAssistantPackage.visualDirection}</p>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shot list</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-slate-700">
+                        {(aiAssistantPackage.shotList || []).map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </div>
+                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checklist publish</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-slate-700">
+                        {[...(aiAssistantPackage.publishChecklist || []), ...(aiAssistantPackage.postPublishChecklist || [])].map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
                 <pre className="mt-4 max-h-80 overflow-auto rounded-lg border border-sky-100 bg-white p-3 text-xs leading-5 text-slate-700">
                   {aiAssistantContext}
