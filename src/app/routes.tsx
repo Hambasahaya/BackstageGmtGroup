@@ -6,6 +6,7 @@ import { Layout } from "./components/Layout";
 import { AgentOnboarding } from "./components/AgentOnboarding";
 import { AgentPurchaseOrder } from "./components/AgentPurchaseOrder";
 import { AgentWithdraw } from "./components/AgentWithdraw";
+import { AgentAchievement } from "./components/AgentAchievement";
 import { AgentApplications } from "./components/AgentApplications";
 import { ApplyAgent } from "./components/ApplyAgent";
 import { Dashboard } from "./components/Dashboard";
@@ -176,6 +177,16 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={userOnly}>
             <ApplyAgent />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "agent-achievement",
+        element: (
+          <RoleGate allowedRoles={agentOnly}>
+            <OfficialAgentGate>
+              <AgentAchievement />
+            </OfficialAgentGate>
           </RoleGate>
         ),
       },

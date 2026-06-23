@@ -23,6 +23,7 @@ import {
   UserPlus,
   Users,
   Wallet,
+  Trophy,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ElementType } from "react";
@@ -59,6 +60,7 @@ const menuItems: MenuItem[] = [
   { icon: UserPlus, label: "Agent Applications", path: "/agent-applications", roles: ["super_admin"] },
   { icon: Wallet, label: "Withdraw Approval", path: "/withdraw-approvals", roles: ["super_admin"] },
   { icon: UserPlus, label: "Apply Agent", path: "/apply-agent", roles: ["user"], statuses: ["not_verif", "verif", "stopped_agent"] },
+  { icon: Trophy, label: "Achievement", path: "/agent-achievement", roles: ["agent"], statuses: ["official_agent"] },
   { icon: GraduationCap, label: "Agent Onboarding", path: "/agent-onboarding", roles: ["agent"], statuses: ["official_agent"] },
   { icon: ShoppingCart, label: "Purchase Order", path: "/agent-purchase-orders", roles: ["agent"], statuses: ["official_agent"] },
   { icon: Wallet, label: "Withdraw", path: "/agent-withdraw", roles: ["agent"], statuses: ["official_agent"] },

@@ -873,6 +873,7 @@ export default async function handler(request, response) {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
     const pageId = requestUrl.searchParams.get("pageId");
     const igUserIdParam = requestUrl.searchParams.get("igUserId");
+    const skipAi = requestUrl.searchParams.get("skip_ai") === "true";
     const dateRange = parseDateRange(requestUrl);
     const bundle = await getStoredTokenBundle();
     const page = findInstagramPage(bundle, pageId, igUserIdParam);
@@ -898,6 +899,37 @@ export default async function handler(request, response) {
       getRecentMedia({ igUserId, accessToken: page.access_token, ...dateRange }),
       getAudienceInsights({ igUserId, accessToken: page.access_token }),
     ]);
+
+    // When skip_ai=true, we still run the real-time content reasoning (enrichMediaReasoning)
+    // because reasoning is needed in real-time for new posts.
+    // However, we skip the expensive contentBrief and contentReferences generation,
+    // which are cached in the database.
+    if (skipAi) {
+      const mediaWithReasoning = await enrichMediaReasoning({
+        mediaItems: media.data || [],
+        profile,
+        dateRange,
+      });
+
+      json(response, 200, {
+        connected: true,
+        skippedAi: true,
+        page: {
+          id: page.id,
+          name: page.name,
+        },
+        profile,
+        dateRange,
+        insights: insights.data || [],
+        media: mediaWithReasoning.data || [],
+        audience: audience.data,
+        contentBrief: null,
+        contentReferences: [],
+        warnings: [insights.warning, media.warning, mediaWithReasoning.warning, audience.warning].filter(Boolean),
+      });
+      return;
+    }
+
     const mediaWithReasoning = await enrichMediaReasoning({
       mediaItems: media.data || [],
       profile,
@@ -918,6 +950,7 @@ export default async function handler(request, response) {
 
     json(response, 200, {
       connected: true,
+      skippedAi: false,
       page: {
         id: page.id,
         name: page.name,

@@ -164,14 +164,18 @@ export async function fetchMetaAccounts() {
   return payload as MetaAccountHealth;
 }
 
+import { apiRequest } from "./api";
+
 export async function fetchInstagramInsights(
   igUserId?: string,
   dateRange?: { since: string; until: string },
+  skipAi?: boolean,
 ) {
   const params = new URLSearchParams();
   if (igUserId) params.set("igUserId", igUserId);
   if (dateRange?.since) params.set("since", dateRange.since);
   if (dateRange?.until) params.set("until", dateRange.until);
+  if (skipAi) params.set("skip_ai", "true");
   const query = params.size ? `?${params.toString()}` : "";
   const response = await fetch(`/api/meta/instagram-insights${query}`);
   const payload = await response.json();
@@ -207,4 +211,88 @@ export async function generateReferenceBrief(payload: {
   }
 
   return result as { filename: string; html: string };
+}
+
+export async function generateContentFromBrief(payload: {
+  selectedIdea: any;
+  contentType: string;
+  account?: {
+    username?: string;
+    name?: string;
+    biography?: string;
+    followers?: number;
+    website?: string;
+  };
+}) {
+  const response = await fetch("/api/meta/generate-content", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to generate content.");
+  }
+
+  return result as {
+    contentType: string;
+    title: string;
+    caption: {
+      hook: string;
+      body: string;
+      cta: string;
+      hashtags: string[];
+    };
+    content: {
+      script?: Array<{ timecode: string; visual: string; voiceOver: string; onScreenText: string }>;
+      storyFrames?: Array<{ frame: string; visual: string; text: string; stickerOrCta: string }>;
+      carouselSlides?: Array<{ slide: string; headline: string; visual: string; copy: string }>;
+      article?: string;
+    };
+    metadata: {
+      visualDirection?: string;
+      shotList?: string[];
+      publishChecklist?: string[];
+    };
+  };
+}
+
+export type CachedContentBrief = {
+  cached: boolean;
+  data: {
+    id: number;
+    ig_user_id: string;
+    ig_username?: string;
+    content_brief: InstagramInsights["contentBrief"];
+    content_references: InstagramInsights["contentReferences"];
+    generated_at: string;
+    expires_at: string;
+  } | null;
+};
+
+export async function fetchContentBriefCache(igUserId: string): Promise<CachedContentBrief> {
+  return apiRequest<CachedContentBrief>("/api/marketing/content-brief-cache", {
+    method: "GET",
+    query: { ig_user_id: igUserId },
+  });
+}
+
+export async function saveContentBriefCache(payload: {
+  ig_user_id: string;
+  ig_username?: string;
+  content_brief: InstagramInsights["contentBrief"];
+  content_references: InstagramInsights["contentReferences"];
+}) {
+  return apiRequest<{ message: string; data: any }>("/api/marketing/content-brief-cache", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteContentBriefCache(igUserId: string) {
+  return apiRequest<{ message: string }>("/api/marketing/content-brief-cache", {
+    method: "DELETE",
+    query: { ig_user_id: igUserId },
+  });
 }

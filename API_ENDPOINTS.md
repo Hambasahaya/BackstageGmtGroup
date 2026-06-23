@@ -519,3 +519,98 @@ Efek:
 - Status withdraw berubah menjadi `approval`.
 - `pending_withdraw` berkurang.
 - `withdrawn_balance` bertambah.
+
+## Marketing AI Caching
+
+### `GET /api/marketing/content-brief-cache`
+
+Dipakai untuk mengambil data cached Content Brief 7 Hari dan Reference Insights.
+
+Auth: wajib login (role `marketing` atau `super_admin`).
+
+Query Parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ig_user_id` | string | ✅ | Instagram User ID |
+
+Response (Cache Hit):
+```json
+{
+  "cached": true,
+  "data": {
+    "id": 1,
+    "ig_user_id": "17841466229554456",
+    "ig_username": "gmtgroup.id",
+    "content_brief": {
+      "source": "alibaba",
+      "summary": "...",
+      "items": [ ... ]
+    },
+    "content_references": [ ... ],
+    "generated_at": "2026-06-23T10:00:00Z",
+    "expires_at": "2026-06-30T10:00:00Z"
+  }
+}
+```
+
+Response (Cache Miss/Expired):
+```json
+{
+  "cached": false,
+  "data": null
+}
+```
+
+### `POST /api/marketing/content-brief-cache`
+
+Dipakai untuk menyimpan atau memperbarui cached Content Brief 7 Hari dan Reference Insights.
+
+Auth: wajib login (role `marketing` atau `super_admin`).
+
+Body:
+```json
+{
+  "ig_user_id": "17841466229554456",
+  "ig_username": "gmtgroup.id",
+  "content_brief": {
+    "source": "alibaba",
+    "summary": "...",
+    "items": [ ... ]
+  },
+  "content_references": [ ... ]
+}
+```
+
+Response:
+```json
+{
+  "message": "Content brief cache saved",
+  "data": {
+    "id": 1,
+    "ig_user_id": "17841466229554456",
+    "ig_username": "gmtgroup.id",
+    "generated_at": "2026-06-23T17:05:00Z",
+    "expires_at": "2026-06-30T17:05:00Z"
+  }
+}
+```
+
+### `DELETE /api/marketing/content-brief-cache`
+
+Dipakai untuk menghapus/force invalidate cache.
+
+Auth: wajib login (role `marketing` atau `super_admin`).
+
+Query Parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ig_user_id` | string | ✅ | Instagram User ID |
+
+Response:
+```json
+{
+  "message": "Content brief cache deleted"
+}
+```

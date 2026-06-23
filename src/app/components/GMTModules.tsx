@@ -25,6 +25,10 @@ import {
   TrendingUp,
   Upload,
   Users,
+  CheckCheck,
+  CheckCircle,
+  X,
+  AlertCircle,
 } from "lucide-react";
 import { useEffect, useState, type ElementType, type ReactNode } from "react";
 import {
@@ -49,6 +53,10 @@ import {
   fetchMetaAccounts,
   fetchMetaAuthUrl,
   generateReferenceBrief,
+  fetchContentBriefCache,
+  saveContentBriefCache,
+  deleteContentBriefCache,
+  generateContentFromBrief,
   type InstagramInsights,
   type MetaAccountHealth,
 } from "../services/metaIntegrations";
@@ -948,15 +956,161 @@ export function MarketingIntegrations() {
   const [appliedDateRange, setAppliedDateRange] = useState(defaultDateRange);
   const [dateFilterError, setDateFilterError] = useState("");
 
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [contentModalOpen, setContentModalOpen] = useState(false);
+  const [contentGenError, setContentGenError] = useState("");
+  const [isCopied, setIsCopied] = useState(false);
+  const [isSavedToCms, setIsSavedToCms] = useState(false);
+
+  const handleGenerateContent = async (type: string) => {
+    setIsGeneratingContent(true);
+    setContentGenError("");
+    setContentModalOpen(true);
+    setGeneratedContent(null);
+    setIsCopied(false);
+    setIsSavedToCms(false);
+
+    // Resolve target content type
+    let targetType = type;
+    if (type === "ikutin") {
+      const formatLower = (selectedContentIdea.format || "").toLowerCase();
+      if (formatLower.includes("reel")) targetType = "reels";
+      else if (formatLower.includes("story")) targetType = "story";
+      else if (formatLower.includes("carousel")) targetType = "carousel";
+      else if (formatLower.includes("feed") || formatLower.includes("post")) targetType = "feed";
+      else targetType = "feed";
+    }
+
+    try {
+      const result = await generateContentFromBrief({
+        selectedIdea: {
+          format: selectedContentIdea.format,
+          idea: selectedContentIdea.idea,
+          pillar: selectedContentIdea.pillar,
+          objective: selectedContentIdea.objective,
+          formatGuide: selectedContentIdea.formatGuide,
+          action: selectedContentIdea.action,
+          reason: selectedContentIdea.reason,
+          impact: selectedContentIdea.impact,
+        },
+        contentType: targetType,
+        account: {
+          username: connectedInstagram?.username || profile?.username,
+          name: profile?.name,
+          biography: profile?.biography,
+        },
+      });
+
+      setGeneratedContent(result);
+    } catch (error) {
+      setGeneratedContent(null);
+      setContentGenError(error instanceof Error ? error.message : "Gagal men-generate konten.");
+    } finally {
+      setIsGeneratingContent(false);
+    }
+  };
+
+  const getCopyableText = (data: any) => {
+    if (!data) return "";
+    let text = `Judul: ${data.title}\n\n`;
+    
+    if (data.caption?.hook || data.caption?.body) {
+      text += `[CAPTION]\n`;
+      if (data.caption?.hook) text += `Hook: ${data.caption.hook}\n`;
+      if (data.caption?.body) text += `${data.caption.body}\n`;
+      if (data.caption?.cta) text += `CTA: ${data.caption.cta}\n`;
+      if (data.caption?.hashtags?.length) text += `Hashtags: ${data.caption.hashtags.join(" ")}\n`;
+      text += `\n`;
+    }
+
+    if (data.contentType === "artikel" && data.content?.article) {
+      text += `[ARTIKEL]\n${data.content.article}\n`;
+    } else if (data.content?.script?.length) {
+      text += `[SCRIPT REELS/VIDEO]\n`;
+      data.content.script.forEach((scene: any) => {
+        text += `- ${scene.timecode} | Visual: ${scene.visual} | VO: ${scene.voiceOver} | Text: ${scene.onScreenText}\n`;
+      });
+    } else if (data.content?.storyFrames?.length) {
+      text += `[STORY FRAMES]\n`;
+      data.content.storyFrames.forEach((frame: any) => {
+        text += `- Frame ${frame.frame} | Visual: ${frame.visual} | Text: ${frame.text} | CTA/Sticker: ${frame.stickerOrCta}\n`;
+      });
+    } else if (data.content?.carouselSlides?.length) {
+      text += `[CAROUSEL SLIDES]\n`;
+      data.content.carouselSlides.forEach((slide: any) => {
+        text += `- Slide ${slide.slide} | Headline: ${slide.headline} | Visual: ${slide.visual} | Copy: ${slide.copy}\n`;
+      });
+    }
+
+    if (data.metadata?.visualDirection) {
+      text += `\n[ARAHAN VISUAL]\n${data.metadata.visualDirection}\n`;
+    }
+    return text;
+  };
+
   const loadInstagramInsights = async (
     igUserId: string,
-    dateRange = appliedDateRange,
+    dateRange: { since: string; until: string } = appliedDateRange,
+    forceRefresh: boolean = false
   ) => {
     setIsMetaLoading(true);
     setMetaError("");
 
     try {
-      setInstagramInsights(await fetchInstagramInsights(igUserId, dateRange));
+      let insightsData: InstagramInsights | null = null;
+
+      // Invalidate database cache if force refresh is requested (e.g. Regenerate)
+      if (forceRefresh) {
+        try {
+          await deleteContentBriefCache(igUserId);
+          console.log("Database cache invalidated for igUserId:", igUserId);
+        } catch (deleteError) {
+          console.warn("Failed to delete/invalidate content brief cache:", deleteError);
+        }
+      }
+
+      // 1. Try to fetch from database cache first (only if not forceRefresh)
+      if (!forceRefresh) {
+        try {
+          const cacheRes = await fetchContentBriefCache(igUserId);
+          if (cacheRes && cacheRes.cached && cacheRes.data) {
+            // Cache hit! We fetch raw instagram data with skipAi = true
+            // This still runs enrichMediaReasoning in real-time on the server.
+            insightsData = await fetchInstagramInsights(igUserId, dateRange, true);
+            
+            // Attach cached data
+            insightsData.contentBrief = cacheRes.data.content_brief;
+            insightsData.contentReferences = cacheRes.data.content_references;
+            console.log("AI Content Brief cache hit from database.");
+          }
+        } catch (cacheError) {
+          console.warn("Failed to read from content brief cache (expected if DB/endpoint not ready yet):", cacheError);
+        }
+      }
+
+      // 2. Cache miss or force refresh or cache check failed
+      if (!insightsData) {
+        // Fetch full data including AI calls
+        insightsData = await fetchInstagramInsights(igUserId, dateRange, false);
+
+        // Save generated data to cache
+        if (insightsData.contentBrief || (insightsData.contentReferences && insightsData.contentReferences.length > 0)) {
+          try {
+            await saveContentBriefCache({
+              ig_user_id: igUserId,
+              ig_username: insightsData.profile?.username || "",
+              content_brief: insightsData.contentBrief,
+              content_references: insightsData.contentReferences || [],
+            });
+            console.log("Saved new AI Content Brief to database cache.");
+          } catch (saveError) {
+            console.warn("Failed to write to content brief cache (expected if DB/endpoint not ready yet):", saveError);
+          }
+        }
+      }
+
+      setInstagramInsights(insightsData);
     } catch (error) {
       setInstagramInsights(null);
       setMetaError(error instanceof Error ? error.message : "Gagal membaca insight Instagram.");
@@ -978,7 +1132,7 @@ export function MarketingIntegrations() {
 
       if (accounts.connected && selectedAccount) {
         setSelectedInstagramId(selectedAccount.id);
-        setInstagramInsights(await fetchInstagramInsights(selectedAccount.id, appliedDateRange));
+        await loadInstagramInsights(selectedAccount.id, appliedDateRange);
       } else {
         setSelectedInstagramId("");
         setInstagramInsights(null);
@@ -2031,6 +2185,16 @@ export function MarketingIntegrations() {
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                   Pakai konten referensi terbaik sebagai pola: hook cepat, visual jelas, caption singkat, dan CTA yang meminta komentar, save, atau DM.
                 </p>
+                {selectedInstagramId && (
+                  <button
+                    onClick={() => loadInstagramInsights(selectedInstagramId, appliedDateRange, true)}
+                    disabled={isMetaLoading}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-300 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {isMetaLoading ? "Memperbarui..." : "Perbarui AI Brief (Regenerate)"}
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2 sm:min-w-80">
                 <MetricPill label="Avg engagement" value={formatPercent(averageEngagementRate)} />
@@ -2141,14 +2305,35 @@ export function MarketingIntegrations() {
                     >
                       Sebelumnya
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedContentIdeaIndex((current) => Math.min(contentIdeas.length - 1, current + 1))}
-                      disabled={selectedContentIdeaIndex === contentIdeas.length - 1}
-                      className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      Berikutnya
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <select
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            void handleGenerateContent(val);
+                            e.target.value = "";
+                          }
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Buat konten dengan AI...</option>
+                        <option value="ikutin">Ikutin jenis konten ini ({selectedContentIdea.format})</option>
+                        <option value="artikel">Buat jadi artikel</option>
+                        <option value="reels">Buat jadi Reels</option>
+                        <option value="story">Buat jadi Story</option>
+                        <option value="carousel">Buat jadi Carousel</option>
+                        <option value="feed">Buat jadi Feed</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedContentIdeaIndex((current) => Math.min(contentIdeas.length - 1, current + 1))}
+                        disabled={selectedContentIdeaIndex === contentIdeas.length - 1}
+                        className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        Berikutnya
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2228,6 +2413,291 @@ export function MarketingIntegrations() {
           <p className="mt-1">{instagramInsights.warnings.join(" ")}</p>
         </div>
       ) : null}
+
+      {/* AI CONTENT GENERATOR MODAL */}
+      {contentModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="flex h-[85vh] w-full max-w-4xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-[#0F766E] px-6 py-4 text-white">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-white/10 p-2">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">GMT AI Content Writer</h3>
+                  <p className="text-xs text-teal-100">Dibuat otomatis dari Brief Kalender Konten Hari {selectedContentIdeaIndex + 1}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setContentModalOpen(false)}
+                className="rounded-lg p-1.5 text-teal-50 hover:bg-white/10 hover:text-white transition-colors"
+                aria-label="Tutup modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {isGeneratingContent ? (
+                <div className="flex h-full flex-col items-center justify-center gap-4 py-20 text-center">
+                  <video
+                    src="/imgloading/4067125821-preview.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="h-32 w-32 rounded-xl object-cover shadow-lg"
+                  />
+                  <div>
+                    <h4 className="text-base font-bold text-slate-900 animate-pulse">Menghasilkan Konten dengan AI...</h4>
+                    <p className="mt-2 text-sm text-slate-500 max-w-md">Alibaba Model Studio sedang merancang draf visual, copywriting, dan struktur konten terbaik untuk Anda.</p>
+                  </div>
+                </div>
+              ) : contentGenError ? (
+                <div className="flex h-full flex-col items-center justify-center py-20 text-center">
+                  <div className="rounded-full bg-rose-50 p-4 text-rose-600">
+                    <AlertCircle className="h-10 w-10" />
+                  </div>
+                  <h4 className="mt-4 text-base font-bold text-slate-900">Gagal Menghasilkan Konten</h4>
+                  <p className="mt-2 text-sm text-slate-500 max-w-md">{contentGenError}</p>
+                  <button
+                    onClick={() => handleGenerateContent("ikutin")}
+                    className="mt-6 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              ) : generatedContent ? (
+                <div className="space-y-6">
+                  {/* Title & Format Info */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <span className="inline-flex rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-[#0F766E] ring-1 ring-teal-200 capitalize">
+                        {generatedContent.contentType}
+                      </span>
+                      <h4 className="mt-2 text-xl font-extrabold text-slate-900">{generatedContent.title}</h4>
+                    </div>
+                  </div>
+
+                  {/* Caption Card (if provided) */}
+                  {generatedContent.caption && (generatedContent.caption.hook || generatedContent.caption.body) && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+                      <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Copywriting Caption / Deskripsi</h5>
+                      <div className="bg-white rounded-lg border border-slate-200 p-4 text-sm font-medium text-slate-800 space-y-3 shadow-inner">
+                        {generatedContent.caption.hook && (
+                          <p className="font-bold text-[#0F766E] border-b border-slate-100 pb-2">
+                            {generatedContent.caption.hook}
+                          </p>
+                        )}
+                        {generatedContent.caption.body && (
+                          <p className="whitespace-pre-wrap leading-relaxed text-slate-700">
+                            {generatedContent.caption.body}
+                          </p>
+                        )}
+                        {generatedContent.caption.cta && (
+                          <p className="font-semibold text-blue-600 border-t border-slate-100 pt-2">
+                            {generatedContent.caption.cta}
+                          </p>
+                        )}
+                        {generatedContent.caption.hashtags?.length > 0 && (
+                          <p className="text-slate-500 text-xs font-semibold">
+                            {generatedContent.caption.hashtags.join(" ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Format-Specific Content Outputs */}
+                  {generatedContent.contentType === "artikel" && generatedContent.content?.article && (
+                    <div className="rounded-xl border border-slate-200 p-5">
+                      <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Draf Artikel SEO (Markdown)</h5>
+                      <div className="max-h-[300px] overflow-y-auto bg-slate-950 text-slate-100 rounded-lg p-4 font-mono text-xs whitespace-pre-wrap leading-relaxed shadow-inner">
+                        {generatedContent.content.article}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reels / Video script */}
+                  {(generatedContent.contentType === "reels" || generatedContent.contentType === "reals" || generatedContent.contentType === "video") && generatedContent.content?.script?.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 p-5">
+                      <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Script & Storyboard Video</h5>
+                      <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-inner">
+                        <table className="w-full border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
+                              <th className="p-3 w-16">Durasi</th>
+                              <th className="p-3 w-1/3">Deskripsi Visual</th>
+                              <th className="p-3 w-1/3">Voice Over / Audio</th>
+                              <th className="p-3">Teks di Layar</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-600 font-medium">
+                            {generatedContent.content.script.map((scene, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/50">
+                                <td className="p-3 font-bold text-[#0F766E]">{scene.timecode || "-"}</td>
+                                <td className="p-3 whitespace-pre-wrap">{scene.visual || "-"}</td>
+                                <td className="p-3 whitespace-pre-wrap">{scene.voiceOver || "-"}</td>
+                                <td className="p-3 whitespace-pre-wrap">{scene.onScreenText || "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Story frames */}
+                  {generatedContent.contentType === "story" && generatedContent.content?.storyFrames?.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 p-5">
+                      <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Frame Story Sequence</h5>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                        {generatedContent.content.storyFrames.map((frame, idx) => (
+                          <div key={idx} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-3 flex flex-col justify-between">
+                            <div>
+                              <span className="inline-flex rounded bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                                Frame {frame.frame || idx + 1}
+                              </span>
+                              <p className="mt-2 text-xs font-bold text-slate-800">{frame.visual || "No visual direction"}</p>
+                            </div>
+                            <div className="border-t border-slate-100 pt-2 space-y-2">
+                              {frame.text && (
+                                <p className="text-[11px] text-slate-600 italic">Teks: "{frame.text}"</p>
+                              )}
+                              {frame.stickerOrCta && (
+                                <p className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 rounded px-2 py-1 inline-block">
+                                  🔗 {frame.stickerOrCta}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Carousel slides */}
+                  {generatedContent.contentType === "carousel" && generatedContent.content?.carouselSlides?.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 p-5">
+                      <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Slide Outline Carousel</h5>
+                      <div className="space-y-3">
+                        {generatedContent.content.carouselSlides.map((slide, idx) => (
+                          <div key={idx} className="flex gap-4 rounded-lg border border-slate-100 p-3.5 bg-slate-50/50 hover:bg-slate-50 transition">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 font-bold text-xs text-[#0F766E]">
+                              {slide.slide || idx + 1}
+                            </div>
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <p className="text-sm font-bold text-slate-900">{slide.headline || "-"}</p>
+                              <p className="text-xs text-slate-500"><span className="font-semibold text-slate-600">Visual:</span> {slide.visual || "-"}</p>
+                              {slide.copy && (
+                                <p className="text-xs text-slate-600 bg-white border border-slate-100 rounded p-2 mt-1 leading-relaxed whitespace-pre-wrap">{slide.copy}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Metadata cards */}
+                  {generatedContent.metadata && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {generatedContent.metadata.visualDirection && (
+                        <div className="rounded-xl border border-slate-200 p-5 bg-teal-50/10">
+                          <h5 className="text-xs font-semibold uppercase tracking-wider text-teal-800 mb-2">Arahan Visual & Mood</h5>
+                          <p className="text-xs leading-5 text-slate-700 font-medium">{generatedContent.metadata.visualDirection}</p>
+                        </div>
+                      )}
+                      {generatedContent.metadata.shotList?.length > 0 && (
+                        <div className="rounded-xl border border-slate-200 p-5 bg-sky-50/10">
+                          <h5 className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2">Daftar Pengambilan Gambar (Shot List)</h5>
+                          <ul className="list-disc pl-4 text-xs space-y-1 text-slate-600 font-medium">
+                            {generatedContent.metadata.shotList.map((shot, idx) => (
+                              <li key={idx}>{shot}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Checklists */}
+                  {generatedContent.metadata?.publishChecklist?.length > 0 && (
+                    <div className="rounded-xl border border-slate-200 p-5">
+                      <h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Publish QA Checklist</h5>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {generatedContent.metadata.publishChecklist.map((item, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs text-slate-600 font-medium">
+                            <CheckCheck className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center py-20 text-center text-slate-400">
+                  Belum ada data konten.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 px-6 py-4 flex flex-wrap items-center justify-between gap-3 bg-slate-50">
+              <div className="flex items-center gap-2">
+                {generatedContent && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const text = getCopyableText(generatedContent);
+                        await navigator.clipboard.writeText(text);
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      } catch (err) {
+                        alert("Gagal menyalin ke clipboard.");
+                      }
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                      isCopied ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                    }`}
+                  >
+                    <CheckCheck className={`h-4 w-4 transition-transform ${isCopied ? "scale-100" : "scale-0 w-0"}`} />
+                    {isCopied ? "Tersalin!" : "Salin Teks"}
+                  </button>
+                )}
+                {generatedContent && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSavedToCms(true);
+                      setTimeout(() => setIsSavedToCms(false), 3000);
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                      isSavedToCms ? "bg-emerald-600 text-white" : "bg-[#0F766E] text-white hover:bg-[#115E59]"
+                    }`}
+                  >
+                    <CheckCircle className={`h-4 w-4 transition-transform ${isSavedToCms ? "scale-100" : "scale-0 w-0"}`} />
+                    {isSavedToCms ? "Sukses Tersimpan di CMS!" : "Simpan ke Draf CMS"}
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setContentModalOpen(false)}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </ModuleShell>
   );
 }
