@@ -6,6 +6,37 @@ const STORE_PATH =
   process.env.META_TOKEN_STORE_PATH ||
   path.join(os.tmpdir(), "gmtgroupbe-meta-token-store.json");
 
+const parseInstagramAccounts = (raw) => {
+  if (!raw) return [];
+
+  try {
+    const accounts = JSON.parse(raw);
+    if (!Array.isArray(accounts)) return [];
+
+    return accounts
+      .map((account, index) => {
+        const accessToken = account.accessToken || account.token || account.igAccessToken || account.pageAccessToken || "";
+        const igUserId = account.igUserId || account.instagramUserId || account.id || "";
+
+        if (!accessToken || !igUserId) return null;
+
+        return {
+          id: account.pageId || igUserId,
+          name: account.pageName || account.name || (account.username ? `@${account.username}` : `Instagram account ${index + 1}`),
+          access_token: accessToken,
+          instagram_business_account: {
+            id: igUserId,
+            username: account.username || undefined,
+            profile_picture_url: account.profilePictureUrl || undefined,
+          },
+        };
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
 const envTokenBundle = () => {
   const {
     META_ACCESS_TOKEN,
@@ -15,31 +46,34 @@ const envTokenBundle = () => {
     META_PAGE_ID,
     META_IG_USER_ID,
     META_IG_USERNAME,
+    META_INSTAGRAM_ACCOUNTS,
   } = process.env;
   const userAccessToken = META_USER_ACCESS_TOKEN || META_ACCESS_TOKEN || "";
   const directInstagramToken = META_IG_ACCESS_TOKEN || "";
   const directAccessToken = directInstagramToken || META_PAGE_ACCESS_TOKEN || "";
+  const directAccounts = parseInstagramAccounts(META_INSTAGRAM_ACCOUNTS);
+  const legacyDirectAccount =
+    directAccessToken && META_IG_USER_ID
+      ? [
+          {
+            id: META_PAGE_ID || META_IG_USER_ID,
+            name: META_IG_USERNAME ? `@${META_IG_USERNAME}` : "Direct Instagram account",
+            access_token: directAccessToken,
+            instagram_business_account: {
+              id: META_IG_USER_ID,
+              username: META_IG_USERNAME || undefined,
+            },
+          },
+        ]
+      : [];
 
-  if (!userAccessToken && !directAccessToken) {
+  if (!userAccessToken && !directAccessToken && !directAccounts.length) {
     return null;
   }
 
   return {
     userAccessToken,
-    pages:
-      directAccessToken && META_IG_USER_ID
-        ? [
-            {
-              id: META_PAGE_ID || META_IG_USER_ID,
-              name: META_IG_USERNAME ? `@${META_IG_USERNAME}` : "Direct Instagram account",
-              access_token: directAccessToken,
-              instagram_business_account: {
-                id: META_IG_USER_ID,
-                username: META_IG_USERNAME || undefined,
-              },
-            },
-          ]
-        : [],
+    pages: [...directAccounts, ...legacyDirectAccount],
     source: "env",
     savedAt: new Date().toISOString(),
   };
