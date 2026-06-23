@@ -176,7 +176,8 @@ const getAiProviderConfig = () => {
   return {
     apiKey,
     baseUrl: (process.env.ALIBABA_MODEL_STUDIO_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/$/, ""),
-    model: process.env.ALIBABA_MODEL || "qwen-plus",
+    model: process.env.ALIBABA_MODEL || "qwen3.7-plus",
+    multimodalModel: process.env.ALIBABA_MULTIMODAL_MODEL || "qwen3.5-omni-plus-2026-03-1",
     source: "alibaba",
   };
 };
@@ -228,6 +229,7 @@ const callAlibabaForContentReasoning = async ({ profile, dateRange, mediaPayload
 
   const prompt = [
     "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
+    "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
     "Act as a content strategist, not a caption writer. Evaluate each post using content pillars, audience value, engagement quality, format fit, posting cadence, and next optimization.",
     "Return only valid JSON. No markdown. No commentary.",
     "Schema: {\"items\":[{\"id\":\"media id\",\"reasoning\":\"1-2 concise Indonesian sentences for the dashboard table\",\"action\":\"short next action\",\"angle\":\"content angle or pillar\"}]}",
@@ -318,6 +320,7 @@ const getReferenceInsights = async ({ profile, igUserId, recentPosts }) => {
 
   const prompt = [
     "You are applying the Social Media Manager skill for an Indonesian Instagram dashboard.",
+    "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
     "Analyze the provided reference Instagram content/account links for the selected account.",
     "Important: if a reference only has a URL and no caption/note, do not pretend you can see the post. Infer only format from the URL when possible and give a practical creative-use reason.",
     "Return only valid JSON. No markdown. No commentary.",
@@ -413,14 +416,16 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
   }
 };
 
-const callAlibabaForContentBrief = async ({ profile, dateRange, mediaPayload, audience }) => {
+const callAlibabaForContentBrief = async ({ profile, dateRange, mediaPayload, audience, references = [] }) => {
   if (!mediaPayload.length) return { contentBrief: null, warning: null };
 
   const prompt = [
     "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
+    "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
     "Create a tactical 7-day content brief and production-ready assistant package from the account profile, audience signals, and recent post metrics.",
     "Use the Social Media Manager skill principles: content pillars, audience value, growth objective, format fit, cadence, hook strategy, CTA, platform-native execution, and publish QA.",
     "Make the assistant package format-aware: Reels/video must include script and shot list; Carousel must include slide-by-slide outline; Story must include frame sequence; Feed/static must include visual direction.",
+    "Every day/card must be generated from the provided account data, recent posts, and custom references. Avoid generic templates and do not repeat the same idea with different wording.",
     "Return only valid JSON. No markdown. No commentary.",
     "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"alibaba\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"publishChecklist\":[\"\"],\"postPublishChecklist\":[\"\"]}}]}",
     "Exactly 7 items. Keep every field practical, specific, and in Indonesian. Do not invent metrics not present in the input.",
@@ -445,6 +450,7 @@ const callAlibabaForContentBrief = async ({ profile, dateRange, mediaPayload, au
         },
       },
       recentPosts: mediaPayload,
+      customReferences: references,
     }),
   ].join("\n");
 
@@ -518,13 +524,14 @@ const callAlibabaForContentBrief = async ({ profile, dateRange, mediaPayload, au
   };
 };
 
-const getContentBrief = async ({ profile, dateRange, mediaItems, audience }) => {
+const getContentBrief = async ({ profile, dateRange, mediaItems, audience, igUserId }) => {
   try {
     return await callAlibabaForContentBrief({
       profile,
       dateRange,
       mediaPayload: getMediaReasoningPayload(mediaItems),
       audience,
+      references: getConfiguredReferences({ igUserId, username: profile?.username }),
     });
   } catch (error) {
     return {
@@ -877,6 +884,7 @@ export default async function handler(request, response) {
       dateRange,
       mediaItems: mediaWithReasoning.data || [],
       audience: audience.data,
+      igUserId,
     });
     const contentReferences = await getReferenceInsights({
       profile,

@@ -2107,18 +2107,17 @@ export function MarketingIntegrations() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-bold text-slate-950">1. Buat Reels pendek</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Mulai dengan hasil/masalah di 2 detik pertama, lalu tutup dengan CTA jelas.</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-bold text-slate-950">2. Aktifkan Story harian</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Gunakan poll, quiz, Q&A, atau behind the scene untuk memancing reply.</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-bold text-slate-950">3. Ulangi pola terbaik</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Ambil format dari konten referensi, lalu buat variasi topik baru.</p>
-            </div>
+            {contentIdeas.slice(0, 3).map((idea, index) => (
+              <div key={`summary-${idea.day}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={contentBriefSource !== "local" ? "blue" : "slate"}>{contentBriefSource !== "local" ? "Alibaba" : "Local"}</StatusBadge>
+                  <span className="text-xs font-semibold text-slate-500">{idea.day}</span>
+                </div>
+                <p className="mt-3 text-sm font-bold text-slate-950">{index + 1}. {idea.format}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{idea.idea}</p>
+                {idea.objective ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{idea.objective}</p> : null}
+              </div>
+            ))}
           </div>
 
           <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
