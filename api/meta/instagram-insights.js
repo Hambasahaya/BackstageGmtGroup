@@ -68,6 +68,195 @@ const sortBreakdown = (items) =>
     .filter((item) => item.label && Number.isFinite(item.value))
     .sort((first, second) => second.value - first.value);
 
+const toNumber = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (value && typeof value === "object") {
+    const total = Object.values(value).reduce((sum, item) => sum + (Number(item) || 0), 0);
+    return Number.isFinite(total) ? total : undefined;
+  }
+  return undefined;
+};
+
+const getMediaMetricValue = (media, ...names) =>
+  toNumber(media.insights?.data?.find((item) => names.includes(item.name))?.values?.at(-1)?.value);
+
+const getContentType = (media) => {
+  if (media.media_product_type === "REELS") return "Reels";
+  if (media.media_product_type === "STORY") return "Story";
+  if (media.media_type === "CAROUSEL_ALBUM") return "Carousel";
+  return media.media_type || "POST";
+};
+
+const buildLocalContentReasoning = ({ reach, views, interactions, engagementRate, saves, shares, contentType }) => {
+  const notes = [];
+
+  if (engagementRate !== undefined) {
+    if (engagementRate >= 0.1) notes.push("Engagement tinggi; konten kuat untuk dijadikan referensi format berikutnya.");
+    else if (engagementRate >= 0.03) notes.push("Engagement cukup stabil; pertahankan tema dan optimalkan hook/caption.");
+    else notes.push("Engagement rendah; perlu perbaikan hook, visual awal, atau CTA.");
+  } else if (reach > 0) {
+    notes.push("Reach ada, tetapi interaksi terbatas sehingga kualitas respons audiens perlu dicek.");
+  } else {
+    notes.push("Data reach belum cukup; evaluasi setelah insight konten tersedia.");
+  }
+
+  if (views > reach && views > 0) notes.push("Views lebih besar dari reach, indikasi ada repeat view atau konsumsi ulang.");
+  else if (reach > 0 && interactions > 0) notes.push("Konten mendapat respons organik dari audiens yang melihat.");
+  if (saves > 0) notes.push("Ada saves, menandakan konten bernilai untuk disimpan.");
+  if (shares > 0) notes.push("Ada shares, menandakan konten cukup relevan untuk dibagikan.");
+  if (contentType === "Reels" && views === 0) notes.push("Reels belum punya views terukur dari API untuk periode ini.");
+
+  return notes.slice(0, 2).join(" ");
+};
+
+const getMediaReasoningPayload = (mediaItems) =>
+  mediaItems.map((media) => {
+    const reach = getMediaMetricValue(media, "reach", "accounts_reached") || 0;
+    const likes = media.like_count || 0;
+    const comments = media.comments_count || 0;
+    const shares = getMediaMetricValue(media, "shares") || 0;
+    const saves = getMediaMetricValue(media, "saved", "saves") || 0;
+    const views = getMediaMetricValue(media, "impressions", "views", "plays") || 0;
+    const interactions = getMediaMetricValue(media, "total_interactions") ?? (likes + comments + shares + saves);
+    const engagementRate = reach ? interactions / reach : undefined;
+    const contentType = getContentType(media);
+
+    return {
+      id: media.id,
+      caption: (media.caption || "").slice(0, 700),
+      contentType,
+      mediaType: media.media_type,
+      productType: media.media_product_type,
+      postedAt: media.timestamp,
+      metrics: {
+        reach,
+        views,
+        likes,
+        comments,
+        shares,
+        saves,
+        interactions,
+        engagementRate,
+      },
+      fallbackReasoning: buildLocalContentReasoning({
+        reach,
+        views,
+        interactions,
+        engagementRate,
+        saves,
+        shares,
+        contentType,
+      }),
+    };
+  });
+
+const extractJsonObject = (text) => {
+  if (!text) return null;
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
+  const candidate = fenced || text;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end <= start) return null;
+  return JSON.parse(candidate.slice(start, end + 1));
+};
+
+const callGeminiForContentReasoning = async ({ profile, dateRange, mediaPayload }) => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+  if (!apiKey || !mediaPayload.length) return { items: [], warning: null, source: "local" };
+
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
+  url.searchParams.set("key", apiKey);
+
+  const prompt = [
+    "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
+    "Act as a content strategist, not a caption writer. Evaluate each post using content pillars, audience value, engagement quality, format fit, posting cadence, and next optimization.",
+    "Return only valid JSON. No markdown. No commentary.",
+    "Schema: {\"items\":[{\"id\":\"media id\",\"reasoning\":\"1-2 concise Indonesian sentences for the dashboard table\",\"action\":\"short next action\",\"angle\":\"content angle or pillar\"}]}",
+    "Reasoning must mention the useful metric pattern when available, and must not invent metrics not present in the input.",
+    "Keep each reasoning under 220 characters.",
+    JSON.stringify({
+      account: {
+        username: profile?.username,
+        name: profile?.name,
+        biography: profile?.biography,
+        followers: profile?.followers_count,
+        website: profile?.website,
+      },
+      dateRange,
+      posts: mediaPayload,
+    }),
+  ].join("\n");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.35,
+        maxOutputTokens: 4096,
+      },
+    }),
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || "Gemini content reasoning request failed.");
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("\n");
+  const parsed = extractJsonObject(text);
+  if (!Array.isArray(parsed?.items)) {
+    throw new Error("Gemini returned an invalid content reasoning payload.");
+  }
+
+  return { items: parsed.items, warning: null, source: "gemini" };
+};
+
+const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
+  const mediaPayload = getMediaReasoningPayload(mediaItems);
+  const fallbackById = new Map(mediaPayload.map((item) => [item.id, item.fallbackReasoning]));
+
+  try {
+    const gemini = await callGeminiForContentReasoning({ profile, dateRange, mediaPayload });
+    const reasoningById = new Map(
+      gemini.items
+        .filter((item) => item?.id && typeof item.reasoning === "string")
+        .map((item) => [item.id, item]),
+    );
+
+    return {
+      data: mediaItems.map((media) => {
+        const reasoning = reasoningById.get(media.id);
+        return {
+          ...media,
+          ai_reasoning: reasoning?.reasoning || fallbackById.get(media.id),
+          ai_action: reasoning?.action,
+          ai_angle: reasoning?.angle,
+          ai_reasoning_source: reasoning?.reasoning ? "gemini" : "local",
+        };
+      }),
+      warning: gemini.source === "gemini" ? null : null,
+    };
+  } catch (error) {
+    return {
+      data: mediaItems.map((media) => ({
+        ...media,
+        ai_reasoning: fallbackById.get(media.id),
+        ai_reasoning_source: "local",
+      })),
+      warning: `Gemini reasoning fallback: ${error.message}`,
+    };
+  }
+};
+
 const normalizeOnlineFollowers = (payload) => {
   const insight = payload.data?.[0] || {};
   const directValue = insight.values?.at(-1)?.value
@@ -209,13 +398,14 @@ const getInsightMetrics = async ({ igUserId, accessToken, since, until }) => {
     "views",
     "content_views",
   ]);
-  const configuredMetrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,profile_links_taps,follower_count,views")
+  const configuredMetrics = (process.env.META_ACCOUNT_INSIGHT_METRICS || "reach,profile_views,website_clicks,profile_links_taps,follower_count,follows_and_unfollows,views")
     .split(",")
     .map((metric) => metric.trim())
     .filter((metric) => validAccountMetrics.has(metric));
   // `views` replaces the legacy `impressions` account metric on newer Graph API versions.
   const dashboardMetrics = [
     "follower_count",
+    "follows_and_unfollows",
     "reach",
     "views",
     "profile_views",
@@ -400,6 +590,11 @@ export default async function handler(request, response) {
       getRecentMedia({ igUserId, accessToken: page.access_token, ...dateRange }),
       getAudienceInsights({ igUserId, accessToken: page.access_token }),
     ]);
+    const mediaWithReasoning = await enrichMediaReasoning({
+      mediaItems: media.data || [],
+      profile,
+      dateRange,
+    });
 
     json(response, 200, {
       connected: true,
@@ -410,9 +605,9 @@ export default async function handler(request, response) {
       profile,
       dateRange,
       insights: insights.data || [],
-      media: media.data || [],
+      media: mediaWithReasoning.data || [],
       audience: audience.data,
-      warnings: [insights.warning, media.warning, audience.warning].filter(Boolean),
+      warnings: [insights.warning, media.warning, mediaWithReasoning.warning, audience.warning].filter(Boolean),
     });
   } catch (error) {
     json(response, 500, { connected: false, error: error.message || "Instagram insights request failed." });

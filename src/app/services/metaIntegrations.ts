@@ -57,6 +57,10 @@ export type InstagramInsights = {
     timestamp?: string;
     like_count?: number;
     comments_count?: number;
+    ai_reasoning?: string;
+    ai_action?: string;
+    ai_angle?: string;
+    ai_reasoning_source?: "gemini" | "local";
     insights?: {
       data?: Array<{
         name: string;

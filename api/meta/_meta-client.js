@@ -1,3 +1,4 @@
+import "./_load-env.js";
 import { readTokenBundle } from "./_token-store.js";
 
 export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v22.0";

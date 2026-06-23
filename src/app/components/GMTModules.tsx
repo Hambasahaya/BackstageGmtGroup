@@ -306,6 +306,31 @@ const sumNumbers = (values: Array<number | undefined>) => {
   return available.length ? available.reduce((total, value) => total + value, 0) : undefined;
 };
 
+const getFollowerDeltaValue = (value: unknown): number | undefined => {
+  const numericValue = toNumber(value);
+  if (typeof value !== "object" || value === null) return numericValue;
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return numericValue;
+
+  let hasFollowSignal = false;
+  let total = 0;
+  for (const [key, entryValue] of entries) {
+    const entryNumber = toNumber(entryValue);
+    if (entryNumber === undefined) continue;
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey.includes("unfollow")) {
+      hasFollowSignal = true;
+      total -= entryNumber;
+    } else if (normalizedKey.includes("follow")) {
+      hasFollowSignal = true;
+      total += entryNumber;
+    }
+  }
+
+  return hasFollowSignal ? total : numericValue;
+};
+
 const formatRankedValue = (items: Array<{ label: string; value: number }> | undefined, fallback = "-") => {
   const top = items?.find((item) => item.label);
   return top ? `${top.label} (${formatNumber(top.value)})` : fallback;
@@ -1029,18 +1054,24 @@ export function MarketingIntegrations() {
   const demographicCity = formatRankedValue(audience?.demographics?.city);
   const demographicCountry = formatRankedValue(audience?.demographics?.country);
   const followerSeries = instagramInsights?.insights.find((item) => item.name === "follower_count")?.values || [];
-  const firstFollowerValue = toNumber(followerSeries.at(0)?.value);
-  const lastFollowerValue = toNumber(followerSeries.at(-1)?.value);
-  const followerGrowth = firstFollowerValue !== undefined && lastFollowerValue !== undefined
-    ? lastFollowerValue - firstFollowerValue
+  const followsAndUnfollowsSeries = instagramInsights?.insights.find((item) => item.name === "follows_and_unfollows")?.values || [];
+  const followsAndUnfollowsGrowth = followsAndUnfollowsSeries.length
+    ? followsAndUnfollowsSeries.reduce((total, point) => total + (getFollowerDeltaValue(point.value) || 0), 0)
     : undefined;
-  const followerGrowthRate = firstFollowerValue && lastFollowerValue !== undefined
-    ? followerGrowth! / firstFollowerValue
+  const newFollowerGrowth = followerSeries.length
+    ? followerSeries.reduce((total, point) => total + (toNumber(point.value) || 0), 0)
+    : undefined;
+  const followerGrowth = followsAndUnfollowsGrowth ?? newFollowerGrowth;
+  const followerStartValue = profile?.followers_count !== undefined && followerGrowth !== undefined
+    ? profile.followers_count - followerGrowth
+    : undefined;
+  const followerGrowthRate = followerStartValue && followerGrowth !== undefined
+    ? followerGrowth / followerStartValue
     : undefined;
 
   const accountMetrics = [
     { label: "Followers count", value: profile?.followers_count, detail: "Total followers akun saat ini" },
-    { label: "Followers growth", value: followerGrowthRate, valueType: "percent", detail: followerGrowth !== undefined ? `${formatNumber(followerGrowth)} followers dalam periode data` : "Perubahan harian, mingguan, dan bulanan" },
+    { label: "Followers growth", value: followerGrowthRate, valueType: "percent", detail: followerGrowth !== undefined ? `${formatNumber(followerGrowth)} followers dalam periode data` : "Perubahan follower awal ke akhir periode" },
     { label: "Follows count", value: profile?.follows_count, detail: "Jumlah akun yang diikuti" },
     { label: "Profile views", value: profileViews, detail: accountProfileViews === undefined && mediaProfileActivityTotal !== undefined ? "Fallback dari profile visits konten" : "Jumlah kunjungan ke profil" },
     { label: "Reach akun", value: latestReach, detail: mediaReachTotal !== undefined && getAccountMetricTotal("reach", "accounts_reached") === undefined ? "Akumulasi reach konten yang dimuat" : "Akun unik yang melihat konten" },
@@ -1306,7 +1337,7 @@ export function MarketingIntegrations() {
       engagementRate,
       contentType,
       postedAtTime: media.timestamp ? new Date(media.timestamp).getTime() : 0,
-      reasoning: buildContentReasoning({
+      reasoning: media.ai_reasoning || buildContentReasoning({
         reach: reach || 0,
         views: views || 0,
         interactions,
@@ -1344,7 +1375,10 @@ export function MarketingIntegrations() {
       formatNumber(shares),
       formatNumber(saves),
       formatPercent(engagementRate),
-      <p className="max-w-sm text-xs leading-5 text-slate-600">{reasoning}</p>,
+      <div className="max-w-sm space-y-2">
+        <p className="text-xs leading-5 text-slate-600">{reasoning}</p>
+        <StatusBadge tone={media.ai_reasoning_source === "gemini" ? "blue" : "slate"}>{media.ai_reasoning_source === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+      </div>,
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
     ];
   });
@@ -1769,7 +1803,7 @@ export function MarketingIntegrations() {
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-medium text-slate-600">Follower growth rate</p>
             <p className="mt-2 text-2xl font-bold text-slate-950">{formatPercent(followerGrowthRate)}</p>
-            <p className="mt-1 text-xs text-slate-500">Perubahan titik awal ke akhir dari {followerSeries.length} periode</p>
+            <p className="mt-1 text-xs text-slate-500">{followerGrowth !== undefined && followerStartValue !== undefined ? `${formatNumber(followerGrowth)} / ${formatNumber(followerStartValue)} followers awal` : "Menunggu data follower periode"}</p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-medium text-slate-600">Best time to post</p>
