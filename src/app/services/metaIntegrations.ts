@@ -78,6 +78,21 @@ export type InstagramInsights = {
       country?: Array<{ label: string; value: number }>;
     };
   };
+  contentBrief?: {
+    source: "gemini";
+    summary?: string;
+    items: Array<{
+      day: string;
+      format: string;
+      pillar?: string;
+      objective?: string;
+      idea: string;
+      formatGuide: string;
+      action: string;
+      reason: string;
+      impact: string;
+    }>;
+  } | null;
   warnings?: string[];
 };
 

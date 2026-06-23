@@ -257,6 +257,106 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
   }
 };
 
+const callGeminiForContentBrief = async ({ profile, dateRange, mediaPayload, audience }) => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+  if (!apiKey || !mediaPayload.length) return { contentBrief: null, warning: null };
+
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`);
+  url.searchParams.set("key", apiKey);
+
+  const prompt = [
+    "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
+    "Create a tactical 7-day content brief from the account profile, audience signals, and recent post metrics.",
+    "Use content pillars, format mix, cadence, hook strategy, CTA, audience value, and measurable objective.",
+    "Return only valid JSON. No markdown. No commentary.",
+    "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"gemini\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\"}]}",
+    "Exactly 7 items. Keep every field practical, specific, and in Indonesian. Do not invent metrics not present in the input.",
+    "Prefer GMT/brand-relevant ideas over generic social media advice.",
+    JSON.stringify({
+      account: {
+        username: profile?.username,
+        name: profile?.name,
+        biography: profile?.biography,
+        followers: profile?.followers_count,
+        website: profile?.website,
+      },
+      dateRange,
+      audience: {
+        topOnlineFollowers: audience?.onlineFollowers?.slice(0, 4),
+        demographics: {
+          age: audience?.demographics?.age?.slice(0, 3),
+          gender: audience?.demographics?.gender?.slice(0, 3),
+          city: audience?.demographics?.city?.slice(0, 3),
+          country: audience?.demographics?.country?.slice(0, 3),
+        },
+      },
+      recentPosts: mediaPayload,
+    }),
+  ].join("\n");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.45,
+        maxOutputTokens: 8192,
+      },
+    }),
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || "Gemini content brief request failed.");
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("\n");
+  const parsed = extractJsonObject(text);
+  const items = Array.isArray(parsed?.items) ? parsed.items.slice(0, 7) : [];
+
+  if (items.length !== 7) {
+    throw new Error("Gemini returned an invalid 7-day content brief payload.");
+  }
+
+  return {
+    contentBrief: {
+      source: "gemini",
+      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      items: items.map((item, index) => ({
+        day: typeof item.day === "string" ? item.day : `Hari ${index + 1}`,
+        format: typeof item.format === "string" ? item.format : "Feed",
+        pillar: typeof item.pillar === "string" ? item.pillar : "",
+        objective: typeof item.objective === "string" ? item.objective : "",
+        idea: typeof item.idea === "string" ? item.idea : "",
+        formatGuide: typeof item.formatGuide === "string" ? item.formatGuide : "",
+        action: typeof item.action === "string" ? item.action : "",
+        reason: typeof item.reason === "string" ? item.reason : "",
+        impact: typeof item.impact === "string" ? item.impact : "",
+      })),
+    },
+    warning: null,
+  };
+};
+
+const getContentBrief = async ({ profile, dateRange, mediaItems, audience }) => {
+  try {
+    return await callGeminiForContentBrief({
+      profile,
+      dateRange,
+      mediaPayload: getMediaReasoningPayload(mediaItems),
+      audience,
+    });
+  } catch (error) {
+    return {
+      contentBrief: null,
+      warning: `Gemini content brief fallback: ${error.message}`,
+    };
+  }
+};
+
 const normalizeOnlineFollowers = (payload) => {
   const insight = payload.data?.[0] || {};
   const directValue = insight.values?.at(-1)?.value
@@ -595,6 +695,12 @@ export default async function handler(request, response) {
       profile,
       dateRange,
     });
+    const contentBrief = await getContentBrief({
+      profile,
+      dateRange,
+      mediaItems: mediaWithReasoning.data || [],
+      audience: audience.data,
+    });
 
     json(response, 200, {
       connected: true,
@@ -607,7 +713,8 @@ export default async function handler(request, response) {
       insights: insights.data || [],
       media: mediaWithReasoning.data || [],
       audience: audience.data,
-      warnings: [insights.warning, media.warning, mediaWithReasoning.warning, audience.warning].filter(Boolean),
+      contentBrief: contentBrief.contentBrief,
+      warnings: [insights.warning, media.warning, mediaWithReasoning.warning, contentBrief.warning, audience.warning].filter(Boolean),
     });
   } catch (error) {
     json(response, 500, { connected: false, error: error.message || "Instagram insights request failed." });

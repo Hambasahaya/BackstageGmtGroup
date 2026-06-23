@@ -1405,7 +1405,7 @@ export function MarketingIntegrations() {
   const averageWatchTime = averageWatchTimeMs !== undefined
     ? `${(averageWatchTimeMs / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} dtk`
     : "-";
-  const contentIdeas = [
+  const fallbackContentIdeas = [
     {
       day: "Hari 1",
       format: "Reels",
@@ -1470,6 +1470,14 @@ export function MarketingIntegrations() {
       impact: "Memperpanjang umur konten yang sudah bagus dan membantu followers menangkap value utama minggu itu.",
     },
   ];
+  const geminiContentIdeas = instagramInsights?.contentBrief?.items?.length === 7
+    ? instagramInsights.contentBrief.items
+    : [];
+  const contentIdeas = geminiContentIdeas.length ? geminiContentIdeas : fallbackContentIdeas;
+  const contentBriefSource = geminiContentIdeas.length ? "gemini" : "local";
+  const contentBriefSummary = geminiContentIdeas.length
+    ? instagramInsights?.contentBrief?.summary
+    : `Fokus ke ${bestContentType?.type || "Reels"} di ${bestTimeSlots[0]?.label || "jam performa terbaik"}.`;
   const selectedContentIdea = contentIdeas[Math.min(selectedContentIdeaIndex, contentIdeas.length - 1)] || contentIdeas[0];
 
   return (
@@ -1902,9 +1910,12 @@ export function MarketingIntegrations() {
           <div className="rounded-xl border border-teal-100 bg-teal-50 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Rekomendasi utama</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Rekomendasi utama</p>
+                  <StatusBadge tone={contentBriefSource === "gemini" ? "blue" : "slate"}>{contentBriefSource === "gemini" ? "Gemini" : "Local"}</StatusBadge>
+                </div>
                 <h3 className="mt-1 text-xl font-bold text-slate-950">
-                  Fokus ke {bestContentType?.type || "Reels"} di {bestTimeSlots[0]?.label || "jam performa terbaik"}.
+                  {contentBriefSummary}
                 </h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                   Pakai konten referensi terbaik sebagai pola: hook cepat, visual jelas, caption singkat, dan CTA yang meminta komentar, save, atau DM.
@@ -1971,6 +1982,23 @@ export function MarketingIntegrations() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ide utama</p>
                     <p className="mt-2 text-base font-semibold leading-7 text-slate-950">{selectedContentIdea.idea}</p>
                   </div>
+
+                  {(selectedContentIdea.pillar || selectedContentIdea.objective) && (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {selectedContentIdea.pillar && (
+                        <div className="rounded-lg border border-slate-200 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Content pillar</p>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.pillar}</p>
+                        </div>
+                      )}
+                      {selectedContentIdea.objective && (
+                        <div className="rounded-lg border border-slate-200 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Objective</p>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.objective}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="rounded-lg border border-slate-200 p-4">
