@@ -3,6 +3,8 @@ import {
   Bot,
   Brain,
   CalendarCheck,
+  Check,
+  Clipboard,
   FileArchive,
   FileSpreadsheet,
   FileText,
@@ -920,6 +922,7 @@ export function MarketingIntegrations() {
   const [contentSort, setContentSort] = useState<"newest" | "oldest" | "reach" | "views" | "engagement" | "likes" | "comments" | "saves">("newest");
   const [accountTrendChartType, setAccountTrendChartType] = useState<"line" | "bar">("line");
   const [visibleAccountTrendMetrics, setVisibleAccountTrendMetrics] = useState(["Reach", "Impressions", "Profile Views", "Website Clicks"]);
+  const [isAssistantContextCopied, setIsAssistantContextCopied] = useState(false);
   const [sinceDate, setSinceDate] = useState(defaultDateRange.since);
   const [untilDate, setUntilDate] = useState(defaultDateRange.until);
   const [appliedDateRange, setAppliedDateRange] = useState(defaultDateRange);
@@ -1479,6 +1482,56 @@ export function MarketingIntegrations() {
     ? instagramInsights?.contentBrief?.summary
     : `Fokus ke ${bestContentType?.type || "Reels"} di ${bestTimeSlots[0]?.label || "jam performa terbaik"}.`;
   const selectedContentIdea = contentIdeas[Math.min(selectedContentIdeaIndex, contentIdeas.length - 1)] || contentIdeas[0];
+  const aiAssistantContext = JSON.stringify({
+    task: "Buat caption, storyboard, shot list, dan checklist publish untuk konten Instagram.",
+    language: "Bahasa Indonesia",
+    account: {
+      username: connectedInstagram?.username ? `@${connectedInstagram.username}` : undefined,
+      name: profile?.name,
+      biography: profile?.biography,
+      followers: profile?.followers_count,
+      website: profile?.website,
+    },
+    period: appliedDateRange,
+    source: contentBriefSource,
+    mainRecommendation: contentBriefSummary,
+    selectedBrief: selectedContentIdea,
+    performanceSignals: {
+      averageEngagementRate: formatPercent(averageEngagementRate),
+      bestPostingTime: mediaAnalytics.length >= 3 ? bestTimeSlots[0]?.label || undefined : undefined,
+      bestContentType: bestContentType?.type,
+      topHashtags,
+      audience: {
+        age: demographicAge,
+        gender: demographicGender,
+        city: demographicCity,
+        country: demographicCountry,
+      },
+    },
+    referencePosts: topContentReferences.map((item) => ({
+      contentType: item.contentType,
+      caption: item.media.caption || "",
+      reach: item.reach,
+      engagementRate: formatPercent(item.engagementRate),
+      reasoning: item.media.ai_reasoning,
+      permalink: item.media.permalink,
+    })),
+    outputRequirements: [
+      "Caption dengan hook, body, CTA, dan hashtag.",
+      "Storyboard per scene/frame.",
+      "Shot list produksi yang praktis.",
+      "Checklist publish sebelum dan sesudah posting.",
+    ],
+  }, null, 2);
+  const handleCopyAssistantContext = async () => {
+    try {
+      await navigator.clipboard.writeText(aiAssistantContext);
+      setIsAssistantContextCopied(true);
+      window.setTimeout(() => setIsAssistantContextCopied(false), 1600);
+    } catch {
+      setIsAssistantContextCopied(false);
+    }
+  };
 
   return (
     <ModuleShell
@@ -2077,8 +2130,23 @@ export function MarketingIntegrations() {
               )}
 
               <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
-                <p className="font-semibold text-slate-950">Nanti untuk AI Assistant</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">Blok ini bisa dikirim ke Cloud/Codex sebagai konteks untuk membuat caption, storyboard, shot list, dan checklist publish.</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-950">Nanti untuk AI Assistant</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">Konteks siap pakai untuk caption, storyboard, shot list, dan checklist publish.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyAssistantContext}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+                    {isAssistantContextCopied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
+                    {isAssistantContextCopied ? "Tersalin" : "Salin"}
+                  </button>
+                </div>
+                <pre className="mt-4 max-h-80 overflow-auto rounded-lg border border-sky-100 bg-white p-3 text-xs leading-5 text-slate-700">
+                  {aiAssistantContext}
+                </pre>
               </div>
             </div>
           </div>
