@@ -1,5 +1,6 @@
 .env
 .env.metaa
+.env.ref
 .env.production
 .env.local
 .env.*.local

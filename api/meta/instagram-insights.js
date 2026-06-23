@@ -329,7 +329,7 @@ const getConfiguredReferences = ({ igUserId, username }) => {
     return references
       .map(normalizeReferenceItem)
       .filter((item) => item?.url || item?.caption || item?.note)
-      .slice(0, 6);
+      .slice(0, 24);
   } catch {
     return [];
   }

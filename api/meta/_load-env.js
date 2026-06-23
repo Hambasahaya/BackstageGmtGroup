@@ -33,6 +33,6 @@ const loadEnvFile = (filename) => {
   }
 };
 
-for (const filename of [".env", ".env.local", ".env.metaa"]) {
+for (const filename of [".env", ".env.local", ".env.metaa", ".env.ref"]) {
   loadEnvFile(filename);
 }
