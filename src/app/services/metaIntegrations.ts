@@ -142,6 +142,44 @@ export type InstagramInsights = {
   warnings?: string[];
 };
 
+export type CompetitorBenchmark = {
+  connected: boolean;
+  setupRequired?: boolean;
+  message?: string;
+  source?: "instagram_business_discovery";
+  dateRange?: {
+    since?: string;
+    until?: string;
+  };
+  competitors: Array<{
+    username: string;
+    name?: string;
+    profilePictureUrl?: string;
+    followersCount: number;
+    mediaCount: number;
+    publicMedia: Array<{
+      id: string;
+      caption?: string;
+      mediaType?: string;
+      timestamp?: string;
+      permalink?: string;
+      likes: number;
+      comments: number;
+      interactions: number;
+    }>;
+    summary: {
+      posts: number;
+      likes: number;
+      comments: number;
+      interactions: number;
+      avgInteractions: number;
+      avgEngagementRate: number | null;
+      postingFrequencyPerWeek: number;
+    };
+  }>;
+  warnings?: string[];
+};
+
 export async function fetchMetaAuthUrl() {
   const response = await fetch("/api/meta/auth-url");
   const payload = await response.json();
@@ -185,6 +223,25 @@ export async function fetchInstagramInsights(
   }
 
   return payload as InstagramInsights;
+}
+
+export async function fetchCompetitorBenchmark(
+  igUserId?: string,
+  dateRange?: { since: string; until: string },
+) {
+  const params = new URLSearchParams();
+  if (igUserId) params.set("igUserId", igUserId);
+  if (dateRange?.since) params.set("since", dateRange.since);
+  if (dateRange?.until) params.set("until", dateRange.until);
+  const query = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/meta/competitor-benchmark${query}`);
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error || "Failed to fetch competitor benchmark.");
+  }
+
+  return payload as CompetitorBenchmark;
 }
 
 export async function generateReferenceBrief(payload: {
@@ -254,6 +311,34 @@ export async function generateContentFromBrief(payload: {
       visualDirection?: string;
       shotList?: string[];
       publishChecklist?: string[];
+    };
+  };
+}
+
+export async function autoPostInstagramContent(payload: {
+  igUserId?: string;
+  content: any;
+  reference?: Record<string, unknown>;
+}) {
+  const response = await fetch("/api/meta/auto-post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to auto post Instagram content.");
+  }
+
+  return result as {
+    success: boolean;
+    mediaId?: string;
+    permalink?: string;
+    selectedAsset?: {
+      id: string;
+      name: string;
+      mimeType: string;
     };
   };
 }

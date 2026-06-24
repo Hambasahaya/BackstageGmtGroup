@@ -21,6 +21,7 @@ pages_show_list
 pages_read_engagement
 instagram_basic
 instagram_manage_insights
+instagram_content_publish
 ```
 
 Setiap Instagram harus berupa akun Business atau Creator dan terhubung ke Facebook Page yang dapat diakses token tersebut.
@@ -51,7 +52,11 @@ META_APP_SECRET=your_meta_app_secret
 META_REDIRECT_URI=https://your-domain.com/api/meta/callback
 META_DASHBOARD_URL=https://your-domain.com/integrations
 META_OAUTH_STATE=use_a_long_random_value
-META_SCOPES=pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights
+META_SCOPES=pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights,instagram_content_publish
+META_ENABLE_AUTO_POST=false
+GOOGLE_DRIVE_ASSET_FOLDER_ID=your_drive_folder_id_for_instagram_assets
+META_COMPETITOR_USERNAMES=kompetitor1,kompetitor2,kompetitor3
+META_COMPETITOR_MEDIA_LIMIT=24
 ```
 
 Tambahkan nilai `META_REDIRECT_URI` yang sama persis ke **Valid OAuth Redirect URIs** pada Meta Developer Dashboard.

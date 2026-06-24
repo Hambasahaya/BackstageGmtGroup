@@ -50,13 +50,16 @@ import {
 } from "recharts";
 import {
   fetchInstagramInsights,
+  fetchCompetitorBenchmark,
   fetchMetaAccounts,
   fetchMetaAuthUrl,
   generateReferenceBrief,
+  autoPostInstagramContent,
   fetchContentBriefCache,
   saveContentBriefCache,
   deleteContentBriefCache,
   generateContentFromBrief,
+  type CompetitorBenchmark,
   type InstagramInsights,
   type MetaAccountHealth,
 } from "../services/metaIntegrations";
@@ -941,9 +944,12 @@ export function MarketingIntegrations() {
   const defaultDateRange = getDefaultInstagramDateRange();
   const [metaHealth, setMetaHealth] = useState<MetaAccountHealth | null>(null);
   const [instagramInsights, setInstagramInsights] = useState<InstagramInsights | null>(null);
+  const [competitorBenchmark, setCompetitorBenchmark] = useState<CompetitorBenchmark | null>(null);
   const [selectedInstagramId, setSelectedInstagramId] = useState("");
   const [metaError, setMetaError] = useState("");
+  const [competitorError, setCompetitorError] = useState("");
   const [isMetaLoading, setIsMetaLoading] = useState(true);
+  const [isCompetitorLoading, setIsCompetitorLoading] = useState(false);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
   const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
   const [contentSort, setContentSort] = useState<"newest" | "oldest" | "reach" | "views" | "engagement" | "likes" | "comments" | "saves">("newest");
@@ -962,19 +968,28 @@ export function MarketingIntegrations() {
   const [contentGenError, setContentGenError] = useState("");
   const [isCopied, setIsCopied] = useState(false);
   const [isSavedToCms, setIsSavedToCms] = useState(false);
+  const [contentGenerationSource, setContentGenerationSource] = useState<"calendar" | "reference">("calendar");
+  const [contentGenerationReference, setContentGenerationReference] = useState<any>(null);
+  const [isAutoPosting, setIsAutoPosting] = useState(false);
+  const [autoPostMessage, setAutoPostMessage] = useState("");
+  const [autoPostError, setAutoPostError] = useState("");
 
-  const handleGenerateContent = async (type: string) => {
+  const handleGenerateContent = async (type: string, referenceItem?: any) => {
     setIsGeneratingContent(true);
     setContentGenError("");
     setContentModalOpen(true);
     setGeneratedContent(null);
     setIsCopied(false);
     setIsSavedToCms(false);
+    setAutoPostMessage("");
+    setAutoPostError("");
+    setContentGenerationSource(referenceItem ? "reference" : "calendar");
+    setContentGenerationReference(referenceItem || null);
 
     // Resolve target content type
     let targetType = type;
     if (type === "ikutin") {
-      const formatLower = (selectedContentIdea.format || "").toLowerCase();
+      const formatLower = ((referenceItem?.contentType || selectedContentIdea.format) || "").toLowerCase();
       if (formatLower.includes("reel")) targetType = "reels";
       else if (formatLower.includes("story")) targetType = "story";
       else if (formatLower.includes("carousel")) targetType = "carousel";
@@ -982,17 +997,37 @@ export function MarketingIntegrations() {
       else targetType = "feed";
     }
 
+    const sourceIdea = referenceItem
+      ? {
+          format: referenceItem.contentType || "Feed",
+          idea: `Adaptasi konten dari referensi: ${referenceItem.media?.caption || referenceItem.reasoning || referenceItem.media?.permalink || "referensi Instagram"}`,
+          pillar: referenceItem.pillar || "Reference-inspired content",
+          objective: "Membuat konten baru yang mengambil pola hook, gaya visual, dan angle dari referensi tanpa menyalin mentah.",
+          formatGuide: [
+            referenceItem.hook ? `Hook referensi: ${referenceItem.hook}` : "",
+            referenceItem.style ? `Gaya visual/copy: ${referenceItem.style}` : "",
+            referenceItem.action ? `Adaptasi yang disarankan: ${referenceItem.action}` : "",
+            referenceItem.media?.permalink ? `Link referensi: ${referenceItem.media.permalink}` : "",
+          ].filter(Boolean).join("\n") || "Gunakan data performa dan reasoning pada kartu referensi sebagai arahan eksekusi.",
+          action: referenceItem.action || referenceItem.reasoning || "Buat versi baru yang sesuai brand dan audiens akun ini.",
+          reason: referenceItem.reasoning || "Referensi ini dipilih karena pola kontennya relevan untuk diturunkan menjadi ide baru.",
+          impact: referenceItem.engagementRate
+            ? `Mengikuti pola referensi dengan engagement ${formatPercent(referenceItem.engagementRate)} sambil tetap menjaga karakter brand.`
+            : "Diharapkan membantu memperjelas hook, gaya visual, dan CTA konten baru.",
+        }
+      : selectedContentIdea;
+
     try {
       const result = await generateContentFromBrief({
         selectedIdea: {
-          format: selectedContentIdea.format,
-          idea: selectedContentIdea.idea,
-          pillar: selectedContentIdea.pillar,
-          objective: selectedContentIdea.objective,
-          formatGuide: selectedContentIdea.formatGuide,
-          action: selectedContentIdea.action,
-          reason: selectedContentIdea.reason,
-          impact: selectedContentIdea.impact,
+          format: sourceIdea.format,
+          idea: sourceIdea.idea,
+          pillar: sourceIdea.pillar,
+          objective: sourceIdea.objective,
+          formatGuide: sourceIdea.formatGuide,
+          action: sourceIdea.action,
+          reason: sourceIdea.reason,
+          impact: sourceIdea.impact,
         },
         contentType: targetType,
         account: {
@@ -1008,6 +1043,43 @@ export function MarketingIntegrations() {
       setContentGenError(error instanceof Error ? error.message : "Gagal men-generate konten.");
     } finally {
       setIsGeneratingContent(false);
+    }
+  };
+
+  const handleAutoPostGeneratedContent = async () => {
+    if (!generatedContent) return;
+
+    setIsAutoPosting(true);
+    setAutoPostError("");
+    setAutoPostMessage("");
+
+    try {
+      const result = await autoPostInstagramContent({
+        igUserId: selectedInstagramId,
+        content: generatedContent,
+        reference: contentGenerationReference
+          ? {
+              id: contentGenerationReference.media?.id,
+              sourceType: contentGenerationReference.sourceType,
+              contentType: contentGenerationReference.contentType,
+              caption: contentGenerationReference.media?.caption,
+              permalink: contentGenerationReference.media?.permalink,
+              reasoning: contentGenerationReference.reasoning,
+              hook: contentGenerationReference.hook,
+              style: contentGenerationReference.style,
+              action: contentGenerationReference.action,
+            }
+          : undefined,
+      });
+      setAutoPostMessage(
+        result.permalink
+          ? `Konten berhasil diposting: ${result.permalink}`
+          : `Konten berhasil diposting${result.selectedAsset?.name ? ` memakai asset ${result.selectedAsset.name}` : ""}.`,
+      );
+    } catch (error) {
+      setAutoPostError(error instanceof Error ? error.message : "Gagal auto post ke Instagram.");
+    } finally {
+      setIsAutoPosting(false);
     }
   };
 
@@ -1047,6 +1119,24 @@ export function MarketingIntegrations() {
       text += `\n[ARAHAN VISUAL]\n${data.metadata.visualDirection}\n`;
     }
     return text;
+  };
+
+  const loadCompetitorBenchmark = async (
+    igUserId: string,
+    dateRange: { since: string; until: string } = appliedDateRange,
+  ) => {
+    setIsCompetitorLoading(true);
+    setCompetitorError("");
+
+    try {
+      const result = await fetchCompetitorBenchmark(igUserId, dateRange);
+      setCompetitorBenchmark(result);
+    } catch (error) {
+      setCompetitorBenchmark(null);
+      setCompetitorError(error instanceof Error ? error.message : "Gagal membaca benchmark kompetitor.");
+    } finally {
+      setIsCompetitorLoading(false);
+    }
   };
 
   const loadInstagramInsights = async (
@@ -1111,8 +1201,10 @@ export function MarketingIntegrations() {
       }
 
       setInstagramInsights(insightsData);
+      void loadCompetitorBenchmark(igUserId, dateRange);
     } catch (error) {
       setInstagramInsights(null);
+      setCompetitorBenchmark(null);
       setMetaError(error instanceof Error ? error.message : "Gagal membaca insight Instagram.");
     } finally {
       setIsMetaLoading(false);
@@ -1136,6 +1228,7 @@ export function MarketingIntegrations() {
       } else {
         setSelectedInstagramId("");
         setInstagramInsights(null);
+        setCompetitorBenchmark(null);
       }
     } catch (error) {
       setMetaError(error instanceof Error ? error.message : "Gagal membaca status Meta API.");
@@ -1303,6 +1396,40 @@ export function MarketingIntegrations() {
     ...metric,
     total: accountTrendData.reduce((sum, point) => sum + (toNumber(point[metric.key]) || 0), 0),
   }));
+  const competitorColors = ["#0F766E", "#2563EB", "#DB2777", "#F59E0B", "#7C3AED", "#0891B2", "#65A30D", "#EA580C"];
+  const competitorMetricConfig = (competitorBenchmark?.competitors || []).map((competitor, index) => ({
+    key: `@${competitor.username}`,
+    color: competitorColors[index % competitorColors.length],
+    competitor,
+  }));
+  const competitorActivityMap = new Map<string, Record<string, string | number>>();
+
+  for (const metric of competitorMetricConfig) {
+    for (const media of metric.competitor.publicMedia || []) {
+      const dateKey = media.timestamp || media.id;
+      const current = competitorActivityMap.get(dateKey) || {
+        date: media.timestamp ? new Date(media.timestamp).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "-",
+      };
+      current[metric.key] = media.interactions || 0;
+      competitorActivityMap.set(dateKey, current);
+    }
+  }
+
+  const competitorActivityData = Array.from(competitorActivityMap.entries())
+    .sort(([first], [second]) => first.localeCompare(second))
+    .map(([, value]) => value);
+  const competitorSummaryRows = (competitorBenchmark?.competitors || []).map((competitor) => [
+    <div className="min-w-0">
+      <p className="truncate font-semibold text-slate-900">@{competitor.username}</p>
+      {competitor.name ? <p className="text-xs text-slate-500">{competitor.name}</p> : null}
+    </div>,
+    formatNumber(competitor.followersCount),
+    formatNumber(competitor.mediaCount),
+    formatNumber(competitor.summary.posts),
+    formatNumber(competitor.summary.avgInteractions),
+    formatPercent(competitor.summary.avgEngagementRate),
+    `${competitor.summary.postingFrequencyPerWeek.toLocaleString("id-ID", { maximumFractionDigits: 1 })}/minggu`,
+  ]);
 
   const contentChartData = mediaItems.slice(0, 8).reverse().map((media, index) => ({
     name: `Post ${index + 1}`,
@@ -1919,6 +2046,82 @@ export function MarketingIntegrations() {
         )}
       </SectionCard>
 
+      <SectionCard icon={GitCompare} title="Benchmark Kompetitor" description="Grafik terpisah memakai data publik yang bisa diambil: followers, jumlah media, dan interaksi publik dari posting terbaru.">
+        {isCompetitorLoading ? (
+          <EmptyState text="Sedang memuat benchmark kompetitor dari Meta Business Discovery..." />
+        ) : competitorError ? (
+          <EmptyState text={competitorError} />
+        ) : competitorBenchmark?.setupRequired ? (
+          <EmptyState text={competitorBenchmark.message || "Set META_COMPETITOR_USERNAMES untuk menampilkan benchmark kompetitor."} />
+        ) : competitorBenchmark?.competitors?.length ? (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {competitorBenchmark.competitors.slice(0, 4).map((competitor, index) => (
+                <div key={competitor.username} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: competitorColors[index % competitorColors.length] }} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-950">@{competitor.username}</p>
+                      <p className="text-xs text-slate-500">Public benchmark</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-500">Followers</p>
+                      <p className="mt-1 text-base font-bold text-slate-950">{formatNumber(competitor.followersCount)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-500">Avg eng.</p>
+                      <p className="mt-1 text-base font-bold text-[#0F766E]">{formatPercent(competitor.summary.avgEngagementRate)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-950">Interaksi Publik per Tanggal Posting</h3>
+                  <p className="mt-1 text-xs text-slate-500">Nilai grafik = likes + comments. Reach dan impressions kompetitor tidak tersedia sebagai data publik.</p>
+                </div>
+                <StatusBadge tone="slate">Public data</StatusBadge>
+              </div>
+              {competitorActivityData.length ? (
+                <div className="mt-5 h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={competitorActivityData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                      <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
+                      <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} formatter={(value) => formatNumber(toNumber(value))} />
+                      <Legend />
+                      {competitorMetricConfig.map((metric) => (
+                        <Line key={metric.key} type="monotone" dataKey={metric.key} stroke={metric.color} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 6 }} connectNulls />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="mt-5"><EmptyState text="Belum ada posting publik kompetitor dalam periode ini." /></div>
+              )}
+            </div>
+
+            <DataTable
+              columns={["Kompetitor", "Followers", "Media", "Post dimuat", "Avg interaksi/post", "Avg engagement", "Frekuensi"]}
+              rows={competitorSummaryRows}
+            />
+            {competitorBenchmark.warnings?.length ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                {competitorBenchmark.warnings.join(" | ")}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <EmptyState text="Belum ada data benchmark kompetitor yang berhasil dimuat." />
+        )}
+      </SectionCard>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <SectionCard icon={TrendingUp} title="Online Followers" description="Waktu followers paling aktif untuk membantu penjadwalan konten.">
           {onlineFollowerDisplaySlots.length ? (
@@ -2393,7 +2596,22 @@ export function MarketingIntegrations() {
                           </div>
                         )}
                         <p className="mt-3 break-words text-xs leading-5 text-slate-600">{item.reasoning}</p>
-                        {item.media.permalink ? <a className="mt-3 inline-flex text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">{item.sourceType === "custom" ? "Buka link referensi" : "Buka referensi"}</a> : null}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {item.media.permalink ? (
+                            <a className="inline-flex h-9 items-center text-sm font-semibold text-[#0F766E] hover:underline" href={item.media.permalink} target="_blank" rel="noreferrer">
+                              {item.sourceType === "custom" ? "Buka link referensi" : "Buka referensi"}
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateContent("ikutin", item)}
+                            disabled={isGeneratingContent}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            Hasilkan konten
+                          </button>
+                        </div>
                       </div>
                     </details>
                   ))}
@@ -2427,7 +2645,11 @@ export function MarketingIntegrations() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold">GMT AI Content Writer</h3>
-                  <p className="text-xs text-teal-100">Dibuat otomatis dari Brief Kalender Konten Hari {selectedContentIdeaIndex + 1}</p>
+                  <p className="text-xs text-teal-100">
+                    {contentGenerationSource === "reference"
+                      ? "Dibuat otomatis dari kartu Referensi Terbaik"
+                      : `Dibuat otomatis dari Brief Kalender Konten Hari ${selectedContentIdeaIndex + 1}`}
+                  </p>
                 </div>
               </div>
               <button
@@ -2670,21 +2892,36 @@ export function MarketingIntegrations() {
                     {isCopied ? "Tersalin!" : "Salin Teks"}
                   </button>
                 )}
-                {generatedContent && (
-                  <button
-                    type="button"
-                    onClick={() => {
+                  {generatedContent && (
+                    <button
+                      type="button"
+                      onClick={() => {
                       setIsSavedToCms(true);
                       setTimeout(() => setIsSavedToCms(false), 3000);
                     }}
                     className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                       isSavedToCms ? "bg-emerald-600 text-white" : "bg-[#0F766E] text-white hover:bg-[#115E59]"
                     }`}
+                    >
+                      <CheckCircle className={`h-4 w-4 transition-transform ${isSavedToCms ? "scale-100" : "scale-0 w-0"}`} />
+                      {isSavedToCms ? "Sukses Tersimpan di CMS!" : "Simpan ke Draf CMS"}
+                    </button>
+                  )}
+                {generatedContent && (
+                  <button
+                    type="button"
+                    onClick={handleAutoPostGeneratedContent}
+                    disabled={isAutoPosting}
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
-                    <CheckCircle className={`h-4 w-4 transition-transform ${isSavedToCms ? "scale-100" : "scale-0 w-0"}`} />
-                    {isSavedToCms ? "Sukses Tersimpan di CMS!" : "Simpan ke Draf CMS"}
+                    <Instagram className="h-4 w-4" />
+                    {isAutoPosting ? "Mem-posting..." : "Auto post IG"}
                   </button>
                 )}
+              </div>
+              <div className="min-w-0 flex-1 text-xs font-medium">
+                {autoPostMessage ? <p className="break-words text-emerald-700">{autoPostMessage}</p> : null}
+                {autoPostError ? <p className="break-words text-rose-700">{autoPostError}</p> : null}
               </div>
               <button
                 type="button"
