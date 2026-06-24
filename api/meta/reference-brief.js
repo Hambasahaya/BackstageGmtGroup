@@ -34,6 +34,28 @@ const escapeHtml = (value = "") =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+const isLouderTechnologiesAccount = (account = {}) => {
+  const accountText = [
+    account.username,
+    account.name,
+    account.biography,
+    account.website,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return /louder\s*technologies|loudertechnologies|louder-technologies/.test(accountText);
+};
+
+const getLouderTechnologiesInstructions = () => [
+  "Special rule for LouderTechnologies only:",
+  "Write in English only, using simple grammar and clear wording.",
+  "Use a Human Experience First approach: start from real user needs, daily problems, project situations, or product challenges.",
+  "Include Technical Experience, but keep it clear and light. Explain technical terms in a simple way.",
+  "Connect every idea to a specific LouderTechnologies product, system, feature, project, or solution.",
+  "Make the content relatable with realistic customer, project, work, or industry situations.",
+  "Use storytelling based on the project or product: problem, situation, solution, and result.",
+  "Keep the tone professional, helpful, practical, and easy to understand.",
+];
+
 const callAiJson = async (prompt) => {
   const config = getAiProviderConfig();
   if (!config) throw new Error("Missing Alibaba Model Studio API key.");
@@ -97,7 +119,7 @@ const renderList = (items = []) =>
     ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
     : "<p>-</p>";
 
-const renderBriefHtml = ({ account, brief }) => `<!doctype html>
+const renderBriefHtml = ({ account, brief, isLouderTechnologies = false }) => `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -114,27 +136,27 @@ const renderBriefHtml = ({ account, brief }) => `<!doctype html>
 </head>
 <body>
   <h1>${escapeHtml(brief.title || "Reference Brief")}</h1>
-  <p class="muted">Akun: ${escapeHtml(account?.username || "-")} | Dibuat dengan Alibaba Model Studio</p>
-  <h2>Ringkasan Strategi</h2>
+  <p class="muted">${isLouderTechnologies ? "Account" : "Akun"}: ${escapeHtml(account?.username || "-")} | ${isLouderTechnologies ? "Generated with Alibaba Model Studio" : "Dibuat dengan Alibaba Model Studio"}</p>
+  <h2>${isLouderTechnologies ? "Strategy Summary" : "Ringkasan Strategi"}</h2>
   <p>${escapeHtml(brief.summary || "-")}</p>
-  <h2>Pola Referensi Yang Dipakai</h2>
+  <h2>${isLouderTechnologies ? "Reference Patterns Used" : "Pola Referensi Yang Dipakai"}</h2>
   ${renderList(brief.referencePatterns || [])}
   <h2>Content Pillars</h2>
   ${renderList(brief.contentPillars || [])}
-  <h2>Rekomendasi Brief</h2>
+  <h2>${isLouderTechnologies ? "Brief Recommendations" : "Rekomendasi Brief"}</h2>
   ${(brief.briefs || []).map((item, index) => `
     <div class="box">
       <h3>${index + 1}. ${escapeHtml(item.title || item.format || "Brief")}</h3>
       <p><strong>Format:</strong> ${escapeHtml(item.format || "-")}</p>
       <p><strong>Hook:</strong> ${escapeHtml(item.hook || "-")}</p>
       <p><strong>Angle:</strong> ${escapeHtml(item.angle || "-")}</p>
-      <p><strong>Eksekusi:</strong> ${escapeHtml(item.execution || "-")}</p>
+      <p><strong>${isLouderTechnologies ? "Execution" : "Eksekusi"}:</strong> ${escapeHtml(item.execution || "-")}</p>
       <p><strong>CTA:</strong> ${escapeHtml(item.cta || "-")}</p>
     </div>
   `).join("")}
-  <h2>Checklist Produksi</h2>
+  <h2>${isLouderTechnologies ? "Production Checklist" : "Checklist Produksi"}</h2>
   ${renderList(brief.productionChecklist || [])}
-  <h2>Checklist Publish</h2>
+  <h2>${isLouderTechnologies ? "Publish Checklist" : "Checklist Publish"}</h2>
   ${renderList(brief.publishChecklist || [])}
 </body>
 </html>`;
@@ -170,13 +192,18 @@ export default async function handler(request, response) {
       request.on("error", reject);
     });
 
+    const isLouderTechnologies = isLouderTechnologiesAccount(body.account);
     const prompt = [
-      "You are applying the Social Media Manager skill for an Indonesian Instagram account.",
+      isLouderTechnologies
+        ? "You are applying the Social Media Manager skill for the LouderTechnologies Instagram account."
+        : "You are applying the Social Media Manager skill for an Indonesian Instagram account.",
       "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
       "Create a Word-ready strategic brief from the provided reference cards.",
       "References are inspiration only. Do not copy them, do not treat them as performance data, and adapt all ideas to the selected account.",
+      ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
       "Return only valid JSON. No markdown. No commentary.",
       "Schema: {\"title\":\"\",\"summary\":\"\",\"referencePatterns\":[\"\"],\"contentPillars\":[\"\"],\"briefs\":[{\"title\":\"\",\"format\":\"\",\"hook\":\"\",\"angle\":\"\",\"execution\":\"\",\"cta\":\"\"}],\"productionChecklist\":[\"\"],\"publishChecklist\":[\"\"]}",
+      isLouderTechnologies ? "For every field, use English only with simple grammar and clear structure." : "For every field, use Bahasa Indonesia.",
       JSON.stringify({
         account: body.account,
         mainRecommendation: body.mainRecommendation,
@@ -190,7 +217,7 @@ export default async function handler(request, response) {
 
     json(response, 200, {
       filename: `${filenameBase}-reference-brief.doc`,
-      html: renderBriefHtml({ account: body.account, brief }),
+      html: renderBriefHtml({ account: body.account, brief, isLouderTechnologies }),
     });
   } catch (error) {
     json(response, 500, { error: error.message || "Reference brief generation failed." });

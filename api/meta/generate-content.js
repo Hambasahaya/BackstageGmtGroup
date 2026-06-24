@@ -32,6 +32,28 @@ const extractJsonObject = (text) => {
   }
 };
 
+const isLouderTechnologiesAccount = (account = {}) => {
+  const accountText = [
+    account.username,
+    account.name,
+    account.biography,
+    account.website,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return /louder\s*technologies|loudertechnologies|louder-technologies/.test(accountText);
+};
+
+const getLouderTechnologiesInstructions = () => [
+  "Special rule for LouderTechnologies only:",
+  "Write all generated content in English with simple, easy-to-understand grammar.",
+  "Use a Human Experience First approach: start from real user needs, daily problems, project situations, or product challenges.",
+  "Include Technical Experience, but explain it in a clear and light way. Avoid heavy technical language unless it is needed.",
+  "Connect the story to a specific LouderTechnologies product, system, feature, project, or solution. Avoid generic content.",
+  "Make the content relatable by using realistic work, customer, project, or industry situations.",
+  "Use storytelling based on the project or product: problem, situation, solution, and result.",
+  "Keep the tone professional, helpful, practical, and easy to follow.",
+];
+
 const callAiJson = async (prompt) => {
   const config = getAiProviderConfig();
   if (!config) throw new Error("Missing Alibaba Model Studio API key.");
@@ -127,8 +149,32 @@ export default async function handler(request, response) {
       return;
     }
 
+    const isLouderTechnologies = isLouderTechnologiesAccount(account);
+    const languageInstruction = isLouderTechnologies
+      ? "Always generate content in ENGLISH with simple grammar and clear wording."
+      : "Always generate content in BAHASA INDONESIA, with engaging and highly professional copywriting.";
+    const schemaLanguage = isLouderTechnologies ? {
+      hook: "Simple English hook for the first caption line",
+      body: "Main caption body in clear and practical English",
+      cta: "Clear call to action in English",
+      visual: "visual scene description",
+      voiceOver: "voice over / spoken line in simple English",
+      onScreenText: "short on-screen text in English",
+      article: "Full English markdown article with heading tags (#, ##, ###), intro, body sections, conclusion, and FAQs. ONLY include this string if target contentType is \"artikel\"",
+    } : {
+      hook: "Copywriting hook untuk baris pertama caption",
+      body: "Isi caption utama yang persuasif dan lengkap",
+      cta: "Call to action yang jelas",
+      visual: "deskripsi visual adegan",
+      voiceOver: "dialog / suara pengisi",
+      onScreenText: "teks di layar",
+      article: "Full markdown string containing the generated article with heading tags (#, ##, ###), intro, body sections, conclusion, and FAQs. ONLY include this string if target contentType is \"artikel\"",
+    };
+
     const prompt = [
-      "You are a Senior Social Media Copywriter and SEO Content Specialist for GMT Group (Indonesia).",
+      isLouderTechnologies
+        ? "You are a Senior Social Media Copywriter and SEO Content Specialist for LouderTechnologies."
+        : "You are a Senior Social Media Copywriter and SEO Content Specialist for GMT Group (Indonesia).",
       "Using the following input data, generate a complete content of the specified type.",
       `Target Type: ${contentType}`,
       "",
@@ -145,21 +191,22 @@ export default async function handler(request, response) {
       "-------------------------",
       "",
       "Please adapt the brief to the target type and output it as JSON according to the schema rules below.",
-      "Always generate content in BAHASA INDONESIA, with engaging and highly professional copywriting.",
+      languageInstruction,
+      ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
       "",
       "JSON Schema:",
       "{",
       '  "contentType": "' + contentType + '",',
       '  "title": "Title / main focus of this content",',
       '  "caption": {',
-      '    "hook": "Copywriting hook untuk baris pertama caption",',
-      '    "body": "Isi caption utama yang persuasif dan lengkap",',
-      '    "cta": "Call to action yang jelas",',
+      `    "hook": "${schemaLanguage.hook}",`,
+      `    "body": "${schemaLanguage.body}",`,
+      `    "cta": "${schemaLanguage.cta}",`,
       '    "hashtags": ["list", "of", "relevant", "hashtags"]',
       "  },",
       '  "content": {',
       '    "script": [  // ONLY include this array if target contentType is "reals" or "reels" or "video"',
-      '      {"timecode": "0-3s", "visual": "deskripsi visual adegan", "voiceOver": "dialog / suara pengisi", "onScreenText": "teks di layar"}',
+      `      {"timecode": "0-3s", "visual": "${schemaLanguage.visual}", "voiceOver": "${schemaLanguage.voiceOver}", "onScreenText": "${schemaLanguage.onScreenText}"}`,
       "    ],",
       '    "storyFrames": [ // ONLY include this array if target contentType is "story"',
       '      {"frame": "1", "visual": "visual frame", "text": "teks overlay/sticker", "stickerOrCta": "fitur interaksi (poll/question/link)"}',
@@ -167,7 +214,7 @@ export default async function handler(request, response) {
       '    "carouselSlides": [ // ONLY include this array if target contentType is "carousel"',
       '      {"slide": "1", "headline": "Headline slide", "visual": "visual slide", "copy": "bullet points/keterangan slide"}',
       "    ],",
-      '    "article": "Full markdown string containing the generated article with heading tags (#, ##, ###), intro, body sections, conclusion, and FAQs. ONLY include this string if target contentType is \\"artikel\\""',
+      `    "article": "${schemaLanguage.article.replace(/"/g, '\\"')}"`,
       "  },",
       '  "metadata": {',
       '    "visualDirection": "Visual tone, font guidelines, coloring or audio instructions",',

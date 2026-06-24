@@ -2,6 +2,28 @@ import { findInstagramPage, getStoredTokenBundle, json, metaFetch } from "./_met
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+const isLouderTechnologiesAccount = (account = {}) => {
+  const accountText = [
+    account.username,
+    account.name,
+    account.biography,
+    account.website,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return /louder\s*technologies|loudertechnologies|louder-technologies/.test(accountText);
+};
+
+const getLouderTechnologiesInstructions = () => [
+  "Special rule for LouderTechnologies only:",
+  "Write in English only, using simple grammar and clear wording.",
+  "Use a Human Experience First approach: start from real user needs, daily problems, project situations, or product challenges.",
+  "Include Technical Experience, but keep it clear and light. Explain technical terms in a simple way.",
+  "Connect every idea to a specific LouderTechnologies product, system, feature, project, or solution.",
+  "Make the content relatable with realistic customer, project, work, or industry situations.",
+  "Use storytelling based on the project or product: problem, situation, solution, and result.",
+  "Keep the tone professional, helpful, practical, and easy to understand.",
+];
+
 const getDefaultDateRange = () => {
   const insightDays = Math.max(1, Math.min(Number(process.env.META_INSIGHT_DAYS || 30), 90));
   const untilDate = new Date();
@@ -248,12 +270,18 @@ const callAiJson = async ({ prompt, temperature, maxTokens }) => {
 const callAlibabaForContentReasoning = async ({ profile, dateRange, mediaPayload }) => {
   if (!mediaPayload.length) return { items: [], warning: null, source: "local" };
 
+  const isLouderTechnologies = isLouderTechnologiesAccount(profile);
   const prompt = [
-    "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
+    isLouderTechnologies
+      ? "You are applying the Social Media Manager skill for the LouderTechnologies Instagram business dashboard."
+      : "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
     "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
     "Act as a content strategist, not a caption writer. Evaluate each post using content pillars, audience value, engagement quality, format fit, posting cadence, and next optimization.",
+    ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
     "Return only valid JSON. No markdown. No commentary.",
-    "Schema: {\"items\":[{\"id\":\"media id\",\"reasoning\":\"1-2 concise Indonesian sentences for the dashboard table\",\"action\":\"short next action\",\"angle\":\"content angle or pillar\"}]}",
+    isLouderTechnologies
+      ? "Schema: {\"items\":[{\"id\":\"media id\",\"reasoning\":\"1-2 concise English sentences for the dashboard table\",\"action\":\"short next action in English\",\"angle\":\"content angle or pillar\"}]}"
+      : "Schema: {\"items\":[{\"id\":\"media id\",\"reasoning\":\"1-2 concise Indonesian sentences for the dashboard table\",\"action\":\"short next action\",\"angle\":\"content angle or pillar\"}]}",
     "Reasoning must mention the useful metric pattern when available, and must not invent metrics not present in the input.",
     "Keep each reasoning under 220 characters.",
     JSON.stringify({
@@ -339,16 +367,22 @@ const getReferenceInsights = async ({ profile, igUserId, recentPosts }) => {
   const references = getConfiguredReferences({ igUserId, username: profile?.username });
   if (!references.length) return { data: [], warning: null };
 
+  const isLouderTechnologies = isLouderTechnologiesAccount(profile);
   const prompt = [
-    "You are applying the Social Media Manager skill for an Indonesian Instagram dashboard.",
+    isLouderTechnologies
+      ? "You are applying the Social Media Manager skill for the LouderTechnologies Instagram dashboard."
+      : "You are applying the Social Media Manager skill for an Indonesian Instagram dashboard.",
     "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
     "Analyze the provided reference Instagram content/account links for the selected account.",
     "The provided references are examples only. Use them to understand hook, visual style, content angle, pacing, and CTA patterns. Do not copy them, do not treat them as the selected account's performance data, and do not make the selected account imitate them blindly.",
     "Always adapt the reference pattern to the selected account's brand, audience, products/services, and recent post performance.",
     "Important: if a reference only has a URL and no caption/note, do not pretend you can see the post. Infer only format from the URL when possible and give a practical creative-use reason.",
+    ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
     "Return only valid JSON. No markdown. No commentary.",
-    "Schema: {\"items\":[{\"id\":\"reference id\",\"title\":\"short title\",\"contentType\":\"Reels|Carousel|Story|Feed|Account\",\"hook\":\"hook/style to borrow\",\"style\":\"visual/copy style\",\"reasoning\":\"1-2 Indonesian sentences why this is useful for the selected account\",\"action\":\"how to adapt it\",\"pillar\":\"content pillar\"}]}",
-    "Keep reasoning under 240 characters. Use Bahasa Indonesia.",
+    isLouderTechnologies
+      ? "Schema: {\"items\":[{\"id\":\"reference id\",\"title\":\"short English title\",\"contentType\":\"Reels|Carousel|Story|Feed|Account\",\"hook\":\"hook/style to borrow\",\"style\":\"visual/copy style\",\"reasoning\":\"1-2 English sentences why this is useful for the selected account\",\"action\":\"how to adapt it in simple English\",\"pillar\":\"content pillar\"}]}"
+      : "Schema: {\"items\":[{\"id\":\"reference id\",\"title\":\"short title\",\"contentType\":\"Reels|Carousel|Story|Feed|Account\",\"hook\":\"hook/style to borrow\",\"style\":\"visual/copy style\",\"reasoning\":\"1-2 Indonesian sentences why this is useful for the selected account\",\"action\":\"how to adapt it\",\"pillar\":\"content pillar\"}]}",
+    isLouderTechnologies ? "Keep reasoning under 240 characters. Use English only." : "Keep reasoning under 240 characters. Use Bahasa Indonesia.",
     JSON.stringify({
       selectedAccount: {
         igUserId,
@@ -442,19 +476,25 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
 const callAlibabaForContentBrief = async ({ profile, dateRange, mediaPayload, audience, references = [] }) => {
   if (!mediaPayload.length) return { contentBrief: null, warning: null };
 
+  const isLouderTechnologies = isLouderTechnologiesAccount(profile);
   const prompt = [
-    "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
+    isLouderTechnologies
+      ? "You are applying the Social Media Manager skill for the LouderTechnologies Instagram business dashboard."
+      : "You are applying the Social Media Manager skill for an Indonesian Instagram business dashboard.",
     "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
     "Create a tactical 7-day content brief and production-ready assistant package from the account profile, audience signals, and recent post metrics.",
     "Use the Social Media Manager skill principles: content pillars, audience value, growth objective, format fit, cadence, hook strategy, CTA, platform-native execution, and publish QA.",
     "Make the assistant package format-aware: Reels/video must include script and shot list; Carousel must include slide-by-slide outline; Story must include frame sequence; Feed/static must include visual direction.",
     "Custom references are examples only. Use them as creative inspiration for hook, style, structure, and CTA. Do not copy their wording, do not assume their metrics, and do not let them override the selected account's own data.",
     "Every day/card must be generated from the selected account data and recent posts first, then refined by the reference patterns when relevant. Avoid generic templates and do not repeat the same idea with different wording.",
+    ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
     "Return only valid JSON. No markdown. No commentary.",
-    "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"alibaba\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"publishChecklist\":[\"\"],\"postPublishChecklist\":[\"\"]}}]}",
-    "Exactly 7 items. Keep every field practical, specific, and in Indonesian. Do not invent metrics not present in the input.",
+    isLouderTechnologies
+      ? "Schema: {\"summary\":\"one concise English recommendation\",\"source\":\"alibaba\",\"items\":[{\"day\":\"Day 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific English content idea\",\"formatGuide\":\"execution guide in simple English\",\"action\":\"what to do in simple English\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"publishChecklist\":[\"\"],\"postPublishChecklist\":[\"\"]}}]}"
+      : "Schema: {\"summary\":\"one concise Indonesian recommendation\",\"source\":\"alibaba\",\"items\":[{\"day\":\"Hari 1\",\"format\":\"Reels|Story|Carousel|Feed\",\"pillar\":\"content pillar\",\"objective\":\"metric/behavior objective\",\"idea\":\"specific Indonesian content idea\",\"formatGuide\":\"execution guide\",\"action\":\"what to do\",\"reason\":\"why this format/angle\",\"impact\":\"expected business/content impact\",\"assistant\":{\"formatType\":\"video|carousel|story|feed\",\"caption\":{\"hook\":\"\",\"body\":\"\",\"cta\":\"\",\"hashtags\":[\"\"]},\"script\":[{\"timecode\":\"0-3s\",\"visual\":\"\",\"voiceOver\":\"\",\"onScreenText\":\"\"}],\"carouselSlides\":[{\"slide\":\"1\",\"headline\":\"\",\"visual\":\"\",\"copy\":\"\"}],\"storyFrames\":[{\"frame\":\"1\",\"visual\":\"\",\"text\":\"\",\"stickerOrCta\":\"\"}],\"visualDirection\":\"\",\"shotList\":[\"\"],\"postPublishChecklist\":[\"\"],\"publishChecklist\":[\"\"]}}]}",
+    isLouderTechnologies ? "Exactly 7 items. Keep every field practical, specific, and in English. Do not invent metrics not present in the input." : "Exactly 7 items. Keep every field practical, specific, and in Indonesian. Do not invent metrics not present in the input.",
     "For non-matching fields, return an empty array rather than irrelevant content. Example: carouselSlides can be empty for Reels.",
-    "Prefer GMT/brand-relevant ideas over generic social media advice.",
+    isLouderTechnologies ? "Prefer LouderTechnologies project/product-relevant ideas over generic social media advice." : "Prefer GMT/brand-relevant ideas over generic social media advice.",
     JSON.stringify({
       account: {
         username: profile?.username,
