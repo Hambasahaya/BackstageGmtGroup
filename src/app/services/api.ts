@@ -216,6 +216,80 @@ export type NotificationDto = {
   status?: "belum_terbaca" | "terbaca";
 };
 
+export type EducationStatus = "Available" | "Full" | "Closed" | "Cancelled" | string;
+export type EducationType = "Offline" | "Online" | "Hybrid" | string;
+
+export type EducationParticipantDto = {
+  id?: string | number;
+  registration_id?: string;
+  user_id?: string | number;
+  status?: string;
+  salutation?: string;
+  first_name?: string;
+  surname?: string;
+  name?: string;
+  email?: string;
+  phone_landline?: string | null;
+  phone_mobile?: string | null;
+  company?: string | null;
+  position?: string | null;
+  meal_preference?: string | null;
+  additional_information?: string | null;
+  created_at?: string;
+  registered_at?: string;
+};
+
+export type EducationDto = {
+  id: string;
+  title: string;
+  description?: string | null;
+  full_description?: string | null;
+  date: string;
+  time?: string | null;
+  type: EducationType;
+  status: EducationStatus;
+  max_attendees?: number | null;
+  current_attendees?: number | null;
+  location?: string | null;
+  venue?: string | null;
+  image?: string | null;
+  participants?: EducationParticipantDto[];
+  registrations?: EducationParticipantDto[];
+  [key: string]: unknown;
+};
+
+export type EducationListResponse = {
+  success?: boolean;
+  message?: string;
+  data: EducationDto[];
+  meta?: {
+    total: number;
+    page: number;
+    limit: number;
+    total_pages: number;
+  };
+};
+
+export type EducationDetailResponse = {
+  success?: boolean;
+  message?: string;
+  data: EducationDto;
+};
+
+export type EducationPayload = {
+  title: string;
+  description?: string;
+  full_description?: string;
+  date: string;
+  time?: string;
+  type: string;
+  status: string;
+  max_attendees?: number;
+  current_attendees?: number;
+  location?: string;
+  venue?: string;
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
 const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
@@ -645,4 +719,21 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   resetOnboardingProgress: () => apiRequest<{ message: string }>("/api/agent/onboarding/progress", { method: "DELETE" }),
+  educations: (query?: { month?: string; type?: string; status?: string; page?: number; limit?: number }) =>
+    apiRequest<EducationListResponse>("/api/educations", {
+      auth: false,
+      query,
+    }),
+  educationDetail: (id: string) => apiRequest<EducationDetailResponse>(`/api/educations/${id}`, { auth: false }),
+  createEducation: (payload: EducationPayload) =>
+    apiRequest<EducationDetailResponse>("/api/educations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateEducation: (id: string, payload: EducationPayload) =>
+    apiRequest<EducationDetailResponse>(`/api/educations/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteEducation: (id: string) => apiRequest<{ success?: boolean; message?: string }>(`/api/educations/${id}`, { method: "DELETE" }),
 };

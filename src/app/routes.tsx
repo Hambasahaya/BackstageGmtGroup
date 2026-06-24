@@ -10,6 +10,7 @@ import { AgentAchievement } from "./components/AgentAchievement";
 import { AgentApplications } from "./components/AgentApplications";
 import { ApplyAgent } from "./components/ApplyAgent";
 import { Dashboard } from "./components/Dashboard";
+import { EducationEvents } from "./components/EducationEvents";
 import { Login } from "./components/Login";
 import { MyGmtEntry } from "./components/MyGmtEntry";
 import { Register } from "./components/Register";
@@ -18,7 +19,6 @@ import { SsoCallback } from "./components/SsoCallback";
 import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
 import {
   ArticleManagement,
-  EventManagement,
   MediaLibrary,
   MarketingIntegrations,
   MultiWebsiteManagement,
@@ -144,7 +144,7 @@ export const router = createBrowserRouter([
         path: "events",
         element: (
           <RoleGate allowedRoles={superAdminOnly}>
-            <EventManagement />
+            <EducationEvents />
           </RoleGate>
         ),
       },
