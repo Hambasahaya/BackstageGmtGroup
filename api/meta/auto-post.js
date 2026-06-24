@@ -234,6 +234,13 @@ export default async function handler(request, response) {
       return;
     }
 
+    if (page?.token_source === "legacy_instagram_token") {
+      json(response, 400, {
+        error: "Auto post is using META_IG_ACCESS_TOKEN. Use META_INSTAGRAM_ACCOUNTS with a pageAccessToken/accessToken from the connected Facebook Page, or set META_PAGE_ACCESS_TOKEN.",
+      });
+      return;
+    }
+
     const assets = await listDriveAssets();
     if (!assets.length) {
       json(response, 404, { error: "No image or video assets found in the configured Google Drive folder." });

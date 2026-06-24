@@ -15,19 +15,34 @@ const parseInstagramAccounts = (raw) => {
 
     return accounts
       .map((account, index) => {
-        const accessToken = account.accessToken || account.token || account.igAccessToken || account.pageAccessToken || "";
-        const igUserId = account.igUserId || account.instagramUserId || account.id || "";
+        const accessToken =
+          account.pageAccessToken ||
+          account.page_access_token ||
+          account.accessToken ||
+          account.access_token ||
+          account.token ||
+          account.igAccessToken ||
+          account.ig_access_token ||
+          "";
+        const igUserId =
+          account.igUserId ||
+          account.ig_user_id ||
+          account.instagramUserId ||
+          account.instagram_user_id ||
+          account.id ||
+          "";
 
         if (!accessToken || !igUserId) return null;
 
         return {
-          id: account.pageId || igUserId,
-          name: account.pageName || account.name || (account.username ? `@${account.username}` : `Instagram account ${index + 1}`),
+          id: account.pageId || account.page_id || igUserId,
+          name: account.pageName || account.page_name || account.name || (account.username ? `@${account.username}` : `Instagram account ${index + 1}`),
           access_token: accessToken,
+          token_source: "configured_accounts",
           instagram_business_account: {
             id: igUserId,
             username: account.username || undefined,
-            profile_picture_url: account.profilePictureUrl || undefined,
+            profile_picture_url: account.profilePictureUrl || account.profile_picture_url || undefined,
           },
         };
       })
@@ -59,6 +74,7 @@ const envTokenBundle = () => {
             id: META_PAGE_ID || META_IG_USER_ID,
             name: META_IG_USERNAME ? `@${META_IG_USERNAME}` : "Direct Instagram account",
             access_token: directAccessToken,
+            token_source: directInstagramToken ? "legacy_instagram_token" : "legacy_page_token",
             instagram_business_account: {
               id: META_IG_USER_ID,
               username: META_IG_USERNAME || undefined,
