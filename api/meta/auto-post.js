@@ -50,6 +50,24 @@ const postGraph = async (endpoint, params, token) => {
   return payload;
 };
 
+const waitForMediaReady = async (containerId, token, maxRetries = 12, delayMs = 5000) => {
+  const baseUrl = getGraphBaseUrl(token);
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await fetch(`${baseUrl}/${containerId}?fields=status_code&access_token=${token}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error?.message || "Failed to check media container status.");
+    }
+    
+    const status = payload.status_code;
+    if (status === "FINISHED") return true;
+    if (status === "ERROR") throw new Error("Instagram failed to process the media container.");
+    
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error("Media processing timed out. Please try again later.");
+};
+
 const getGoogleAccessToken = async () => {
   if (process.env.GOOGLE_OAUTH_ACCESS_TOKEN) return process.env.GOOGLE_OAUTH_ACCESS_TOKEN;
 
@@ -268,6 +286,10 @@ export default async function handler(request, response) {
       },
       pageAccessToken,
     );
+
+    // Wait for the container to be ready (Instagram processing)
+    await waitForMediaReady(container.id, pageAccessToken);
+
     const published = await postGraph(
       `/${igUserId}/media_publish`,
       { creation_id: container.id },
