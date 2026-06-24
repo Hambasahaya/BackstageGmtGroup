@@ -43,6 +43,136 @@ const isLouderTechnologiesAccount = (account = {}) => {
   return /louder\s*technologies|loudertechnologies|louder-technologies/.test(accountText);
 };
 
+const cleanAiText = (value) => {
+  if (typeof value !== "string") return "";
+
+  return value
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line
+      .replace(/^\s*[-–—/\\|•*]+\s*/g, "")
+      .replace(/\s+([,.!?;:])/g, "$1")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+};
+
+const cleanStringArray = (value, limit = 12) =>
+  Array.isArray(value)
+    ? value.map(cleanAiText).filter(Boolean).slice(0, limit)
+    : [];
+
+const cleanObjectArray = (value, shape, limit = 12) =>
+  Array.isArray(value)
+    ? value.slice(0, limit).map((item) => Object.fromEntries(
+      Object.keys(shape).map((key) => [key, cleanAiText(item?.[key])]),
+    )).filter((item) => Object.values(item).some(Boolean))
+    : [];
+
+const getCarouselSlideTemplate = (index, selectedIdea = {}, isEnglish = false) => {
+  const idea = cleanAiText(selectedIdea.idea) || (isEnglish ? "main idea" : "ide utama");
+  const pillar = cleanAiText(selectedIdea.pillar) || (isEnglish ? "context" : "konteks");
+  const objective = cleanAiText(selectedIdea.objective) || (isEnglish ? "audience action" : "aksi audiens");
+  const slides = isEnglish
+    ? [
+      ["Start with the real problem", `Open with the audience situation behind: ${idea}`, "A clear lifestyle/product image that shows the problem"],
+      ["Why it matters now", `Explain the pain point in one practical sentence and connect it to ${pillar}.`, "Close-up detail or comparison visual"],
+      ["What usually goes wrong", "Mention the common mistake without sounding judgmental.", "Simple visual contrast between old habit and better option"],
+      ["A better way to approach it", "Give one useful step that feels easy to apply today.", "Product/process visual with clean text overlay"],
+      ["Proof or reason to believe", `Show why this matters for ${objective}.`, "Testimonial, result, or feature-detail visual"],
+      ["What to do next", "Invite the audience to save, share, comment, or DM with a clear reason.", "Brand/product visual with soft CTA area"],
+    ]
+    : [
+      ["Mulai dari masalah audiens", `Buka dengan situasi nyata di balik: ${idea}`, "Visual lifestyle/produk yang langsung menunjukkan masalah"],
+      ["Kenapa ini penting sekarang", `Jelaskan pain point secara praktis dan hubungkan dengan ${pillar}.`, "Close-up detail atau visual perbandingan"],
+      ["Kesalahan yang sering terjadi", "Sebutkan kebiasaan yang kurang tepat tanpa terasa menggurui.", "Kontras visual antara cara lama dan cara yang lebih baik"],
+      ["Cara yang lebih enak dilakukan", "Berikan satu langkah yang mudah dipraktikkan hari ini.", "Visual produk/proses dengan overlay teks bersih"],
+      ["Alasan audiens percaya", `Tunjukkan kenapa ini relevan untuk ${objective}.`, "Visual bukti, hasil, testimoni, atau detail fitur"],
+      ["Ajak audiens bergerak", "Minta audiens save, share, komentar, atau DM dengan alasan yang jelas.", "Visual brand/produk dengan area CTA yang rapi"],
+    ];
+  const [headline, copy, visual] = slides[index % slides.length];
+
+  return {
+    slide: String(index + 1),
+    headline,
+    visual,
+    copy,
+  };
+};
+
+const ensureCarouselSlides = ({ slides, selectedIdea, isEnglish }) => {
+  const cleaned = cleanObjectArray(slides, {
+    slide: "",
+    headline: "",
+    visual: "",
+    copy: "",
+  }, 8);
+  const targetCount = Math.max(5, Math.min(8, cleaned.length || 6));
+
+  while (cleaned.length < targetCount) {
+    cleaned.push(getCarouselSlideTemplate(cleaned.length, selectedIdea, isEnglish));
+  }
+
+  return cleaned.slice(0, targetCount).map((slide, index) => ({
+    slide: String(index + 1),
+    headline: slide.headline || getCarouselSlideTemplate(index, selectedIdea, isEnglish).headline,
+    visual: slide.visual || getCarouselSlideTemplate(index, selectedIdea, isEnglish).visual,
+    copy: slide.copy || getCarouselSlideTemplate(index, selectedIdea, isEnglish).copy,
+  }));
+};
+
+const normalizeGeneratedContent = ({ result, selectedIdea, contentType, isEnglish }) => {
+  const normalizedType = String(contentType || result?.contentType || "").toLowerCase();
+  const content = result?.content && typeof result.content === "object" ? result.content : {};
+  const caption = result?.caption && typeof result.caption === "object" ? result.caption : {};
+  const metadata = result?.metadata && typeof result.metadata === "object" ? result.metadata : {};
+
+  const normalized = {
+    contentType: normalizedType,
+    title: cleanAiText(result?.title) || cleanAiText(selectedIdea.idea) || (isEnglish ? "Content draft" : "Draf konten"),
+    caption: {
+      hook: cleanAiText(caption.hook),
+      body: cleanAiText(caption.body),
+      cta: cleanAiText(caption.cta),
+      hashtags: cleanStringArray(caption.hashtags, 18).map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/^#+/, "")}`),
+    },
+    content: {
+      script: cleanObjectArray(content.script, {
+        timecode: "",
+        visual: "",
+        voiceOver: "",
+        onScreenText: "",
+      }),
+      storyFrames: cleanObjectArray(content.storyFrames, {
+        frame: "",
+        visual: "",
+        text: "",
+        stickerOrCta: "",
+      }),
+      carouselSlides: [],
+      article: cleanAiText(content.article),
+    },
+    metadata: {
+      visualDirection: cleanAiText(metadata.visualDirection),
+      shotList: cleanStringArray(metadata.shotList),
+      publishChecklist: cleanStringArray(metadata.publishChecklist),
+    },
+  };
+
+  if (normalizedType === "carousel") {
+    const assistantSlides = selectedIdea?.assistant?.carouselSlides;
+    normalized.content.carouselSlides = ensureCarouselSlides({
+      slides: content.carouselSlides?.length ? content.carouselSlides : assistantSlides,
+      selectedIdea,
+      isEnglish,
+    });
+  }
+
+  return normalized;
+};
+
 const getLouderTechnologiesInstructions = () => [
   "Special rule for LouderTechnologies only:",
   "Write all generated content in English with simple, easy-to-understand grammar.",
@@ -193,6 +323,12 @@ export default async function handler(request, response) {
       "Please adapt the brief to the target type and output it as JSON according to the schema rules below.",
       languageInstruction,
       ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
+      "Write like a real social media specialist: warm, specific, natural, and ready to post.",
+      "Do not prefix normal sentences with '-', '/', '|', bullet symbols, or decorative separators.",
+      "Use clean sentences and natural line breaks instead of markdown-style bullets unless the field explicitly needs a short list.",
+      contentType === "carousel"
+        ? "Carousel requirement: return 5 to 8 distinct carouselSlides. Do not return only one slide. Each slide needs a different headline, visual direction, and copy."
+        : "",
       "",
       "JSON Schema:",
       "{",
@@ -211,8 +347,12 @@ export default async function handler(request, response) {
       '    "storyFrames": [ // ONLY include this array if target contentType is "story"',
       '      {"frame": "1", "visual": "visual frame", "text": "teks overlay/sticker", "stickerOrCta": "fitur interaksi (poll/question/link)"}',
       "    ],",
-      '    "carouselSlides": [ // ONLY include this array if target contentType is "carousel"',
-      '      {"slide": "1", "headline": "Headline slide", "visual": "visual slide", "copy": "bullet points/keterangan slide"}',
+      '    "carouselSlides": [ // ONLY include this array if target contentType is "carousel"; MUST contain 5-8 items',
+      '      {"slide": "1", "headline": "Hook utama", "visual": "visual slide pembuka", "copy": "kalimat pendek yang natural"},',
+      '      {"slide": "2", "headline": "Konteks masalah", "visual": "visual pendukung", "copy": "kalimat pendek yang natural"},',
+      '      {"slide": "3", "headline": "Insight penting", "visual": "visual detail", "copy": "kalimat pendek yang natural"},',
+      '      {"slide": "4", "headline": "Solusi praktis", "visual": "visual solusi", "copy": "kalimat pendek yang natural"},',
+      '      {"slide": "5", "headline": "CTA", "visual": "visual penutup", "copy": "ajakan save/share/comment/DM"}',
       "    ],",
       `    "article": "${schemaLanguage.article.replace(/"/g, '\\"')}"`,
       "  },",
@@ -228,7 +368,12 @@ export default async function handler(request, response) {
     ].join("\n");
 
     const result = await callAiJson(prompt);
-    json(response, 200, result);
+    json(response, 200, normalizeGeneratedContent({
+      result,
+      selectedIdea,
+      contentType,
+      isEnglish: isLouderTechnologies,
+    }));
   } catch (error) {
     json(response, 500, { error: error.message || "Content generation failed." });
   }

@@ -143,6 +143,63 @@ const extractJsonObject = (text) => {
   }
 };
 
+const normalizeWords = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9#\s]+/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2);
+
+const hashText = (value) =>
+  String(value || "").split("").reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 7);
+
+const getContentAssetText = (content = {}, reference = {}) => [
+  content.contentType,
+  content.title,
+  content.caption?.hook,
+  content.caption?.body,
+  content.metadata?.visualDirection,
+  ...(Array.isArray(content.metadata?.shotList) ? content.metadata.shotList : []),
+  reference?.caption,
+  reference?.reasoning,
+  reference?.style,
+  reference?.pillar,
+].filter(Boolean).join(" ");
+
+const scoreAsset = ({ asset, words, wantsVideo }) => {
+  const assetText = normalizeWords([asset.name, asset.description, asset.mimeType].filter(Boolean).join(" "));
+  const matches = assetText.filter((word) => words.includes(word)).length;
+  const mediaScore = wantsVideo === asset.mimeType.startsWith("video/") ? 8 : 0;
+  const ageDays = asset.modifiedTime
+    ? Math.max(0, Math.floor((Date.now() - new Date(asset.modifiedTime).getTime()) / 86400000))
+    : 30;
+  const freshnessScore = Math.max(0, 4 - Math.min(4, ageDays));
+
+  return matches * 3 + mediaScore + freshnessScore;
+};
+
+const rankDriveAssets = ({ assets, content, reference, carousel = false }) => {
+  const type = String(content.contentType || "").toLowerCase();
+  const wantsVideo = !carousel && /reel|video/.test(type);
+  const usable = assets.filter((asset) => {
+    if (carousel) return asset.mimeType.startsWith("image/");
+    return wantsVideo ? asset.mimeType.startsWith("video/") : asset.mimeType.startsWith("image/");
+  });
+  const pool = usable.length ? usable : assets;
+  const contentText = getContentAssetText(content, reference);
+  const words = normalizeWords(contentText);
+  const offset = pool.length ? hashText(contentText) % pool.length : 0;
+
+  return pool
+    .map((asset, index) => ({
+      asset,
+      score: scoreAsset({ asset, words, wantsVideo }),
+      tieBreaker: (index - offset + pool.length) % pool.length,
+    }))
+    .sort((first, second) => (second.score - first.score) || (first.tieBreaker - second.tieBreaker))
+    .map((item) => item.asset);
+};
+
 const chooseAssetWithAi = async ({ assets, content, reference }) => {
   const config = getAiProviderConfig();
   if (!config) return null;
@@ -197,11 +254,19 @@ const chooseDriveAsset = async ({ assets, content, reference }) => {
   const aiAsset = assets.find((asset) => asset.id === aiChoice?.assetId);
   if (aiAsset) return aiAsset;
 
-  const type = String(content.contentType || "").toLowerCase();
-  const wantsVideo = /reel|video/.test(type);
-  const preferred = assets.filter((asset) => wantsVideo ? asset.mimeType.startsWith("video/") : asset.mimeType.startsWith("image/"));
+  const preferred = rankDriveAssets({ assets, content, reference });
 
   return preferred[0] || assets[0] || null;
+};
+
+const chooseCarouselAssets = ({ assets, content, reference }) => {
+  const slideCount = Array.isArray(content.content?.carouselSlides)
+    ? Math.min(10, Math.max(2, content.content.carouselSlides.length))
+    : 5;
+  const ranked = rankDriveAssets({ assets, content, reference, carousel: true });
+  const unique = Array.from(new Map(ranked.map((asset) => [asset.id, asset])).values());
+
+  return unique.slice(0, slideCount);
 };
 
 const buildCaption = (content) => {
@@ -266,26 +331,65 @@ export default async function handler(request, response) {
       return;
     }
 
-    const selectedAsset = await chooseDriveAsset({ assets, content: body.content, reference: body.reference });
+    const isCarousel = String(body.content.contentType || "").toLowerCase() === "carousel";
+    const selectedAssets = isCarousel
+      ? chooseCarouselAssets({ assets, content: body.content, reference: body.reference })
+      : [];
+    const selectedAsset = isCarousel
+      ? selectedAssets[0]
+      : await chooseDriveAsset({ assets, content: body.content, reference: body.reference });
     if (!selectedAsset) {
       json(response, 404, { error: "No suitable Drive asset found for this content." });
       return;
     }
 
-    const publicAssetUrl = process.env.GOOGLE_DRIVE_PUBLIC_ASSET_BASE_URL
-      ? `${process.env.GOOGLE_DRIVE_PUBLIC_ASSET_BASE_URL.replace(/\/$/, "")}/${selectedAsset.id}`
-      : `https://drive.google.com/uc?export=download&id=${selectedAsset.id}`;
-    const isVideo = selectedAsset.mimeType.startsWith("video/");
-    const container = await postGraph(
-      `/${igUserId}/media`,
-      {
-        caption: buildCaption(body.content),
-        media_type: isVideo ? "REELS" : undefined,
-        image_url: isVideo ? undefined : publicAssetUrl,
-        video_url: isVideo ? publicAssetUrl : undefined,
-      },
-      pageAccessToken,
-    );
+    const getPublicAssetUrl = (asset) => process.env.GOOGLE_DRIVE_PUBLIC_ASSET_BASE_URL
+      ? `${process.env.GOOGLE_DRIVE_PUBLIC_ASSET_BASE_URL.replace(/\/$/, "")}/${asset.id}`
+      : `https://drive.google.com/uc?export=download&id=${asset.id}`;
+
+    let container;
+    if (isCarousel) {
+      if (selectedAssets.length < 2) {
+        json(response, 400, { error: "Carousel publishing requires at least 2 image assets in the configured Google Drive folder." });
+        return;
+      }
+
+      const childContainers = [];
+      for (const asset of selectedAssets) {
+        const child = await postGraph(
+          `/${igUserId}/media`,
+          {
+            image_url: getPublicAssetUrl(asset),
+            is_carousel_item: "true",
+          },
+          pageAccessToken,
+        );
+        childContainers.push(child.id);
+      }
+
+      container = await postGraph(
+        `/${igUserId}/media`,
+        {
+          caption: buildCaption(body.content),
+          media_type: "CAROUSEL",
+          children: childContainers.join(","),
+        },
+        pageAccessToken,
+      );
+    } else {
+      const publicAssetUrl = getPublicAssetUrl(selectedAsset);
+      const isVideo = selectedAsset.mimeType.startsWith("video/");
+      container = await postGraph(
+        `/${igUserId}/media`,
+        {
+          caption: buildCaption(body.content),
+          media_type: isVideo ? "REELS" : undefined,
+          image_url: isVideo ? undefined : publicAssetUrl,
+          video_url: isVideo ? publicAssetUrl : undefined,
+        },
+        pageAccessToken,
+      );
+    }
 
     // Wait for the container to be ready (Instagram processing)
     await waitForMediaReady(container.id, pageAccessToken);
@@ -304,6 +408,11 @@ export default async function handler(request, response) {
         name: selectedAsset.name,
         mimeType: selectedAsset.mimeType,
       },
+      selectedAssets: selectedAssets.map((asset) => ({
+        id: asset.id,
+        name: asset.name,
+        mimeType: asset.mimeType,
+      })),
     });
   } catch (error) {
     json(response, 500, { error: error.message || "Instagram auto post failed." });
