@@ -319,7 +319,7 @@ export function EducationEvents() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">Daftar education event</h2>
-            <p className="mt-1 text-sm text-slate-500">Data publik dari `GET /api/educations`, aksi CRUD memakai token super admin.</p>
+            <p className="mt-1 text-sm text-slate-500">Kelola Events</p>
           </div>
           <div className="flex flex-col gap-2 lg:flex-row">
             <div className="relative">
