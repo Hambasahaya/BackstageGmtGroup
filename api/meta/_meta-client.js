@@ -5,7 +5,7 @@ export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v22.0";
 export const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
 export const INSTAGRAM_GRAPH_BASE_URL = `https://graph.instagram.com/${GRAPH_VERSION}`;
 
-const getGraphBaseUrl = (token) => {
+export const getGraphBaseUrl = (token) => {
   const mode = (process.env.META_API_MODE || "").toLowerCase();
 
   if (mode === "instagram" || token?.startsWith("IGA")) {

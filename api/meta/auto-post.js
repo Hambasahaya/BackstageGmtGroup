@@ -1,5 +1,5 @@
 import "./_load-env.js";
-import { findInstagramPage, GRAPH_BASE_URL, getStoredTokenBundle, json } from "./_meta-client.js";
+import { findInstagramPage, getGraphBaseUrl, getStoredTokenBundle, json } from "./_meta-client.js";
 
 const getAiProviderConfig = () => {
   const apiKey =
@@ -33,7 +33,8 @@ const readJsonBody = (request) =>
   });
 
 const postGraph = async (endpoint, params, token) => {
-  const response = await fetch(`${GRAPH_BASE_URL}${endpoint}`, {
+  const baseUrl = getGraphBaseUrl(token);
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     method: "POST",
     body: new URLSearchParams({
       ...Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "")),
