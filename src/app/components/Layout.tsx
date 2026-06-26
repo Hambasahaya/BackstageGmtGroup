@@ -2,6 +2,7 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import {
   BarChart3,
   Bell,
+  Brain,
   CalendarDays,
   CheckCheck,
   ClipboardList,
@@ -54,6 +55,7 @@ const menuItems: MenuItem[] = [
   { icon: Globe2, label: "Websites", path: "/websites", roles: ["super_admin"] },
   { icon: BarChart3, label: "SEO Management", path: "/seo", roles: ["super_admin"] },
   { icon: Megaphone, label: "Marketing Integrations", path: "/integrations", roles: ["super_admin"] },
+  { icon: Brain, label: "Model Knowledge Base", path: "/model-knowledge-base", roles: ["super_admin"] },
   { icon: FileText, label: "Article CMS", path: "/articles", roles: ["super_admin"] },
   { icon: CalendarDays, label: "Events", path: "/events", roles: ["super_admin"] },
   { icon: UserCheck, label: "Participants", path: "/participants", roles: ["super_admin"] },

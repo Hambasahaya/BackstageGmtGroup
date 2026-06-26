@@ -21,6 +21,7 @@ import {
   ArticleManagement,
   MediaLibrary,
   MarketingIntegrations,
+  ModelKnowledgeBaseManagement,
   MultiWebsiteManagement,
   NotificationCenter,
   ParticipantManagement,
@@ -129,6 +130,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={superAdminOnly}>
             <MarketingIntegrations />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "model-knowledge-base",
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <ModelKnowledgeBaseManagement />
           </RoleGate>
         ),
       },

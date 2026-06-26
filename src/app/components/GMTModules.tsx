@@ -63,6 +63,7 @@ import {
   type InstagramInsights,
   type MetaAccountHealth,
 } from "../services/metaIntegrations";
+import { apiRequest } from "../services/api";
 import { fetchKeywordResearch, type KeywordResearchResponse } from "../services/seoIntegrations";
 import { fetchWebsiteAnalytics, type WebsiteAnalyticsResponse } from "../services/websiteAnalytics";
 
@@ -222,6 +223,144 @@ function FeatureGrid({ features }: { features: Array<{ icon: ElementType; title:
         );
       })}
     </div>
+  );
+}
+
+export function ModelKnowledgeBaseManagement() {
+  const [entries, setEntries] = useState<Record<string, string>>({});
+  const [selectedModel, setSelectedModel] = useState("growthStrategist");
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await apiRequest<{ data?: Record<string, string>; success?: boolean }>("/api/super-admin/knowledge-base", {
+          method: "GET",
+        });
+        if (response?.data && typeof response.data === "object") {
+          setEntries(response.data as Record<string, string>);
+        }
+      } catch {
+        // Fallback: try loading from localStorage if backend is unreachable.
+        const stored = localStorage.getItem("modelKnowledgeBase");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed && typeof parsed === "object") {
+              setEntries(parsed);
+            }
+          } catch {
+            setEntries({});
+          }
+        }
+      }
+    };
+
+    void load();
+  }, []);
+
+  const models = [
+    { value: "growthStrategist", label: "Growth Strategist" },
+    { value: "marketingSpecialist", label: "Marketing Specialist" },
+    { value: "conversionCommunityLead", label: "Conversion & Community Lead" },
+  ];
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setMessage("");
+
+    try {
+      const response = await apiRequest<{ data?: Record<string, string>; success?: boolean }>("/api/super-admin/knowledge-base", {
+        method: "POST",
+        body: JSON.stringify(entries),
+      });
+      localStorage.setItem("modelKnowledgeBase", JSON.stringify(entries));
+      setMessage(response?.success ? "Knowledge base berhasil disimpan ke database dan siap dipakai oleh prompt content brief." : "Gagal menyimpan ke database. Data tersimpan sementara di browser.");
+    } catch {
+      localStorage.setItem("modelKnowledgeBase", JSON.stringify(entries));
+      setMessage("Gagal menyimpan ke server. Data tersimpan sementara di browser saja.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleChange = (modelKey: string, value: string) => {
+    setEntries((prev) => ({ ...prev, [modelKey]: value }));
+  };
+
+  return (
+    <ModuleShell
+      title="Model Knowledge Base"
+      description="Atur pengetahuan khusus per model agar AI content brief lebih konsisten dan strategis."
+      stats={[
+        { label: "Model Tersedia", value: String(models.length), detail: "Growth, Marketing, Community" },
+        { label: "Entry Tersimpan", value: String(Object.keys(entries).length), detail: "Di browser lokal" },
+        { label: "Status", value: isSaving ? "Menyimpan" : "Siap", detail: "Pembaruan langsung" },
+      ]}
+      toolbar={
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <label className="text-sm font-semibold text-slate-700">Pilih model</label>
+          <select
+            value={selectedModel}
+            onChange={(event) => setSelectedModel(event.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          >
+            {models.map((model) => (
+              <option key={model.value} value={model.value}>{model.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleSave}
+            className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+          >
+            {isSaving ? "Menyimpan..." : "Simpan Knowledge Base"}
+          </button>
+        </div>
+      }
+    >
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-950">Editor Knowledge Base</h2>
+              <p className="text-sm text-slate-500">Tuliskan instruksi khusus yang ingin dipakai model saat menghasilkan content brief.</p>
+            </div>
+            <StatusBadge tone="teal">{models.find((m) => m.value === selectedModel)?.label}</StatusBadge>
+          </div>
+          <textarea
+            value={entries[selectedModel] || ""}
+            onChange={(event) => handleChange(selectedModel, event.target.value)}
+            rows={16}
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+            placeholder="Contoh: Fokus pada edukasi, CTA pada DM, gunakan bahasa yang santai untuk audience Gen Z..."
+          />
+          {message && <p className="mt-3 text-sm text-emerald-600">{message}</p>}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-950">Tips Penggunaan</h3>
+            <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-500">
+              <li>• Masukkan insight brand, tone, atau aturan khusus per model.</li>
+              <li>• Gunakan kalimat singkat dan actionable untuk hasil yang konsisten.</li>
+              <li>• Simpan setelah setiap perubahan agar prompt dapat menggunakannya.</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-950">Model yang Bisa Diatur</h3>
+            <div className="mt-3 space-y-2">
+              {models.map((model) => (
+                <div key={model.value} className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-900">{model.label}</p>
+                  <p className="mt-1 text-xs text-slate-500">Kunci: {model.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModuleShell>
   );
 }
 
