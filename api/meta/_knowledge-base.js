@@ -1,5 +1,5 @@
 import { json } from "./_meta-client.js";
-import { readKnowledgeBaseStore, writeKnowledgeBaseStore } from "./knowledge-base-store.js";
+import { readKnowledgeBaseStore, writeKnowledgeBaseStore } from "./_knowledge-base-store.js";
 
 export default async function handler(request, response) {
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");

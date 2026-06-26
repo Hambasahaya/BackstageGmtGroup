@@ -1,4 +1,4 @@
-import { readKnowledgeBaseStore } from "./knowledge-base-store.js";
+import { readKnowledgeBaseStore } from "./_knowledge-base-store.js";
 
 const isLouderTechnologiesAccount = (account = {}) => {
   const accountText = [

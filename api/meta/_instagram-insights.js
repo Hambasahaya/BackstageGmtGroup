@@ -1,5 +1,5 @@
 import { findInstagramPage, getStoredTokenBundle, json, metaFetch } from "./_meta-client.js";
-import { buildContentBriefMessages, buildContentBriefPrompt, getContentBriefConfig } from "./content-brief-config.js";
+import { buildContentBriefMessages, buildContentBriefPrompt, getContentBriefConfig } from "./_content-brief-config.js";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
