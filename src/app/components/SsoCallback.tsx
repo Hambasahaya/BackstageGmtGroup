@@ -18,7 +18,7 @@ export function SsoCallback() {
   const [message, setMessage] = useState("Tunggu Sebentar...");
 
   useEffect(() => {
-    let isAsnnshmbjbctive = true;
+    let isActive = true;
 
     const exchangeCode = async () => {
       const code = searchParams.get("code");
