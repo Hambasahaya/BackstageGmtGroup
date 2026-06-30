@@ -382,7 +382,7 @@ export function Layout() {
       <aside
         className={`fixed left-0 top-0 z-40 h-screen w-72 border-r border-slate-200 bg-white transition-transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
+        } lg:translate-x-0 ${currentRole === "agent" ? "hidden lg:flex lg:flex-col" : ""}`}
       >
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center justify-between border-b border-[#0F766E] bg-[#0F766E] px-5">
@@ -443,7 +443,9 @@ export function Layout() {
             <button
               aria-label="Open navigation"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-md p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+              className={`rounded-md p-2 text-slate-500 hover:bg-slate-100 lg:hidden ${
+                currentRole === "agent" ? "hidden" : ""
+              }`}
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -571,10 +573,32 @@ export function Layout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-6">
+        <main className={`p-4 sm:p-6 ${currentRole === "agent" ? "pb-24 lg:pb-6" : ""}`}>
           <Outlet />
         </main>
       </div>
+
+      {currentRole === "agent" && visibleMenuItems.length > 0 && (
+        <nav className="fixed bottom-0 left-0 z-40 flex h-16 w-full items-center justify-around border-t border-slate-200 bg-white px-2 shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] lg:hidden">
+          {visibleMenuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className={`flex flex-col items-center justify-center gap-1.5 w-full h-full transition-colors ${
+                  isActive ? "text-[#0F766E]" : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <Icon className={`h-5 w-5 ${isActive ? "text-[#0F766E]" : "text-slate-400"}`} />
+                <span className="text-[10px] font-medium truncate w-full text-center px-1">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {sidebarOpen && (
         <div
