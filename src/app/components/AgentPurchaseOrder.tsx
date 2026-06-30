@@ -650,7 +650,7 @@ export function AgentPurchaseOrder() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px]">
+          <table className="w-full min-w-[920px] whitespace-nowrap">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
                 <th className="px-4 py-3 font-semibold">PO</th>
