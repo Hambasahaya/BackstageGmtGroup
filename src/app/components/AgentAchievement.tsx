@@ -264,61 +264,61 @@ export function AgentAchievement() {
       )}
 
       {/* QUICK STATS CARD GRID */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Total Penjualan Anda</p>
-            <div className="rounded-lg bg-teal-50 p-2 text-[#0F766E]">
-              <TrendingUp className="h-5 w-5" />
+            <p className="text-xs sm:text-sm font-medium text-slate-500 line-clamp-1 mr-2">Total Penjualan Anda</p>
+            <div className="rounded-lg bg-teal-50 p-1.5 sm:p-2 text-[#0F766E] shrink-0">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{formatCurrencyFull(currentSales)}</p>
-          <div className="mt-3 flex items-center gap-1.5 text-xs">
-            <span className="rounded bg-teal-50 px-2 py-0.5 font-semibold text-teal-700">Real Data PO</span>
-            <span className="text-slate-500">Tahun berjalan</span>
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{formatCurrencyFull(currentSales)}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs">
+            <span className="rounded bg-teal-50 px-1.5 sm:px-2 py-0.5 font-semibold text-teal-700">Real Data PO</span>
+            <span className="text-slate-500 hidden sm:inline">Tahun berjalan</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Target Tahunan Agent</p>
-            <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
-              <Target className="h-5 w-5" />
+            <p className="text-xs sm:text-sm font-medium text-slate-500 line-clamp-1 mr-2">Target Tahunan Agent</p>
+            <div className="rounded-lg bg-blue-50 p-1.5 sm:p-2 text-blue-600 shrink-0">
+              <Target className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{formatCurrencyFull(ANNUAL_TARGET)}</p>
-          <div className="mt-3 text-xs text-slate-500">
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{formatCurrencyFull(ANNUAL_TARGET)}</p>
+          <div className="mt-3 text-[10px] sm:text-xs text-slate-500 line-clamp-2">
             Ditargetkan selesai dalam 12 bulan
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Persentase Pencapaian</p>
-            <div className="rounded-lg bg-yellow-50 p-2 text-yellow-600">
-              <Trophy className="h-5 w-5" />
+            <p className="text-xs sm:text-sm font-medium text-slate-500 line-clamp-1 mr-2">Persentase Pencapaian</p>
+            <div className="rounded-lg bg-yellow-50 p-1.5 sm:p-2 text-yellow-600 shrink-0">
+              <Trophy className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{totalPercentage.toFixed(1)}%</p>
-          <div className="mt-3 flex items-center gap-1 text-xs">
-            <div className="h-1.5 w-24 rounded-full bg-slate-100 overflow-hidden">
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950">{totalPercentage.toFixed(1)}%</p>
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-[10px] sm:text-xs">
+            <div className="h-1.5 w-full sm:w-24 rounded-full bg-slate-100 overflow-hidden">
               <div className="h-full bg-yellow-500" style={{ width: `${totalPercentage}%` }} />
             </div>
             <span className="text-slate-500 font-semibold">{totalPercentage >= 10 ? "Hebat!" : "Ayo kejar!"}</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-500">Peringkat Agent Anda</p>
-            <div className="rounded-lg bg-pink-50 p-2 text-pink-600">
-              <Award className="h-5 w-5" />
+            <p className="text-xs sm:text-sm font-medium text-slate-500 line-clamp-1 mr-2">Peringkat Agent Anda</p>
+            <div className="rounded-lg bg-pink-50 p-1.5 sm:p-2 text-pink-600 shrink-0">
+              <Award className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-950">
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">
             {currentTier ? currentTier.name.split(" ")[0] : "Standard"}
           </p>
-          <div className="mt-3 text-xs text-slate-500 truncate">
+          <div className="mt-3 text-[10px] sm:text-xs text-slate-500 truncate">
             {currentTier ? `${currentTier.commissionBonus} aktif` : "Belum mencapai tier reward"}
           </div>
         </div>
