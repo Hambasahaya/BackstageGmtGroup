@@ -1,5 +1,5 @@
 import { CheckCircle2, Clock3, Lock, PlayCircle, RotateCcw, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, resolveApiAssetUrl, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
 
 const emptySummary: OnboardingSummaryDto = {
@@ -96,6 +96,7 @@ export function AgentOnboarding() {
   const [savingVideoIds, setSavingVideoIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const loadOnboarding = async () => {
     setIsLoading(true);
@@ -140,6 +141,22 @@ export function AgentOnboarding() {
     [summary.progress, videos],
   );
 
+  // Auto-scroll to the first unfinished video on load
+  useEffect(() => {
+    if (!isLoading && progressRows.length > 0 && scrollContainerRef.current) {
+      const firstUnfinishedIndex = progressRows.findIndex((v) => !v.isWatched);
+      const targetIndex = firstUnfinishedIndex === -1 ? 0 : firstUnfinishedIndex;
+      
+      const cards = scrollContainerRef.current.querySelectorAll("article");
+      const targetCard = cards[targetIndex];
+      if (targetCard) {
+        setTimeout(() => {
+          targetCard.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        }, 500);
+      }
+    }
+  }, [isLoading, progressRows.length]);
+
   const saveProgress = async (video: OnboardingVideoDto, watchedSeconds: number, status: "in_progress" | "completed") => {
     const durationSeconds = Math.max(1, Math.round(video.duration_seconds || watchedSeconds || 1));
     const nextWatchedSeconds = status === "completed" ? durationSeconds : Math.max(0, Math.round(watchedSeconds));
@@ -179,6 +196,18 @@ export function AgentOnboarding() {
           is_completed: normalizedSummary.is_completed || (totalRequired > 0 && completedCount >= totalRequired),
         };
       });
+
+      if (status === "completed") {
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            const cards = scrollContainerRef.current.querySelectorAll("article");
+            const nextCard = cards[video.index + 1];
+            if (nextCard) {
+              nextCard.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+            }
+          }
+        }, 600);
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal menyimpan progress video.");
     } finally {
@@ -255,12 +284,19 @@ export function AgentOnboarding() {
       {isLoading ? (
         <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-500">Memuat video onboarding...</div>
       ) : (
-        <section className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <section 
+          ref={scrollContainerRef}
+          className="flex overflow-x-auto snap-x snap-mandatory gap-5 pb-4 scroll-smooth"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }} // hide scrollbar for clean UI
+        >
+          {/* Hide webkit scrollbar via inline styles since tailwind requires a plugin for it */}
+          <style dangerouslySetInnerHTML={{__html: `section::-webkit-scrollbar { display: none; }`}} />
+          
           {progressRows.map((video) => (
             <article
               key={video.id}
-              className={`overflow-hidden rounded-lg border bg-white shadow-sm ${
-                video.isUnlocked ? "border-slate-200" : "border-slate-200 opacity-70"
+              className={`shrink-0 w-[90%] sm:w-[75%] md:w-[60%] lg:w-[45%] xl:w-[400px] snap-center overflow-hidden rounded-lg border bg-white shadow-sm transition-opacity duration-300 ${
+                video.isUnlocked ? "border-slate-200" : "border-slate-200 opacity-60"
               }`}
             >
               <div className="relative aspect-video bg-slate-950">
