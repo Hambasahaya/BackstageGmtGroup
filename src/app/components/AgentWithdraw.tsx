@@ -67,10 +67,10 @@ function StatusBadge({ status }: { status: WithdrawDto["status"] }) {
 
 function StatCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">{detail}</p>
+    <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+      <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">{label}</p>
+      <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{value}</p>
+      <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">{detail}</p>
     </div>
   );
 }
@@ -159,7 +159,7 @@ export function AgentWithdraw() {
         </button>
       </div>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Total komisi" value={currencyFormatter.format(wallet.total_commission)} detail="Akumulasi komisi approve" />
         <StatCard label="Available balance" value={currencyFormatter.format(wallet.available_balance)} detail="Saldo yang bisa di-withdraw" />
         <StatCard label="Pending withdraw" value={currencyFormatter.format(wallet.pending_withdraw)} detail="Menunggu proses admin" />
