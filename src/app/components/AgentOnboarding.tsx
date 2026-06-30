@@ -220,35 +220,35 @@ export function AgentOnboarding() {
         </div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Progress selesai</p>
-          <p className="mt-2 text-3xl font-bold text-slate-950">{summary.completion_percent}%</p>
-          <div className="mt-4 h-2 rounded-full bg-slate-100">
-            <div className="h-2 rounded-full bg-[#0F766E]" style={{ width: `${summary.completion_percent}%` }} />
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Progress selesai</p>
+          <p className="mt-2 text-xl sm:text-3xl font-bold text-slate-950">{summary.completion_percent}%</p>
+          <div className="mt-3 sm:mt-4 h-1.5 sm:h-2 rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-[#0F766E]" style={{ width: `${summary.completion_percent}%` }} />
           </div>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Video ditonton</p>
-          <p className="mt-2 text-3xl font-bold text-slate-950">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Video ditonton</p>
+          <p className="mt-2 text-xl sm:text-3xl font-bold text-slate-950">
             {summary.completed_count}/{summary.total_required || videos.length}
           </p>
-          <p className="mt-3 text-sm text-slate-500">Progress tontonan agent</p>
+          <p className="mt-2 sm:mt-3 text-[10px] sm:text-sm text-slate-500 line-clamp-1">Progress tontonan agent</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Status onboarding</p>
-          <p className="mt-2 text-lg font-bold text-slate-950">{summary.is_completed ? "Completed" : "In progress"}</p>
-          <p className="mt-3 text-sm text-slate-500">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Status onboarding</p>
+          <p className="mt-2 text-base sm:text-lg font-bold text-slate-950 line-clamp-1">{summary.is_completed ? "Completed" : "In progress"}</p>
+          <p className="mt-2 sm:mt-3 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">
             {summary.is_completed ? "Semua materi agent selesai" : "Selesaikan video sesuai urutan"}
           </p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Akses</p>
-          <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-[#0F766E] ring-1 ring-teal-200">
-            <ShieldCheck className="h-4 w-4" />
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Akses</p>
+          <div className="mt-2 inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-teal-50 px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-sm font-semibold text-[#0F766E] ring-1 ring-teal-200">
+            <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4" />
             Agent
           </div>
-          <p className="mt-3 text-sm text-slate-500">Materi khusus onboarding agent</p>
+          <p className="mt-2 sm:mt-3 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">Materi khusus onboarding agent</p>
         </div>
       </section>
 

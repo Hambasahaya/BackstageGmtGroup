@@ -681,7 +681,7 @@ export function AgentAchievement() {
           <div className="mt-4 p-8 text-center text-sm text-slate-500">Memuat histori PO...</div>
         ) : approvedPreorders.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full border-collapse text-left text-sm">
+            <table className="w-full border-collapse text-left text-sm whitespace-nowrap">
               <thead>
                 <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   <th className="pb-3 pr-4">PO Number</th>
@@ -695,19 +695,19 @@ export function AgentAchievement() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {approvedPreorders.map((po) => (
                   <tr key={po.id} className="hover:bg-slate-50">
-                    <td className="py-3 font-semibold text-slate-900">{po.po_number || `PO-${po.id}`}</td>
-                    <td className="py-3">{po.nama_customer}</td>
-                    <td className="py-3">
+                    <td className="py-3 pr-4 font-semibold text-slate-900">{po.po_number || `PO-${po.id}`}</td>
+                    <td className="py-3 pr-4">{po.nama_customer}</td>
+                    <td className="py-3 pr-4">
                       {po.created_at ? new Date(po.created_at).toLocaleDateString("id-ID", {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
                       }) : "-"}
                     </td>
-                    <td className="py-3 text-right font-semibold text-slate-950">
+                    <td className="py-3 pr-4 text-right font-semibold text-slate-950">
                       {formatCurrencyFull(po.total || 0)}
                     </td>
-                    <td className="py-3 text-right text-emerald-600 font-semibold">
+                    <td className="py-3 pr-4 text-right text-emerald-600 font-semibold">
                       {formatCurrencyFull(po.total_komisi || 0)}
                     </td>
                     <td className="py-3">
