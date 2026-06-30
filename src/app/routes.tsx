@@ -12,6 +12,8 @@ import { ApplyAgent } from "./components/ApplyAgent";
 import { Dashboard } from "./components/Dashboard";
 import { EducationEvents } from "./components/EducationEvents";
 import { Login } from "./components/Login";
+import { ForgotPassword } from "./components/ForgotPassword";
+import { ResetPassword } from "./components/ResetPassword";
 import { MyGmtEntry } from "./components/MyGmtEntry";
 import { Register } from "./components/Register";
 import { SalesOrders } from "./components/SalesOrders";
@@ -76,6 +78,14 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+  },
+  {
+    path: "/forgot-password",
+    Component: ForgotPassword,
+  },
+  {
+    path: "/reset-password",
+    Component: ResetPassword,
   },
   {
     path: "/register",

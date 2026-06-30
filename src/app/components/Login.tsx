@@ -79,7 +79,15 @@ export function Login() {
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-normal text-[#9a9a9a]">Password</span>
+          <div className="flex justify-between items-center">
+            <span className="text-[11px] font-normal text-[#9a9a9a]">Password</span>
+            <Link
+              to="/forgot-password"
+              className="text-[11px] font-normal text-[#9a9a9a] transition hover:text-white"
+            >
+              Forgot Password?
+            </Link>
+          </div>
           <input
             value={password}
             onChange={(event) => setPassword(event.target.value)}

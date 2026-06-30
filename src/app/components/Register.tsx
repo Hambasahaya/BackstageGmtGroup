@@ -101,7 +101,6 @@ export function Register() {
       try {
         await refreshStoredUser(loginResponse.token);
       } catch {
-        // New users can continue with the login response if profile details are not available yet.
       }
       setSuccessMessage("Register berhasil. Mengarahkan ke apply agent...");
       navigate("/apply-agent", { replace: true });

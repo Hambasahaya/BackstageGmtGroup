@@ -22,7 +22,7 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
-import { api, type PreorderDto } from "../services/api";
+import { api, type PreorderDto, connectAgentPreorderStream } from "../services/api";
 
 type AchievementTier = {
   name: string;
@@ -117,9 +117,6 @@ export function AgentAchievement() {
   const [preorders, setPreorders] = useState<PreorderDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  // State mock untuk demo interaktif jika real data masih kosong agar user bisa melihat progres
-  const [mockSalesInput, setMockSalesInput] = useState<number | null>(null);
-  const [showDemoMode, setShowDemoMode] = useState(false);
 
   const loadPreorders = async () => {
     setIsLoading(true);
@@ -139,6 +136,33 @@ export function AgentAchievement() {
     void loadPreorders();
   }, []);
 
+  // Listen to realtime preorder updates via SSE
+  useEffect(() => {
+    const disconnect = connectAgentPreorderStream({
+      onPreorderUpdated: (updatedPO) => {
+        setPreorders((prevPreorders) => {
+          const exists = prevPreorders.some((po) => po.id === updatedPO.id);
+          if (exists) {
+            // Update existing PO in state
+            return prevPreorders.map((po) =>
+              po.id === updatedPO.id ? { ...po, ...updatedPO } : po
+            );
+          }
+          // If the PO doesn't exist in our state yet, reload everything to get the full detail
+          void loadPreorders();
+          return prevPreorders;
+        });
+      },
+      onError: (err) => {
+        console.error("Agent preorder SSE error:", err);
+      },
+    });
+
+    return () => {
+      disconnect();
+    };
+  }, []);
+
   // Filter PO yang disetujui / paid
   const approvedPreorders = useMemo(() => {
     return preorders.filter(
@@ -151,14 +175,10 @@ export function AgentAchievement() {
     return approvedPreorders.reduce((total, po) => total + (po.total || 0), 0);
   }, [approvedPreorders]);
 
-  // Penjualan Aktif yang Digunakan (Real vs Mock Demo)
+  // Penjualan Aktif yang Digunakan (Real)
   const currentSales = useMemo(() => {
-    if (showDemoMode && mockSalesInput !== null) {
-      return mockSalesInput;
-    }
-    // Jika real sales adalah 0, tawarkan demo 120jt secara default atau pakai real sales
     return realSalesTotal;
-  }, [realSalesTotal, mockSalesInput, showDemoMode]);
+  }, [realSalesTotal]);
 
   // Persentase pencapaian dari Target Tahunan (1.2 Miliar)
   const totalPercentage = useMemo(() => {
@@ -186,7 +206,6 @@ export function AgentAchievement() {
   }, [currentSales, nextTier]);
 
   // Kelompokkan data bulanan untuk grafik
-  // Jika real data bulanan kosong, kita sediakan mock data berdasarkan profile pencapaian saat ini
   const monthlyChartData = useMemo(() => {
     const months = [
       "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", 
@@ -196,34 +215,15 @@ export function AgentAchievement() {
     // Inisialisasi actual value per bulan
     const monthlyValues = new Array(12).fill(0);
 
-    if (approvedPreorders.length > 0 && !showDemoMode) {
-      approvedPreorders.forEach((po) => {
-        if (po.created_at) {
-          const date = new Date(po.created_at);
-          const monthIndex = date.getMonth();
-          if (monthIndex >= 0 && monthIndex < 12) {
-            monthlyValues[monthIndex] += po.total || 0;
-          }
-        }
-      });
-    } else {
-      // Mengisi mock data yang proporsional dengan currentSales (misal disebar di beberapa bulan pertama)
-      let remainingMock = currentSales;
-      // Distribusikan ke bulan Jan - Jun
-      for (let i = 0; i < 6; i++) {
-        if (remainingMock > 0) {
-          // Bobot random agar terlihat dinamis
-          const weights = [0.15, 0.25, 0.1, 0.2, 0.12, 0.18];
-          const allocation = Math.min(remainingMock, Math.round(currentSales * weights[i]));
-          monthlyValues[i] = allocation;
-          remainingMock -= allocation;
+    approvedPreorders.forEach((po) => {
+      if (po.created_at) {
+        const date = new Date(po.created_at);
+        const monthIndex = date.getMonth();
+        if (monthIndex >= 0 && monthIndex < 12) {
+          monthlyValues[monthIndex] += po.total || 0;
         }
       }
-      // Jika masih ada sisa, taruh di bulan pertama
-      if (remainingMock > 0) {
-        monthlyValues[0] += remainingMock;
-      }
-    }
+    });
 
     return months.map((month, index) => {
       const actual = monthlyValues[index];
@@ -235,18 +235,13 @@ export function AgentAchievement() {
         isTargetMet: actual >= MONTHLY_TARGET,
       };
     });
-  }, [approvedPreorders, currentSales, showDemoMode]);
+  }, [approvedPreorders]);
 
   // Hitung jumlah bulan yang memenuhi target bulanan (100 Juta)
   const targetMetMonthsCount = useMemo(() => {
     return monthlyChartData.filter(d => d["Realisasi Penjualan"] >= MONTHLY_TARGET).length;
   }, [monthlyChartData]);
 
-  // Handler untuk mengaktifkan demo mode dengan slider
-  const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setMockSalesInput(Number(event.target.value));
-    setShowDemoMode(true);
-  };
 
   return (
     <div className="space-y-6">
@@ -258,39 +253,6 @@ export function AgentAchievement() {
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
             Dapatkan reward trip ke Bali, bonus persentase komisi, dan benefit eksklusif dengan mengejar target penjualan tahunan Anda.
           </p>
-        </div>
-        
-        {/* INTERACTIVE DEMO SELECTOR */}
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="text-xs">
-            <span className="font-semibold text-slate-900 block">Mode Demo Simulasi:</span>
-            <span className="text-slate-500">Geser untuk tes persentase grafik</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min="0"
-              max={ANNUAL_TARGET}
-              step="10000000" // 10 Juta per step
-              value={currentSales}
-              onChange={handleSliderChange}
-              className="h-2 w-32 cursor-pointer rounded-lg bg-slate-200 accent-[#0F766E]"
-            />
-            <span className="text-xs font-bold text-[#0F766E] w-14 text-right">
-              {((currentSales / ANNUAL_TARGET) * 100).toFixed(0)}%
-            </span>
-          </div>
-          {showDemoMode && (
-            <button
-              onClick={() => {
-                setShowDemoMode(false);
-                setMockSalesInput(null);
-              }}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 underline"
-            >
-              Reset Real
-            </button>
-          )}
         </div>
       </div>
 
@@ -312,11 +274,7 @@ export function AgentAchievement() {
           </div>
           <p className="mt-2 text-2xl font-bold text-slate-950">{formatCurrencyFull(currentSales)}</p>
           <div className="mt-3 flex items-center gap-1.5 text-xs">
-            {showDemoMode ? (
-              <span className="rounded bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">Simulasi Demo</span>
-            ) : (
-              <span className="rounded bg-teal-50 px-2 py-0.5 font-semibold text-teal-700">Real Data PO</span>
-            )}
+            <span className="rounded bg-teal-50 px-2 py-0.5 font-semibold text-teal-700">Real Data PO</span>
             <span className="text-slate-500">Tahun berjalan</span>
           </div>
         </div>
@@ -721,7 +679,7 @@ export function AgentAchievement() {
 
         {isLoading ? (
           <div className="mt-4 p-8 text-center text-sm text-slate-500">Memuat histori PO...</div>
-        ) : approvedPreorders.length > 0 && !showDemoMode ? (
+        ) : approvedPreorders.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
@@ -769,11 +727,6 @@ export function AgentAchievement() {
             <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
               Penjualan real Anda dari menu **Purchase Order** akan terhitung otomatis di halaman ini setelah disetujui oleh pihak GMT Admin.
             </p>
-            {showDemoMode && (
-              <p className="mt-4 text-xs font-semibold text-amber-700 bg-amber-50 rounded px-3 py-1.5 inline-block border border-amber-200">
-                ⚠️ Anda sedang dalam **Mode Demo Simulasi** dengan nilai {formatCurrencyFull(currentSales)} (Target {totalPercentage.toFixed(0)}%).
-              </p>
-            )}
           </div>
         )}
       </section>

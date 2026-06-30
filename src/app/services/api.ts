@@ -445,6 +445,92 @@ export function connectSalesNotificationStream({
   };
 }
 
+export function connectAgentPreorderStream({
+  onPreorderUpdated,
+  onOpen,
+  onError,
+}: {
+  onPreorderUpdated: (preorder: Partial<PreorderDto>) => void;
+  onOpen?: () => void;
+  onError?: (error: unknown) => void;
+}) {
+  const controller = new AbortController();
+  let retryTimer: number | undefined;
+  let retryDelay = 1000;
+
+  const connect = async () => {
+    try {
+      const token = getAuthToken();
+      const headers = new Headers({ Accept: "text/event-stream" });
+
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      const response = await fetch(buildUrl("/api/agent/preorders/stream"), {
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Preorder stream failed with status ${response.status}`);
+      }
+
+      onOpen?.();
+      retryDelay = 1000;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (!controller.signal.aborted) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split(/\r?\n\r?\n/);
+        buffer = chunks.pop() ?? "";
+
+        chunks.forEach((chunk) => {
+          const { eventName, data } = parseSseEvent(chunk);
+
+          if (eventName !== "preorder_updated" || !data) {
+            return;
+          }
+
+          try {
+            onPreorderUpdated(JSON.parse(data) as Partial<PreorderDto>);
+          } catch {
+            // ignore JSON parse errors
+          }
+        });
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        onError?.(error);
+      }
+    }
+
+    if (!controller.signal.aborted) {
+      retryTimer = window.setTimeout(connect, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 15000);
+    }
+  };
+
+  void connect();
+
+  return () => {
+    controller.abort();
+
+    if (retryTimer) {
+      window.clearTimeout(retryTimer);
+    }
+  };
+}
+
 export function getAuthToken() {
   return window.localStorage.getItem(authTokenStorageKey);
 }
@@ -604,6 +690,24 @@ export const api = {
     }),
   register: (payload: RegisterPayload) =>
     apiRequest<{ message: string; user?: UserSession }>("/api/auth/register", {
+      auth: false,
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  forgotPassword: (payload: { email: string }) =>
+    apiRequest<{ message: string }>("/api/auth/forgot-password", {
+      auth: false,
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  verifyResetToken: (payload: { email: string; token: string }) =>
+    apiRequest<{ message: string }>("/api/auth/verify-reset-token", {
+      auth: false,
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  resetPassword: (payload: { email: string; token: string; new_password: string }) =>
+    apiRequest<{ message: string }>("/api/auth/reset-password", {
       auth: false,
       method: "POST",
       body: JSON.stringify(payload),

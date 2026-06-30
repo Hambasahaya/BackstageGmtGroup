@@ -53,10 +53,10 @@ export function AuthSuiteShell({
   mode,
   children,
 }: {
-  mode: "login" | "register";
+  mode: "login" | "register" | "forgot-password" | "reset-password";
   children: ReactNode;
 }) {
-  const gridSide = mode === "login" ? "left" : "right";
+  const gridSide = mode === "register" ? "right" : "left";
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#0a0a0a] px-3 py-6 text-white sm:px-5 sm:py-10">
@@ -65,7 +65,7 @@ export function AuthSuiteShell({
         <section
           className={[
             "relative z-10 flex min-h-[640px] w-full max-w-[470px] flex-col rounded-[20px] bg-[#111] px-5 py-8 shadow-[0_0_0_1px_#2b2b2b,0_24px_70px_rgba(0,0,0,0.55)] sm:px-9 lg:px-[46px] lg:py-[46px]",
-            mode === "login" ? "order-2" : "order-1",
+            mode === "register" ? "order-1" : "order-2",
           ].join(" ")}
         >
           <div className="mb-10 flex min-h-[46px] items-center justify-center">

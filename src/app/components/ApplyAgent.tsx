@@ -218,7 +218,6 @@ export function ApplyAgent() {
       setStatus(latestUser.detail_user?.status ?? null);
       setIsVerificationCompleted(hasCompletedVerification(latestUser.detail_user));
     } catch {
-      // Status sync is best-effort; submit errors still surface in the form.
     }
   }, []);
 
