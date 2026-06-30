@@ -346,13 +346,13 @@ export function AgentAchievement() {
             <div className="mt-8 space-y-6">
               <div className="relative">
                 {/* Milestone Tick Marks */}
-                <div className="absolute -top-7 left-0 w-full flex justify-between text-[10px] font-bold text-slate-400">
-                  <span>0</span>
-                  <span className="absolute" style={{ left: "8.3%" }}>100JT</span>
-                  <span className="absolute" style={{ left: "25%" }}>300JT</span>
-                  <span className="absolute" style={{ left: "50%" }}>600JT</span>
-                  <span className="absolute" style={{ left: "75%" }}>900JT</span>
-                  <span className="absolute right-0">1.2M (GOLDEN TARGET)</span>
+                <div className="absolute -top-7 left-0 w-full flex justify-between text-[9px] sm:text-[10px] font-bold text-slate-400">
+                  <span className="opacity-0 sm:opacity-100">0</span>
+                  <span className="absolute" style={{ left: "8.3%" }}>100<span className="hidden sm:inline">JT</span></span>
+                  <span className="absolute hidden sm:block" style={{ left: "25%" }}>300JT</span>
+                  <span className="absolute" style={{ left: "50%" }}>600<span className="hidden sm:inline">JT</span></span>
+                  <span className="absolute hidden sm:block" style={{ left: "75%" }}>900JT</span>
+                  <span className="absolute right-0">1.2M<span className="hidden md:inline"> (GOLDEN TARGET)</span></span>
                 </div>
 
                 {/* Main Progress Bar Wrapper */}
@@ -377,12 +377,12 @@ export function AgentAchievement() {
                 </div>
 
                 {/* Milestones Label bottom */}
-                <div className="mt-2 w-full flex justify-between text-[9px] text-slate-400 select-none">
-                  <span>Start</span>
-                  <span className="absolute" style={{ left: "7%" }}>Bronze Tier</span>
-                  <span className="absolute" style={{ left: "23.5%" }}>Silver Tier</span>
-                  <span className="absolute" style={{ left: "48.5%" }}>Gold Tier</span>
-                  <span className="absolute" style={{ left: "73.5%" }}>Platinum Tier</span>
+                <div className="mt-2 w-full flex justify-between text-[8px] sm:text-[9px] text-slate-400 select-none">
+                  <span className="opacity-0 sm:opacity-100">Start</span>
+                  <span className="absolute" style={{ left: "7%" }}>Bronze<span className="hidden sm:inline"> Tier</span></span>
+                  <span className="absolute hidden sm:block" style={{ left: "23.5%" }}>Silver Tier</span>
+                  <span className="absolute" style={{ left: "48.5%" }}>Gold<span className="hidden sm:inline"> Tier</span></span>
+                  <span className="absolute hidden sm:block" style={{ left: "73.5%" }}>Platinum Tier</span>
                   <span className="font-semibold text-[#0F766E]">Trip Bali</span>
                 </div>
               </div>
