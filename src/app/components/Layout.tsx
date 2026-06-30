@@ -593,7 +593,9 @@ export function Layout() {
                 }`}
               >
                 <Icon className={`h-5 w-5 ${isActive ? "text-[#0F766E]" : "text-slate-400"}`} />
-                <span className="text-[10px] font-medium truncate w-full text-center px-1">{item.label}</span>
+                <span className="text-[10px] font-medium truncate w-full text-center px-1">
+                  {item.label === "Agent Onboarding" ? "Onboarding" : item.label}
+                </span>
               </button>
             );
           })}
