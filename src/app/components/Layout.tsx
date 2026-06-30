@@ -489,7 +489,7 @@ export function Layout() {
               </button>
 
               {notificationOpen && (
-                <div className="absolute right-0 top-12 z-50 w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
+                <div className="fixed inset-x-4 top-[4.5rem] z-50 sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-[24rem] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
                   <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-950">Notifikasi</p>
