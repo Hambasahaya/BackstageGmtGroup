@@ -606,28 +606,28 @@ export function AgentPurchaseOrder() {
         </button>
       </div>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Total PO</p>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{purchaseOrders.length}</p>
-          <p className="mt-2 text-sm text-slate-500">Draft dan sent PO</p>
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Total PO</p>
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{purchaseOrders.length}</p>
+          <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">Draft dan sent PO</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Sent PO</p>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{submittedCount}</p>
-          <p className="mt-2 text-sm text-slate-500">Menunggu review sales</p>
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Sent PO</p>
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{submittedCount}</p>
+          <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">Menunggu review sales</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Draft</p>
-          <p className="mt-2 text-2xl font-bold text-slate-950">{draftCount}</p>
-          <p className="mt-2 text-sm text-slate-500">Belum dikirim ke sales</p>
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Draft</p>
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{draftCount}</p>
+          <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">Belum dikirim ke sales</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Estimasi komisi</p>
-          <p className="mt-2 text-2xl font-bold text-slate-950">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
+          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Estimasi komisi</p>
+          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">
             {currencyFormatter.format(purchaseOrders.reduce((sum, po) => sum + po.commissionTotal, 0))}
           </p>
-          <p className="mt-2 text-sm text-slate-500">{commissionPercent}% dari total PO</p>
+          <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">{commissionPercent}% dari total PO</p>
         </div>
       </section>
 
