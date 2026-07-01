@@ -408,7 +408,7 @@ export function ApplyAgent() {
               <p className="mt-1 text-sm text-slate-500">Isi data ini setelah admin mengubah status pengajuan menjadi verif.</p>
             </div>
             <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} />
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
@@ -443,7 +443,7 @@ export function ApplyAgent() {
           <form onSubmit={handleApplySubmit} className="space-y-5 p-5">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data pengajuan</h3>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} placeholder="Sales Executive" />
                 <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" />
                 <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" />
@@ -453,7 +453,7 @@ export function ApplyAgent() {
 
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data verifikasi</h3>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} />
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
@@ -487,7 +487,7 @@ export function ApplyAgent() {
 
             <TextArea label="Alasan ingin menjadi Moxlite Agent" value={applyForm.agent_motivation} onChange={(value) => setApplyForm((current) => ({ ...current, agent_motivation: value }))} placeholder="Ceritakan alasan kamu..." />
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Mengetahui program ini dari siapa?</span>
                 <select value={applyForm.referral_source} onChange={(event) => setApplyForm((current) => ({ ...current, referral_source: event.target.value }))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
