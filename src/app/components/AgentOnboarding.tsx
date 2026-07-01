@@ -1,5 +1,6 @@
-import { CheckCircle2, Clock3, Lock, PlayCircle, RotateCcw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock3, Lock, PlayCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactPlayer from "react-player";
 import { api, resolveApiAssetUrl, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
 
 const emptySummary: OnboardingSummaryDto = {
@@ -94,6 +95,7 @@ export function AgentOnboarding() {
   const [summary, setSummary] = useState<OnboardingSummaryDto>(emptySummary);
   const [videoErrors, setVideoErrors] = useState<Record<number, string>>({});
   const [savingVideoIds, setSavingVideoIds] = useState<number[]>([]);
+  const [finishedVideoIds, setFinishedVideoIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -234,13 +236,6 @@ export function AgentOnboarding() {
             Materi onboarding dari API agent dengan progress tonton berurutan.
           </p>
         </div>
-        <button
-          onClick={resetProgress}
-          className="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Reset progress
-        </button>
       </div>
 
       {errorMessage && (
@@ -301,32 +296,27 @@ export function AgentOnboarding() {
             >
               <div className="relative aspect-video bg-slate-950">
                 {video.isUnlocked ? (
-                  video.forcedYoutubeUrl ? (
-                    <iframe
-                      className="h-full w-full"
-                      src={video.forcedYoutubeUrl}
-                      title={video.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                    />
-                  ) : video.resolvedVideoUrl ? (
+                  (video.forcedYoutubeUrl || video.resolvedVideoUrl) ? (
                     <>
-                      <video
-                        className="h-full w-full object-cover"
+                      <ReactPlayer
+                        url={video.forcedYoutubeUrl ? forcedOnboardingVideoUrls[video.index] : video.resolvedVideoUrl}
+                        width="100%"
+                        height="100%"
                         controls
-                        preload="metadata"
-                        src={video.resolvedVideoUrl}
+                        onEnded={() => {
+                          if (!finishedVideoIds.includes(video.id)) {
+                            setFinishedVideoIds((prev) => [...prev, video.id]);
+                          }
+                        }}
                         onError={() =>
                           setVideoErrors((current) => ({
                             ...current,
-                            [video.id]: "Video gagal dimuat. Periksa file, URL asset, atau akses static backend.",
+                            [video.id]: "Video gagal dimuat. Periksa file, URL asset, atau koneksi.",
                           }))
                         }
-                        onPause={(event) => void saveProgress(video, event.currentTarget.currentTime, "in_progress")}
-                        onEnded={() => void saveProgress(video, video.duration_seconds, "completed")}
                       />
                       {videoErrors[video.id] && (
-                        <div className="absolute inset-x-3 bottom-3 rounded-md bg-rose-600/90 px-3 py-2 text-xs font-medium text-white">
+                        <div className="absolute inset-x-3 bottom-3 rounded-md bg-rose-600/90 px-3 py-2 text-xs font-medium text-white z-10">
                           {videoErrors[video.id]}
                         </div>
                       )}
@@ -389,11 +379,19 @@ export function AgentOnboarding() {
                   <button
                     type="button"
                     onClick={() => void saveProgress(video, video.duration_seconds, "completed")}
-                    disabled={savingVideoIds.includes(video.id)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                    disabled={savingVideoIds.includes(video.id) || !finishedVideoIds.includes(video.id)}
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                      finishedVideoIds.includes(video.id)
+                        ? "bg-[#0F766E] hover:bg-[#115E59] text-white"
+                        : "bg-slate-200 cursor-not-allowed text-slate-500"
+                    }`}
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    {savingVideoIds.includes(video.id) ? "Menyimpan..." : "Tandai selesai"}
+                    {savingVideoIds.includes(video.id)
+                      ? "Menyimpan..."
+                      : finishedVideoIds.includes(video.id)
+                      ? "Tandai selesai"
+                      : "Selesaikan menonton terlebih dahulu"}
                   </button>
                 )}
               </div>

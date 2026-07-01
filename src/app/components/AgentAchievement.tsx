@@ -262,7 +262,7 @@ export function AgentAchievement() {
       )}
 
       {/* QUICK STATS CARD GRID */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs sm:text-sm font-medium text-slate-500 line-clamp-1 mr-2">Total Penjualan Anda</p>
@@ -305,27 +305,12 @@ export function AgentAchievement() {
             <span className="text-slate-500 font-semibold">{totalPercentage >= 10 ? "Hebat!" : "Ayo kejar!"}</span>
           </div>
         </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-xs sm:text-sm font-medium text-slate-500 line-clamp-1 mr-2">Peringkat Agent Anda</p>
-            <div className="rounded-lg bg-pink-50 p-1.5 sm:p-2 text-pink-600 shrink-0">
-              <Award className="h-4 w-4 sm:h-5 sm:w-5" />
-            </div>
-          </div>
-          <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">
-            {currentTier ? currentTier.name.split(" ")[0] : "Standard"}
-          </p>
-          <div className="mt-3 text-[10px] sm:text-xs text-slate-500 truncate">
-            {currentTier ? `${currentTier.commissionBonus} aktif` : "Belum mencapai tier reward"}
-          </div>
-        </div>
       </div>
 
       {/* DETAILED PROGRESS & BADGES SECTION */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-6">
         {/* PROGRESS BAR & GOAL CARD */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2 flex flex-col justify-between">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between">
               <div>
@@ -421,132 +406,6 @@ export function AgentAchievement() {
             </div>
           </div>
         </div>
-
-        {/* CURRENT REWARDS / BENEFIT SIDE CARD */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-950">Status & Keuntungan Tier</h2>
-            <p className="mt-1 text-sm text-slate-500">Detail benefit peringkat Anda saat ini.</p>
-
-            <div className="mt-5 space-y-4">
-              {/* Bronze */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm">
-                    B
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 text-sm block">Bronze Benefit</span>
-                    <span className="text-slate-500 text-xs">Target &gt; 100 JT</span>
-                  </div>
-                </div>
-                {currentSales >= 100000000 ? (
-                  <span className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> Unlocked
-                  </span>
-                ) : (
-                  <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Locked
-                  </span>
-                )}
-              </div>
-
-              {/* Silver */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
-                    S
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 text-sm block">Silver Benefit</span>
-                    <span className="text-slate-500 text-xs">Target &gt; 300 JT</span>
-                  </div>
-                </div>
-                {currentSales >= 300000000 ? (
-                  <span className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> Unlocked
-                  </span>
-                ) : (
-                  <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Locked
-                  </span>
-                )}
-              </div>
-
-              {/* Gold */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-bold text-sm">
-                    G
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 text-sm block">Gold Benefit</span>
-                    <span className="text-slate-500 text-xs">Target &gt; 600 JT</span>
-                  </div>
-                </div>
-                {currentSales >= 600000000 ? (
-                  <span className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> Unlocked
-                  </span>
-                ) : (
-                  <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Locked
-                  </span>
-                )}
-              </div>
-
-              {/* Platinum */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm">
-                    P
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 text-sm block">Platinum Benefit</span>
-                    <span className="text-slate-500 text-xs">Target &gt; 900 JT</span>
-                  </div>
-                </div>
-                {currentSales >= 900000000 ? (
-                  <span className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> Unlocked
-                  </span>
-                ) : (
-                  <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Locked
-                  </span>
-                )}
-              </div>
-
-              {/* Diamond */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
-                    D
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 text-sm block">Elite Diamond</span>
-                    <span className="text-slate-500 text-xs">Target &gt; 1.2 Miliar</span>
-                  </div>
-                </div>
-                {currentSales >= 1200000000 ? (
-                  <span className="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" /> Unlocked
-                  </span>
-                ) : (
-                  <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                    <Lock className="h-3 w-3" /> Locked
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 border-t border-slate-100 pt-4 text-center">
-            <span className="text-xs text-slate-500 font-medium">
-              Komisi dikalkulasi otomatis saat status Preorder **Approve/Paid**
-            </span>
-          </div>
-        </div>
       </section>
 
       {/* MONTHLY PROJECTION GRAPH (BAR CHART) */}
@@ -608,64 +467,6 @@ export function AgentAchievement() {
           <span className="font-semibold text-slate-700">
             Jumlah bulan lolos target: {targetMetMonthsCount} dari 12 bulan
           </span>
-        </div>
-      </section>
-
-      {/* EXPLANATORY LIST OF TIERS & MILESTONES WITH EXPANDED CARDS */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-950">Detail Program Reward Agent 2026</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {ACHIEVEMENT_TIERS.map((tier, index) => {
-            const isCompleted = currentSales >= tier.target;
-            const isActiveTier = currentTier && currentTier.name === tier.name;
-
-            return (
-              <div
-                key={tier.name}
-                className={`rounded-xl border p-5 transition flex flex-col justify-between h-56 ${isCompleted
-                    ? "border-emerald-200 bg-emerald-50/25"
-                    : isActiveTier
-                      ? "border-[#0F766E] bg-teal-50/10 ring-2 ring-teal-100"
-                      : "border-slate-200 bg-white"
-                  }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">
-                      Tier {index + 1}
-                    </span>
-                    {isCompleted ? (
-                      <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 flex items-center gap-1 ring-1 ring-emerald-200">
-                        <CheckCircle className="h-3 w-3" /> Tercapai
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 font-semibold">
-                        Sisa {formatCurrency(tier.target - currentSales)}
-                      </span>
-                    )}
-                  </div>
-
-                  <h3 className="mt-3 text-base font-bold text-slate-950">{tier.name}</h3>
-                  <p className="mt-1.5 text-xs leading-5 text-slate-500">{tier.description}</p>
-                </div>
-
-                <div className="mt-4 border-t border-slate-100 pt-3">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="rounded-lg bg-teal-50 p-1.5 text-[#0F766E]">
-                      <Gift className="h-3.5 w-3.5" />
-                    </div>
-                    <span className="font-semibold text-slate-700 leading-tight">
-                      {tier.reward}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Target Penjualan:</span>
-                    <span className="font-bold text-slate-950">{formatCurrencyFull(tier.target)}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 
