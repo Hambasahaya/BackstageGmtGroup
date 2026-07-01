@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Clock3, FileImage, Send, UserPlus, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock3, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -109,23 +109,43 @@ function FileField({
   label,
   value,
   onChange,
+  icon: Icon = Camera,
 }: {
   label: string;
   value: File | null;
   onChange: (value: File | null) => void;
+  icon?: any;
 }) {
+  const previewUrl = value ? URL.createObjectURL(value) : null;
+
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <input
-        type="file"
-        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-[#0F766E] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-        required
-      />
-      {value && <span className="mt-1 block text-xs text-slate-500">{value.name}</span>}
-    </label>
+      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-300 p-3 transition hover:bg-slate-50">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+          {previewUrl ? (
+            <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
+          ) : (
+            <Icon className="h-6 w-6 text-slate-400" />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+          <span className="rounded-md bg-[#0F766E] px-3 py-1.5 text-sm font-semibold text-white">
+            Ambil Foto
+          </span>
+          <span className="w-full truncate text-xs text-slate-500">
+            {value ? value.name : "Belum ada file terpilih"}
+          </span>
+        </div>
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+          className="sr-only"
+          required
+        />
+      </label>
+    </div>
   );
 }
 
@@ -389,8 +409,8 @@ export function ApplyAgent() {
             </div>
             <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
@@ -434,8 +454,8 @@ export function ApplyAgent() {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data verifikasi</h3>
               <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
