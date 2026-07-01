@@ -10,6 +10,7 @@ import {
   type ApplyAgentPayload,
   type DetailUserDto,
 } from "../services/api";
+import { WebcamCapture } from "./WebcamCapture";
 
 const applyInitial: ApplyAgentPayload = {
   job: "",
@@ -110,18 +111,26 @@ function FileField({
   value,
   onChange,
   icon: Icon = Camera,
+  livePhotoType,
+  onOpenLivePhoto,
 }: {
   label: string;
   value: File | null;
   onChange: (value: File | null) => void;
   icon?: any;
+  livePhotoType?: "ktp" | "selfie";
+  onOpenLivePhoto?: () => void;
 }) {
   const previewUrl = value ? URL.createObjectURL(value) : null;
+  const Wrapper = livePhotoType ? "div" : "label";
 
   return (
     <div className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
-      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-300 p-3 transition hover:bg-slate-50">
+      <Wrapper 
+        className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-300 p-3 transition hover:bg-slate-50"
+        onClick={livePhotoType ? onOpenLivePhoto : undefined}
+      >
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
           {previewUrl ? (
             <img src={previewUrl} alt="Preview" className="h-full w-full object-cover" />
@@ -137,14 +146,16 @@ function FileField({
             {value ? value.name : "Belum ada file terpilih"}
           </span>
         </div>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-          className="sr-only"
-          required
-        />
-      </label>
+        {!livePhotoType && (
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+            onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+            className="sr-only"
+            required={!value}
+          />
+        )}
+      </Wrapper>
     </div>
   );
 }
@@ -226,6 +237,7 @@ export function ApplyAgent() {
   const [isVerificationCompleted, setIsVerificationCompleted] = useState(hasCompletedVerification(storedUser?.detail_user));
   const [applyForm, setApplyForm] = useState<ApplyAgentPayload>(applyInitial);
   const [verificationForm, setVerificationForm] = useState<VerificationForm>(verificationInitial);
+  const [activeCamera, setActiveCamera] = useState<"ktp" | "selfie" | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
@@ -403,8 +415,8 @@ export function ApplyAgent() {
             </div>
             <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} />
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
@@ -448,8 +460,8 @@ export function ApplyAgent() {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data verifikasi</h3>
               <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} />
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
@@ -506,6 +518,21 @@ export function ApplyAgent() {
             </div>
           </form>
         </section>
+      )}
+
+      {activeCamera && (
+        <WebcamCapture
+          overlayType={activeCamera}
+          onClose={() => setActiveCamera(null)}
+          onCapture={(file) => {
+            if (activeCamera === "ktp") {
+              setVerificationForm((current) => ({ ...current, ktp_photo: file }));
+            } else if (activeCamera === "selfie") {
+              setVerificationForm((current) => ({ ...current, photo: file }));
+            }
+            setActiveCamera(null);
+          }}
+        />
       )}
     </div>
   );

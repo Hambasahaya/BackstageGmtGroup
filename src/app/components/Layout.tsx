@@ -140,6 +140,7 @@ export function Layout() {
   const [latestSalesNotification, setLatestSalesNotification] = useState<NotificationDto | null>(null);
   const [salesStreamStatus, setSalesStreamStatus] = useState<"idle" | "connected" | "reconnecting">("idle");
   const [storedUser, setStoredUser] = useState<UserSession | null>(() => getStoredUser());
+  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
   const latestNotificationTimerRef = useRef<number>();
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const currentRole = getCurrentRole();
@@ -154,7 +155,16 @@ export function Layout() {
     if (!currentAgentStatus) {
       return item.path === "/apply-agent";
     }
-    return item.statuses.includes(currentAgentStatus);
+    if (!item.statuses.includes(currentAgentStatus)) {
+      return false;
+    }
+
+    const requiresOnboarding = ["/agent-purchase-orders", "/agent-withdraw"].includes(item.path);
+    if (requiresOnboarding && !isOnboardingCompleted) {
+      return false;
+    }
+
+    return true;
   });
   const initials = (storedUser?.name ?? roleLabels[currentRole])
     .split(" ")
@@ -288,6 +298,16 @@ export function Layout() {
       window.removeEventListener("storage", refreshStoredSession);
     };
   }, []);
+
+  useEffect(() => {
+    if (currentRole === "agent" && currentAgentStatus === "official_agent") {
+      api.onboardingProgress()
+        .then((data) => setIsOnboardingCompleted(data.is_completed))
+        .catch(() => {
+          // ignore
+        });
+    }
+  }, [currentRole, currentAgentStatus]);
 
   useEffect(() => {
     if (currentRole !== "sales") {
