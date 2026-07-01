@@ -26,7 +26,7 @@ export function WebcamCapture({
     const loadModel = async () => {
       try {
         await tf.ready();
-        const loadedModel = await blazeface.load();
+        const loadedModel = await blazeface.load({ modelUrl: '/models/blazeface/model.json' });
         if (isMounted) {
           setModel(loadedModel);
           setValidationMessage("Menganalisa kamera...");
