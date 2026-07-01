@@ -10,7 +10,9 @@ import {
   type ApplyAgentPayload,
   type DetailUserDto,
 } from "../services/api";
-import { WebcamCapture } from "./WebcamCapture";
+import { Suspense, lazy } from "react";
+
+const WebcamCapture = lazy(() => import("./WebcamCapture").then(module => ({ default: module.WebcamCapture })));
 
 const applyInitial: ApplyAgentPayload = {
   job: "",
@@ -521,18 +523,27 @@ export function ApplyAgent() {
       )}
 
       {activeCamera && (
-        <WebcamCapture
-          overlayType={activeCamera}
-          onClose={() => setActiveCamera(null)}
-          onCapture={(file) => {
-            if (activeCamera === "ktp") {
-              setVerificationForm((current) => ({ ...current, ktp_photo: file }));
-            } else if (activeCamera === "selfie") {
-              setVerificationForm((current) => ({ ...current, photo: file }));
-            }
-            setActiveCamera(null);
-          }}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950 text-white">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              <span>Menyiapkan kamera & AI...</span>
+            </div>
+          </div>
+        }>
+          <WebcamCapture
+            overlayType={activeCamera}
+            onClose={() => setActiveCamera(null)}
+            onCapture={(file) => {
+              if (activeCamera === "ktp") {
+                setVerificationForm((current) => ({ ...current, ktp_photo: file }));
+              } else if (activeCamera === "selfie") {
+                setVerificationForm((current) => ({ ...current, photo: file }));
+              }
+              setActiveCamera(null);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );
