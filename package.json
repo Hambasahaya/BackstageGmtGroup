@@ -8,6 +8,8 @@
     "dev": "node ./node_modules/vite/bin/vite.js"
   },
   "dependencies": {
+    "@tensorflow-models/blazeface": "^0.1.0",
+    "@tensorflow/tfjs": "^4.22.0",
     "lucide-react": "0.487.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
