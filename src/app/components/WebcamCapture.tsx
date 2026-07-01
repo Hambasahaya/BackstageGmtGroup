@@ -77,11 +77,24 @@ export function WebcamCapture({
           } else {
             // Mode selfie
             if (predictions.length > 0) {
-              setIsValid(true);
-              setValidationMessage("Wajah terdeteksi");
+              const face = predictions[0];
+              const topLeft = face.topLeft as [number, number];
+              const bottomRight = face.bottomRight as [number, number];
+              const faceCenterX = topLeft[0] + (bottomRight[0] - topLeft[0]) / 2;
+              
+              // Cek apakah pusat wajah ada di tengah (sekitar 30% hingga 70% dari lebar video)
+              const isCentered = faceCenterX > video.videoWidth * 0.3 && faceCenterX < video.videoWidth * 0.7;
+              
+              if (isCentered) {
+                setIsValid(true);
+                setValidationMessage("Posisi wajah sudah pas");
+              } else {
+                setIsValid(false);
+                setValidationMessage("Posisikan wajah Anda tepat di tengah oval");
+              }
             } else {
               setIsValid(false);
-              setValidationMessage("Posisikan wajah Anda ke kamera");
+              setValidationMessage("Wajah tidak terdeteksi. Posisikan wajah ke kamera.");
             }
           }
         } catch (err) {
@@ -188,6 +201,16 @@ export function WebcamCapture({
                   
                   {/* Tanda area kanan (panduan visual) */}
                   <div className="absolute bottom-0 right-0 top-0 w-1/3 border-l-2 border-dashed border-white/20 bg-white/5"></div>
+                </div>
+              )}
+
+              {overlayType === "selfie" && (
+                <div className={`relative h-72 w-56 sm:h-80 sm:w-64 rounded-[100px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className="px-4 text-center text-sm font-bold text-white/80 drop-shadow-md">
+                      Posisikan wajah Anda di dalam oval ini
+                    </p>
+                  </div>
                 </div>
               )}
               
