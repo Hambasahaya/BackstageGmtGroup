@@ -29,7 +29,8 @@ type VerificationForm = {
   ktp_photo: File | null;
   bank_name: string;
   account_number: string;
-  ttl: string;
+  tempat_lahir: string;
+  tanggal_lahir: string;
   full_address: string;
   domicile: string;
 };
@@ -45,7 +46,8 @@ const verificationInitial: VerificationForm = {
   ktp_photo: null,
   bank_name: "",
   account_number: "",
-  ttl: "",
+  tempat_lahir: "",
+  tanggal_lahir: "",
   full_address: "",
   domicile: "",
 };
@@ -265,9 +267,13 @@ export function ApplyAgent() {
 
       const response = await api.applyAgent(applyForm);
       const verificationResponse = await api.completeAgentVerification({
-        ...verificationForm,
         photo: verificationForm.photo,
         ktp_photo: verificationForm.ktp_photo,
+        bank_name: verificationForm.bank_name,
+        account_number: verificationForm.account_number,
+        full_address: verificationForm.full_address,
+        domicile: verificationForm.domicile,
+        ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
       });
 
       saveAuthSession(getAuthToken() ?? "", verificationResponse.user);
@@ -303,9 +309,13 @@ export function ApplyAgent() {
         throw new Error("Foto dan KTP wajib diupload.");
       }
       const response = await api.completeAgentVerification({
-        ...verificationForm,
         photo: verificationForm.photo,
         ktp_photo: verificationForm.ktp_photo,
+        bank_name: verificationForm.bank_name,
+        account_number: verificationForm.account_number,
+        full_address: verificationForm.full_address,
+        domicile: verificationForm.domicile,
+        ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
       });
       const token = localStorage.getItem("gmt-auth-token") ?? "";
       saveAuthSession(token, response.user);
@@ -383,7 +393,11 @@ export function ApplyAgent() {
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" list="indonesia-regions" />
+                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
+                  <input type="date" required value={verificationForm.tanggal_lahir} onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" />
+                </label>
                 <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
               </div>
               <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
@@ -424,7 +438,11 @@ export function ApplyAgent() {
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" list="indonesia-regions" />
+                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
+                  <input type="date" required value={verificationForm.tanggal_lahir} onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" />
+                </label>
                 <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
               </div>
               <div className="mt-4">
