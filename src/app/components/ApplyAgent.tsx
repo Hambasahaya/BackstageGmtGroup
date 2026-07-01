@@ -167,16 +167,10 @@ function WaitingCta({
   description: string;
 }) {
   return (
-    <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-amber-700 ring-1 ring-amber-200">
-          <Clock3 className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold text-amber-950">{title}</h2>
-          <p className="mt-1 max-w-2xl text-sm text-amber-800">{description}</p>
-        </div>
-      </div>
+    <section className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <img src="/imgloading/loadinganimation.png" alt="Menunggu verifikasi" className="mb-4 h-32 w-32 object-contain" />
+      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+      <p className="mt-2 max-w-md text-sm text-slate-500">{description}</p>
     </section>
   );
 }
