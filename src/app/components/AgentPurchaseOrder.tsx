@@ -2,7 +2,6 @@ import {
   Eye,
   FileDown,
   FileText,
-  FileUp,
   Pencil,
   Plus,
   Send,
@@ -10,7 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
 
 type Product = {
@@ -55,21 +54,9 @@ type PurchaseOrder = {
 const commissionPercent = 10;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const discountOptions = [0, 5, 10, 15, 20, 25, 28];
-const paymentProofAccept = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf";
-const allowedPaymentProofExtensions = ["jpg", "jpeg", "png", "pdf"];
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
-}
-
-function validatePaymentProofFile(file: File) {
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-
-  if (!allowedPaymentProofExtensions.includes(extension)) {
-    return "Bukti transfer harus berupa file jpg, jpeg, png, atau pdf.";
-  }
-
-  return "";
 }
 
 const defaultProducts: Product[] = [
@@ -317,7 +304,6 @@ function ItemStatusBadge({ status }: { status: PurchaseOrderItem["itemStatus"] }
 }
 
 export function AgentPurchaseOrder() {
-  const paymentProofInputRef = useRef<HTMLInputElement>(null);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(defaultPurchaseOrders);
   const [products, setProducts] = useState<Product[]>(defaultProducts);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -332,8 +318,6 @@ export function AgentPurchaseOrder() {
   const [quotationMessage, setQuotationMessage] = useState("");
   const [downloadingQuotationId, setDownloadingQuotationId] = useState<number | null>(null);
   const [editingPoId, setEditingPoId] = useState<number | null>(null);
-  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
-  const [shouldSubmitAfterProofPick, setShouldSubmitAfterProofPick] = useState(false);
   const [previewPo, setPreviewPo] = useState<PurchaseOrder | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -373,8 +357,6 @@ export function AgentPurchaseOrder() {
     setFormError("");
     setPdfMessage("");
     setEditingPoId(null);
-    setPaymentProofFile(null);
-    setShouldSubmitAfterProofPick(false);
   };
 
   const closeModal = () => {
@@ -476,28 +458,13 @@ export function AgentPurchaseOrder() {
     return true;
   };
 
-  const persistPurchaseOrder = async (status: PurchaseOrder["status"], selectedPaymentProofFile = paymentProofFile) => {
+  const persistPurchaseOrder = async (status: PurchaseOrder["status"]) => {
     if (isPersistingPo) {
       return;
     }
 
     if (!validateForm()) {
       return;
-    }
-
-    if (status === "in_review") {
-      if (!selectedPaymentProofFile) {
-        setShouldSubmitAfterProofPick(true);
-        setFormError("Upload bukti transfer terlebih dahulu sebelum mengirim PO.");
-        paymentProofInputRef.current?.click();
-        return;
-      }
-
-      const paymentProofError = validatePaymentProofFile(selectedPaymentProofFile);
-      if (paymentProofError) {
-        setFormError(paymentProofError);
-        return;
-      }
     }
 
     const normalizedEmail = normalizeEmail(customerEmail);
@@ -509,10 +476,6 @@ export function AgentPurchaseOrder() {
     try {
       const response = editingPoId ? await api.updatePreorder(editingPoId, payload) : await api.createPreorder(payload);
       if (status === "in_review") {
-        if (!selectedPaymentProofFile) {
-          throw new Error("Upload bukti transfer terlebih dahulu sebelum mengirim PO.");
-        }
-        await api.uploadPreorderPaymentProof(response.preorder.id, selectedPaymentProofFile);
         await api.submitPreorder(response.preorder.id);
       }
       closeModal();
@@ -521,31 +484,6 @@ export function AgentPurchaseOrder() {
       setFormError(error instanceof Error ? error.message : "Gagal menyimpan PO.");
     } finally {
       setIsPersistingPo(false);
-    }
-  };
-
-  const handlePaymentProofChange = (file: File | null) => {
-    if (!file) {
-      return;
-    }
-
-    const paymentProofError = validatePaymentProofFile(file);
-    if (paymentProofError) {
-      setPaymentProofFile(null);
-      setShouldSubmitAfterProofPick(false);
-      setFormError(paymentProofError);
-      if (paymentProofInputRef.current) {
-        paymentProofInputRef.current.value = "";
-      }
-      return;
-    }
-
-    setPaymentProofFile(file);
-    setFormError("");
-
-    if (shouldSubmitAfterProofPick) {
-      setShouldSubmitAfterProofPick(false);
-      void persistPurchaseOrder("in_review", file);
     }
   };
 
@@ -1051,34 +989,6 @@ export function AgentPurchaseOrder() {
                   placeholder="Catatan tambahan untuk PO"
                 />
               </label>
-
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">Bukti transfer</p>
-                    <p className="mt-1 text-sm text-slate-500">Wajib diupload sebelum Send PO. Format: jpg, jpeg, png, pdf.</p>
-                    {paymentProofFile && (
-                      <p className="mt-2 text-sm font-medium text-[#0F766E]">{paymentProofFile.name}</p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => paymentProofInputRef.current?.click()}
-                    disabled={isPersistingPo}
-                    className="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-wait disabled:text-slate-400"
-                  >
-                    <FileUp className="h-4 w-4" />
-                    {paymentProofFile ? "Ganti file" : "Pilih file"}
-                  </button>
-                  <input
-                    ref={paymentProofInputRef}
-                    type="file"
-                    accept={paymentProofAccept}
-                    onChange={(event) => handlePaymentProofChange(event.target.files?.[0] ?? null)}
-                    className="hidden"
-                  />
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
                 <div>

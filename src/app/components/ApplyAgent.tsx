@@ -55,11 +55,13 @@ function TextField({
   value,
   onChange,
   placeholder,
+  list,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  list?: string;
 }) {
   return (
     <label className="block">
@@ -70,6 +72,7 @@ function TextField({
         className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
         placeholder={placeholder}
         required
+        list={list}
       />
     </label>
   );
@@ -211,6 +214,14 @@ export function ApplyAgent() {
   const [successMessage, setSuccessMessage] = useState("");
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [regions, setRegions] = useState<{ id: string; regency: string }[]>([]);
+
+  useEffect(() => {
+    fetch("https://raw.githubusercontent.com/Caknoooo/provinces-cities-indonesia/master/json/regencies.json")
+      .then((res) => res.json())
+      .then((data) => setRegions(data))
+      .catch(() => {});
+  }, []);
 
   const syncLatestStatus = useCallback(async () => {
     try {
@@ -320,6 +331,12 @@ export function ApplyAgent() {
 
   return (
     <div className="space-y-6">
+      <datalist id="indonesia-regions">
+        {regions.map((region) => (
+          <option key={region.id} value={region.regency} />
+        ))}
+      </datalist>
+
       {feedbackDialog && <FeedbackModal feedback={feedbackDialog} onClose={() => setFeedbackDialog(null)} />}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -361,13 +378,13 @@ export function ApplyAgent() {
               <p className="mt-1 text-sm text-slate-500">Isi data ini setelah admin mengubah status pengajuan menjadi verif.</p>
             </div>
             <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" />
-                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" />
+                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" list="indonesia-regions" />
+                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
               </div>
               <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
               <div className="flex justify-end border-t border-slate-200 pt-5">
@@ -392,7 +409,7 @@ export function ApplyAgent() {
           <form onSubmit={handleApplySubmit} className="space-y-5 p-5">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data pengajuan</h3>
-              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
                 <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} placeholder="Sales Executive" />
                 <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" />
                 <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" />
@@ -402,13 +419,13 @@ export function ApplyAgent() {
 
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data verifikasi</h3>
-              <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
                 <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} />
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} />
                 <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" />
-                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" />
+                <TextField label="Tempat tanggal lahir" value={verificationForm.ttl} onChange={(value) => setVerificationForm((current) => ({ ...current, ttl: value }))} placeholder="Jakarta, 10 Januari 2000" list="indonesia-regions" />
+                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
               </div>
               <div className="mt-4">
                 <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
@@ -432,7 +449,7 @@ export function ApplyAgent() {
 
             <TextArea label="Alasan ingin menjadi Moxlite Agent" value={applyForm.agent_motivation} onChange={(value) => setApplyForm((current) => ({ ...current, agent_motivation: value }))} placeholder="Ceritakan alasan kamu..." />
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Mengetahui program ini dari siapa?</span>
                 <select value={applyForm.referral_source} onChange={(event) => setApplyForm((current) => ({ ...current, referral_source: event.target.value }))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">

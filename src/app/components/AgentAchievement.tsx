@@ -208,10 +208,10 @@ export function AgentAchievement() {
   // Kelompokkan data bulanan untuk grafik
   const monthlyChartData = useMemo(() => {
     const months = [
-      "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", 
+      "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
       "Jul", "Agu", "Sep", "Okt", "Nov", "Des"
     ];
-    
+
     // Inisialisasi actual value per bulan
     const monthlyValues = new Array(12).fill(0);
 
@@ -250,9 +250,7 @@ export function AgentAchievement() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">GMT Achievement Program</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Pencapaian Agent Tahunan</h1>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Dapatkan reward trip ke Bali, bonus persentase komisi, dan benefit eksklusif dengan mengejar target penjualan tahunan Anda.
-          </p>
+
         </div>
       </div>
 
@@ -402,8 +400,8 @@ export function AgentAchievement() {
                     {nextTier ? formatCurrencyFull(remainingToNextTier) : "Anda telah menaklukkan target tertinggi Agent!"}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {nextTier 
-                      ? `Raih tier ini untuk membuka reward: ${nextTier.reward}` 
+                    {nextTier
+                      ? `Raih tier ini untuk membuka reward: ${nextTier.reward}`
                       : "Semua reward bonus dan trip liburan Bali eksklusif telah berhasil Anda kunci!"
                     }
                   </p>
@@ -624,13 +622,12 @@ export function AgentAchievement() {
             return (
               <div
                 key={tier.name}
-                className={`rounded-xl border p-5 transition flex flex-col justify-between h-56 ${
-                  isCompleted
+                className={`rounded-xl border p-5 transition flex flex-col justify-between h-56 ${isCompleted
                     ? "border-emerald-200 bg-emerald-50/25"
                     : isActiveTier
-                    ? "border-[#0F766E] bg-teal-50/10 ring-2 ring-teal-100"
-                    : "border-slate-200 bg-white"
-                }`}
+                      ? "border-[#0F766E] bg-teal-50/10 ring-2 ring-teal-100"
+                      : "border-slate-200 bg-white"
+                  }`}
               >
                 <div>
                   <div className="flex items-center justify-between gap-3">
