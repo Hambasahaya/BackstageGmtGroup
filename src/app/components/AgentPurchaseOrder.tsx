@@ -349,6 +349,13 @@ export function AgentPurchaseOrder() {
   }, []);
 
   const orderSummary = useMemo(() => calculateOrder(products, items), [items, products]);
+
+  useEffect(() => {
+    if (orderSummary.total <= 100000000 && paymentMode === "50%") {
+      setPaymentMode("100%");
+    }
+  }, [orderSummary.total, paymentMode]);
+
   const submittedCount = purchaseOrders.filter((po) => po.status === "in_review").length;
   const draftCount = purchaseOrders.filter((po) => po.status === "draft").length;
 
@@ -718,17 +725,6 @@ export function AgentPurchaseOrder() {
                     placeholder="Alamat customer"
                   />
                 </label>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Skema Pembayaran</span>
-                  <select
-                    value={paymentMode}
-                    onChange={(event) => setPaymentMode(event.target.value as "100%" | "50%")}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                  >
-                    <option value="100%">Bayar Full di Awal (100% upfront)</option>
-                    <option value="50%">DP 50% di Awal (Pembayaran 50%)</option>
-                  </select>
-                </label>
               </div>
 
               <div className="space-y-3 md:hidden">
@@ -997,6 +993,25 @@ export function AgentPurchaseOrder() {
                 <Plus className="h-4 w-4" />
                 Tambah product
               </button>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Skema Pembayaran</span>
+                <select
+                  value={paymentMode}
+                  onChange={(event) => setPaymentMode(event.target.value as "100%" | "50%")}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                >
+                  <option value="100%">Bayar Full di Awal (100% upfront)</option>
+                  <option value="50%" disabled={orderSummary.total <= 100000000}>
+                    DP 50% di Awal (Pembayaran 50%)
+                  </option>
+                </select>
+                {orderSummary.total <= 100000000 && (
+                  <p className="mt-1.5 text-xs font-medium text-amber-600">
+                    * Opsi DP 50% hanya tersedia jika Total Price melebihi Rp 100.000.000
+                  </p>
+                )}
+              </label>
 
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Catatan</span>
