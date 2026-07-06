@@ -1,6 +1,7 @@
 export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
 export type PreorderStatus = "draft" | "in_review" | "approve" | "invalid";
 export type PaymentStatus = "unpaid" | "pending" | "paid" | "expired" | "failed" | "refund";
+export type PaymentMode = "full" | "split" | "50%" | "100%" | "50" | "100";
 export type WithdrawStatus = "on_progress" | "approval";
 export type OnboardingProgressStatus = "in_progress" | "completed";
 
@@ -47,6 +48,7 @@ export type PreorderDto = {
   total_diskon?: number;
   total: number;
   total_komisi: number;
+  payment_mode?: PaymentMode | null;
   payment_status?: PaymentStatus | null;
   payment_url?: string | null;
   payment_token?: string | null;

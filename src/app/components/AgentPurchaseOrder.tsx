@@ -44,6 +44,7 @@ type PurchaseOrder = {
   discountTotal: number;
   total: number;
   commissionTotal: number;
+  paymentMode: "100%" | "50%";
   paymentStatus: PaymentStatus;
   paymentUrl?: string;
   paymentToken?: string;
@@ -187,6 +188,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     discountTotal: preorder.total_discount ?? preorder.total_diskon ?? 0,
     total: preorder.total,
     commissionTotal: preorder.total_komisi,
+    paymentMode: (preorder.payment_mode === "split" || preorder.payment_mode === "50%" || preorder.payment_mode === "50") ? "50%" : "100%",
     paymentStatus: preorder.payment_status ?? "unpaid",
     paymentUrl: preorder.payment_url ?? undefined,
     paymentToken: preorder.payment_token ?? undefined,
@@ -201,6 +203,7 @@ function toPreorderPayload(
   customerPhone: string,
   customerAddress: string,
   notes: string,
+  paymentMode: "100%" | "50%",
   items: PurchaseOrderItem[],
 ) {
   const normalizedEmail = normalizeEmail(customerEmail);
@@ -211,6 +214,7 @@ function toPreorderPayload(
     alamat: customerAddress.trim(),
     no_hp: customerPhone.trim(),
     catatan: notes.trim(),
+    payment_mode: paymentMode,
     items: items.map((item) => ({
       id_product: item.productId,
       qty: item.qty,
@@ -322,6 +326,7 @@ export function AgentPurchaseOrder() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPersistingPo, setIsPersistingPo] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"100%" | "50%">("100%");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -357,6 +362,7 @@ export function AgentPurchaseOrder() {
     setFormError("");
     setPdfMessage("");
     setEditingPoId(null);
+    setPaymentMode("100%");
   };
 
   const closeModal = () => {
@@ -422,6 +428,7 @@ export function AgentPurchaseOrder() {
     setItems(po.items);
     setFormError("");
     setPdfMessage("");
+    setPaymentMode(po.paymentMode || "100%");
     setIsModalOpen(true);
   };
 
@@ -470,7 +477,7 @@ export function AgentPurchaseOrder() {
     const normalizedEmail = normalizeEmail(customerEmail);
     setCustomerEmail(normalizedEmail);
 
-    const payload = toPreorderPayload(customerName, normalizedEmail, customerPhone, customerAddress, notes, items);
+    const payload = toPreorderPayload(customerName, normalizedEmail, customerPhone, customerAddress, notes, paymentMode, items);
 
     setIsPersistingPo(true);
     try {
@@ -710,6 +717,17 @@ export function AgentPurchaseOrder() {
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                     placeholder="Alamat customer"
                   />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Skema Pembayaran</span>
+                  <select
+                    value={paymentMode}
+                    onChange={(event) => setPaymentMode(event.target.value as "100%" | "50%")}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                  >
+                    <option value="100%">Bayar Full di Awal (100% upfront)</option>
+                    <option value="50%">DP 50% di Awal (Pembayaran 50%)</option>
+                  </select>
                 </label>
               </div>
 
@@ -1078,7 +1096,7 @@ export function AgentPurchaseOrder() {
             </div>
 
             <div className="space-y-5 p-5">
-              <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</p>
                   <p className="mt-2 font-semibold text-slate-950">{previewPo.customerName}</p>
@@ -1089,6 +1107,15 @@ export function AgentPurchaseOrder() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Alamat dan catatan</p>
                   <p className="mt-2 text-sm text-slate-700">{previewPo.customerAddress}</p>
                   <p className="mt-2 text-sm text-slate-500">{previewPo.notes || "Tidak ada catatan."}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Skema Pembayaran</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                    {(previewPo.paymentMode === "split" || previewPo.paymentMode === "50%" || previewPo.paymentMode === "50") ? "DP 50% di Awal" : "Full Payment (100%)"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Status Pembayaran: <span className="font-semibold text-slate-700">{previewPo.paymentStatus}</span>
+                  </p>
                 </div>
               </section>
 

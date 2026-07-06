@@ -25,6 +25,7 @@ type PurchaseOrder = {
   discountTotal: number;
   total: number;
   commissionTotal: number;
+  paymentMode: "100%" | "50%";
   paymentStatus: PaymentStatus;
   paymentUrl?: string;
   paymentToken?: string;
@@ -129,6 +130,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     discountTotal: preorder.total_discount ?? preorder.total_diskon ?? 0,
     total: preorder.total,
     commissionTotal: preorder.total_komisi,
+    paymentMode: (preorder.payment_mode === "split" || preorder.payment_mode === "50%" || preorder.payment_mode === "50") ? "50%" : "100%",
     paymentStatus: preorder.payment_status ?? "unpaid",
     paymentUrl: preorder.payment_url ?? undefined,
     paymentToken: preorder.payment_token ?? undefined,
@@ -455,8 +457,17 @@ export function SalesOrders() {
 
               <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <PaymentStatusBadge status={previewPo.paymentStatus} />
+                <div className="mt-2 flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-semibold">Status:</span>
+                    <PaymentStatusBadge status={previewPo.paymentStatus} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-semibold">Skema:</span>
+                    <span className="inline-flex rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-[#0F766E] ring-1 ring-teal-200">
+                      {(previewPo.paymentMode === "split" || previewPo.paymentMode === "50%" || previewPo.paymentMode === "50") ? "DP 50%" : "Full Payment"}
+                    </span>
+                  </div>
                   {previewPo.paymentUrl ? (
                     <a
                       href={previewPo.paymentUrl}
