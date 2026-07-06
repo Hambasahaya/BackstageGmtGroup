@@ -793,6 +793,24 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  salesSendPaymentQuotation: (id: number, stage: "full" | "dp" | "remaining") =>
+    apiRequest<{ message: string; payment?: { payment_mode: string; stage: string; amount: number } }>(
+      `/api/sales/preorders/${id}/payment-quotation`,
+      {
+        method: "POST",
+        body: JSON.stringify({ stage }),
+      }
+    ),
+  salesUploadPaymentProof: (id: number, stage: "full" | "dp" | "remaining", file: File) => {
+    const formData = new FormData();
+    formData.set("payment_proof", file);
+    formData.set("stage", stage);
+
+    return apiRequest<{ message: string }>(`/api/sales/preorders/${id}/payment-proof`, {
+      method: "POST",
+      body: formData,
+    });
+  },
   notifications: (status?: NotificationDto["status"]) =>
     apiRequest<{ notifications: NotificationDto[] | null }>("/api/notifications", { query: { status } }),
   notificationDetail: (id: number) => apiRequest<{ notification: NotificationDto }>(`/api/notifications/${id}`),

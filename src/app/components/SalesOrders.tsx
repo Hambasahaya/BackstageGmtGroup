@@ -1,6 +1,7 @@
-import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { api, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
+import Swal from "sweetalert2";
 
 type PurchaseOrderStatus = "draft" | "in_review" | "approve" | "invalid";
 
@@ -165,11 +166,52 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
     failed: { label: "Failed", className: "bg-rose-50 text-rose-700 ring-rose-200" },
     refund: { label: "Refund", className: "bg-violet-50 text-violet-700 ring-violet-200" },
   };
-  const statusMeta = statusMap[status];
+  const statusMeta = statusMap[status] || statusMap.unpaid;
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
       {statusMeta.label}
+    </span>
+  );
+}
+
+function getCustomPaymentBadge(po: PurchaseOrder) {
+  const isDpMode = po.paymentMode === "split" || po.paymentMode === "50%";
+  if (isDpMode) {
+    if (po.paymentStatus === "unpaid") {
+      return (
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+          Bukti DP belum di-upload / Belum bayar DP
+        </span>
+      );
+    }
+    if (po.paymentStatus === "partial") {
+      return (
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+          DP Masuk, Pelunasan belum selesai
+        </span>
+      );
+    }
+    if (po.paymentStatus === "paid") {
+      return (
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+          Lunas
+        </span>
+      );
+    }
+  }
+
+  // Fallback / Full Payment mode
+  if (po.paymentStatus === "paid") {
+    return (
+      <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+        Lunas
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-slate-100 text-slate-700 ring-slate-200">
+      Belum bayar
     </span>
   );
 }
@@ -254,9 +296,78 @@ export function SalesOrders() {
     try {
       await api.salesUpdatePreorderStatus(po.id, { status: "approve" });
       await loadOrders();
-      setPreviewPo((currentPo) => (currentPo?.id === po.id ? { ...currentPo, status: "approve" } : currentPo));
+      // Reload preview state
+      const response = await api.preorders({ status: statusFilter === "all" ? undefined : statusFilter });
+      const updatedPo = response.preorders.map(mapPreorder).find(p => p.id === po.id);
+      if (updatedPo) {
+        setPreviewPo(updatedPo);
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal approve PO.");
+    }
+  };
+
+  const handleUploadProof = async (po: PurchaseOrder, stage: "full" | "dp" | "remaining", file: File) => {
+    try {
+      await api.salesUploadPaymentProof(po.id, stage, file);
+      await Swal.fire({
+        title: "Berhasil",
+        text: "Bukti pembayaran berhasil diupload.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
+      await loadOrders();
+      // Refresh preview modal PO details
+      const response = await api.preorders({ status: statusFilter === "all" ? undefined : statusFilter });
+      const updatedPo = response.preorders.map(mapPreorder).find(p => p.id === po.id);
+      if (updatedPo) {
+        setPreviewPo(updatedPo);
+      }
+    } catch (error) {
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal mengupload bukti pembayaran.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
+    }
+  };
+
+  const handleSendRemainingQuotation = async (po: PurchaseOrder) => {
+    const result = await Swal.fire({
+      title: "Kirim Tagihan Pelunasan?",
+      text: "Apakah Anda yakin ingin mengirimkan tagihan pelunasan (Quotation Pelunasan) ke customer?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Ya, Kirim",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0F766E",
+      cancelButtonColor: "#EF4444",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.salesSendPaymentQuotation(po.id, "remaining");
+        await Swal.fire({
+          title: "Terkirim",
+          text: "Tagihan pelunasan berhasil dikirim ke customer.",
+          icon: "success",
+          confirmButtonColor: "#0F766E",
+        });
+        await loadOrders();
+        const response = await api.preorders({ status: statusFilter === "all" ? undefined : statusFilter });
+        const updatedPo = response.preorders.map(mapPreorder).find(p => p.id === po.id);
+        if (updatedPo) {
+          setPreviewPo(updatedPo);
+        }
+      } catch (error) {
+        await Swal.fire({
+          title: "Gagal",
+          text: error instanceof Error ? error.message : "Gagal mengirim tagihan pelunasan.",
+          icon: "error",
+          confirmButtonColor: "#0F766E",
+        });
+      }
     }
   };
 
@@ -284,6 +395,90 @@ export function SalesOrders() {
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Gagal menyimpan status invalid.");
     }
+  };
+
+  const renderUploadSection = (po: PurchaseOrder) => {
+    const isDpMode = po.paymentMode === "split" || po.paymentMode === "50%";
+
+    if (isDpMode) {
+      if (po.paymentStatus === "unpaid" && po.status === "approve") {
+        return (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-amber-600">
+              * Silakan upload bukti pembayaran DP 50% untuk melanjutkan transaksi.
+            </p>
+            <label className="inline-flex max-w-xs cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100">
+              <Upload className="h-4 w-4" />
+              Upload Bukti DP
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleUploadProof(po, "dp", file);
+                  }
+                }}
+              />
+            </label>
+          </div>
+        );
+      }
+
+      if (po.paymentStatus === "partial" && po.status === "approve") {
+        return (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-sky-600">
+              * Silakan upload bukti pelunasan setelah customer membayar sisa 50%.
+            </p>
+            <label className="inline-flex max-w-xs cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100">
+              <Upload className="h-4 w-4" />
+              Upload Bukti Pelunasan
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleUploadProof(po, "remaining", file);
+                  }
+                }}
+              />
+            </label>
+          </div>
+        );
+      }
+    } else {
+      // Full Payment mode
+      if (po.paymentStatus === "unpaid" && po.status === "approve") {
+        return (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-slate-600">
+              * Silakan upload bukti pembayaran penuh (100%) untuk menyelesaikan transaksi.
+            </p>
+            <label className="inline-flex max-w-xs cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100">
+              <Upload className="h-4 w-4" />
+              Upload Bukti Pembayaran
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleUploadProof(po, "full", file);
+                  }
+                }}
+              />
+            </label>
+          </div>
+        );
+      }
+    }
+
+    return null;
   };
 
   return (
@@ -355,6 +550,7 @@ export function SalesOrders() {
                 <th className="px-4 py-3 font-semibold">Total</th>
                 <th className="px-4 py-3 font-semibold">Komisi</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Mode</th>
                 <th className="px-4 py-3 font-semibold">Payment</th>
                 <th className="px-4 py-3 font-semibold">Tanggal</th>
                 <th className="px-4 py-3 font-semibold">Action</th>
@@ -375,7 +571,16 @@ export function SalesOrders() {
                     <StatusBadge status={po.status} />
                   </td>
                   <td className="px-4 py-3">
-                    <PaymentStatusBadge status={po.paymentStatus} />
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                      (po.paymentMode === "split" || po.paymentMode === "50%")
+                        ? "bg-teal-50 text-[#0F766E] ring-teal-200"
+                        : "bg-slate-100 text-slate-700 ring-slate-200"
+                    }`}>
+                      {(po.paymentMode === "split" || po.paymentMode === "50%") ? "DP 50%" : "Full Payment"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {getCustomPaymentBadge(po)}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{dateFormatter.format(new Date(po.createdAt))}</td>
                   <td className="px-4 py-3">
@@ -460,7 +665,7 @@ export function SalesOrders() {
                 <div className="mt-2 flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 font-semibold">Status:</span>
-                    <PaymentStatusBadge status={previewPo.paymentStatus} />
+                    {getCustomPaymentBadge(previewPo)}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 font-semibold">Skema:</span>
@@ -483,6 +688,11 @@ export function SalesOrders() {
                 </div>
                 {previewPo.midtransOrderId && (
                   <p className="mt-2 text-xs text-slate-500">Midtrans Order ID: {previewPo.midtransOrderId}</p>
+                )}
+                {renderUploadSection(previewPo) && (
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    {renderUploadSection(previewPo)}
+                  </div>
                 )}
               </section>
 
@@ -548,6 +758,18 @@ export function SalesOrders() {
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     Approve
+                  </button>
+                </div>
+              )}
+
+              {previewPo.status === "approve" && (previewPo.paymentMode === "split" || previewPo.paymentMode === "50%") && previewPo.paymentStatus === "partial" && (
+                <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+                  <button
+                    onClick={() => handleSendRemainingQuotation(previewPo)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Kirim Tagihan Pelunasan
                   </button>
                 </div>
               )}
