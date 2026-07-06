@@ -1,6 +1,6 @@
-import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle, Upload } from "lucide-react";
+import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle, Upload, FileText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { api, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
+import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
 import Swal from "sweetalert2";
 
 type PurchaseOrderStatus = "draft" | "in_review" | "approve" | "invalid";
@@ -31,6 +31,10 @@ type PurchaseOrder = {
   paymentUrl?: string;
   paymentToken?: string;
   midtransOrderId?: string;
+  paymentProof?: string;
+  dpProof?: string;
+  remainingProof?: string;
+  lastPaymentStage?: string;
   createdAt: string;
   invalidReason?: string;
 };
@@ -136,6 +140,10 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     paymentUrl: preorder.payment_url ?? undefined,
     paymentToken: preorder.payment_token ?? undefined,
     midtransOrderId: preorder.midtrans_order_id ?? undefined,
+    paymentProof: preorder.payment_proof ?? undefined,
+    dpProof: preorder.dp_proof ?? undefined,
+    remainingProof: preorder.remaining_proof ?? undefined,
+    lastPaymentStage: preorder.last_payment_stage ?? undefined,
     createdAt: preorder.created_at ?? new Date().toISOString(),
     invalidReason: preorder.invalid_reason ?? undefined,
   };
@@ -151,7 +159,7 @@ function StatusBadge({ status }: { status: PurchaseOrderStatus }) {
   const statusMeta = statusMap[status];
 
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className} whitespace-nowrap`}>
       {statusMeta.label}
     </span>
   );
@@ -169,7 +177,7 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const statusMeta = statusMap[status] || statusMap.unpaid;
 
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className} whitespace-nowrap`}>
       {statusMeta.label}
     </span>
   );
@@ -180,21 +188,21 @@ function getCustomPaymentBadge(po: PurchaseOrder) {
   if (isDpMode) {
     if (po.paymentStatus === "unpaid") {
       return (
-        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
           Bukti DP belum di-upload / Belum bayar DP
         </span>
       );
     }
     if (po.paymentStatus === "partial") {
       return (
-        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-sky-50 text-sky-700 ring-sky-200 whitespace-nowrap">
           DP Masuk, Pelunasan belum selesai
         </span>
       );
     }
     if (po.paymentStatus === "paid") {
       return (
-        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200 whitespace-nowrap">
           Lunas
         </span>
       );
@@ -204,13 +212,13 @@ function getCustomPaymentBadge(po: PurchaseOrder) {
   // Fallback / Full Payment mode
   if (po.paymentStatus === "paid") {
     return (
-      <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+      <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200 whitespace-nowrap">
         Lunas
       </span>
     );
   }
   return (
-    <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-slate-100 text-slate-700 ring-slate-200">
+    <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-slate-100 text-slate-700 ring-slate-200 whitespace-nowrap">
       Belum bayar
     </span>
   );
@@ -541,7 +549,7 @@ export function SalesOrders() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[980px] whitespace-nowrap">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
                 <th className="px-4 py-3 font-semibold">PO</th>
@@ -688,6 +696,166 @@ export function SalesOrders() {
                 </div>
                 {previewPo.midtransOrderId && (
                   <p className="mt-2 text-xs text-slate-500">Midtrans Order ID: {previewPo.midtransOrderId}</p>
+                )}
+                {/* Proof of Payment Display */}
+                {(previewPo.dpProof || previewPo.remainingProof || previewPo.paymentProof) && (
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Bukti Pembayaran / Transfer</p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {(previewPo.paymentMode === "split" || previewPo.paymentMode === "50%") ? (
+                        <>
+                          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                            <p className="text-xs font-semibold text-slate-500 mb-2">Bukti Pembayaran DP (50%)</p>
+                            {previewPo.dpProof ? (
+                              <div>
+                                {previewPo.dpProof.toLowerCase().includes(".pdf") ? (
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-8 w-8 text-rose-600 shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-slate-700 truncate">{previewPo.dpProof.split("/").pop()}</p>
+                                      <a
+                                        href={resolveApiAssetUrl(previewPo.dpProof)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-semibold text-[#0F766E] hover:underline"
+                                      >
+                                        Buka PDF
+                                      </a>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <a
+                                      href={resolveApiAssetUrl(previewPo.dpProof)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block overflow-hidden rounded border border-slate-200 hover:opacity-90 max-h-32"
+                                    >
+                                      <img
+                                        src={resolveApiAssetUrl(previewPo.dpProof)}
+                                        alt="Bukti DP"
+                                        className="h-32 w-full object-contain bg-slate-50"
+                                      />
+                                    </a>
+                                    <a
+                                      href={resolveApiAssetUrl(previewPo.dpProof)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-block text-xs font-semibold text-[#0F766E] hover:underline"
+                                    >
+                                      Lihat Detail Gambar
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs italic text-slate-400">Belum di-upload</p>
+                            )}
+                          </div>
+
+                          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                            <p className="text-xs font-semibold text-slate-500 mb-2">Bukti Pembayaran Pelunasan</p>
+                            {previewPo.remainingProof ? (
+                              <div>
+                                {previewPo.remainingProof.toLowerCase().includes(".pdf") ? (
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-8 w-8 text-rose-600 shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-slate-700 truncate">{previewPo.remainingProof.split("/").pop()}</p>
+                                      <a
+                                        href={resolveApiAssetUrl(previewPo.remainingProof)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-semibold text-[#0F766E] hover:underline"
+                                      >
+                                        Buka PDF
+                                      </a>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <a
+                                      href={resolveApiAssetUrl(previewPo.remainingProof)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block overflow-hidden rounded border border-slate-200 hover:opacity-90 max-h-32"
+                                    >
+                                      <img
+                                        src={resolveApiAssetUrl(previewPo.remainingProof)}
+                                        alt="Bukti Pelunasan"
+                                        className="h-32 w-full object-contain bg-slate-50"
+                                      />
+                                    </a>
+                                    <a
+                                      href={resolveApiAssetUrl(previewPo.remainingProof)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-block text-xs font-semibold text-[#0F766E] hover:underline"
+                                    >
+                                      Lihat Detail Gambar
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs italic text-slate-400">Belum di-upload</p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:col-span-2">
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Bukti Pembayaran Penuh (100%)</p>
+                          {previewPo.paymentProof ? (
+                            <div>
+                              {previewPo.paymentProof.toLowerCase().includes(".pdf") ? (
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-8 w-8 text-rose-600 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium text-slate-700 truncate">{previewPo.paymentProof.split("/").pop()}</p>
+                                    <a
+                                      href={resolveApiAssetUrl(previewPo.paymentProof)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-xs font-semibold text-[#0F766E] hover:underline"
+                                    >
+                                      Buka PDF
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <a
+                                    href={resolveApiAssetUrl(previewPo.paymentProof)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block overflow-hidden rounded border border-slate-200 hover:opacity-90 max-h-32 animate-fade-in"
+                                  >
+                                    <img
+                                      src={resolveApiAssetUrl(previewPo.paymentProof)}
+                                      alt="Bukti Pembayaran Penuh"
+                                      className="h-32 w-full object-contain bg-slate-50"
+                                    />
+                                  </a>
+                                  <div>
+                                    <a
+                                      href={resolveApiAssetUrl(previewPo.paymentProof)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-xs font-semibold text-[#0F766E] hover:underline"
+                                    >
+                                      Lihat Detail Gambar
+                                    </a>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs italic text-slate-400">Belum di-upload</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
                 {renderUploadSection(previewPo) && (
                   <div className="mt-4 border-t border-slate-200 pt-4">

@@ -54,6 +54,10 @@ export type PreorderDto = {
   payment_token?: string | null;
   midtrans_order_id?: string | null;
   invalid_reason?: string | null;
+  payment_proof?: string | null;
+  dp_proof?: string | null;
+  remaining_proof?: string | null;
+  last_payment_stage?: string | null;
   created_at?: string;
 };
 
