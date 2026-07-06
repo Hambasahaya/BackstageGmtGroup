@@ -463,6 +463,12 @@ export function AgentPurchaseOrder() {
       return false;
     }
 
+    const phone = customerPhone.trim();
+    if (!phone.startsWith("+62") && !phone.startsWith("08")) {
+      setFormError("Nomor HP customer harus diawali dengan +62 atau 08.");
+      return false;
+    }
+
     if (!items.length) {
       setFormError("Minimal harus ada satu product dalam PO.");
       return false;
