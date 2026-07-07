@@ -893,7 +893,7 @@ export function AgentPurchaseOrder() {
                       </div>
 
                       {item.selected && (
-                        <div className="mt-3 pt-2 border-t border-black flex items-center justify-between text-xs">
+                        <div className="mt-3 pt-2 border-t border-slate-200 -mx-3 px-3 flex items-center justify-between text-xs">
                           <span className="font-bold text-slate-700">Komisi</span>
                           <span className="font-bold text-[#0F766E]">
                             {currencyFormatter.format(calculated.commission)}
@@ -1181,21 +1181,21 @@ export function AgentPurchaseOrder() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-[1fr_200px]">
-              <div className="flex flex-col justify-center order-2 sm:order-1">
-                <h3 className="text-lg font-bold text-slate-950 leading-tight">{previewProduct.name}</h3>
+            <div className="grid grid-cols-[1fr_100px] gap-4 p-4 sm:grid-cols-[1fr_200px]">
+              <div className="flex flex-col justify-center">
+                <h3 className="text-base font-bold text-slate-950 leading-tight sm:text-lg">{previewProduct.name}</h3>
                 <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {previewProduct.unit}
                 </p>
               </div>
-              <div className="flex aspect-square w-full max-w-[200px] sm:max-w-none mx-auto items-center justify-center rounded-lg bg-slate-50 p-4 border border-slate-100 order-1 sm:order-2">
+              <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-slate-50 p-2 sm:p-4 border border-slate-100">
                 <img
                   src={previewProduct.photo}
                   alt={previewProduct.name}
                   className="max-h-full max-w-full object-contain"
                 />
               </div>
-              <div className="col-span-1 sm:col-span-2 border-t border-slate-100 -mx-4 px-4 pt-4 mt-2 order-3">
+              <div className="col-span-2 border-t border-slate-100 -mx-4 px-4 pt-4 mt-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Deskripsi Produk</p>
                 <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line">
                   {previewProduct.description || "-"}
