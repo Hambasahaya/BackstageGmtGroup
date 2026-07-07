@@ -31,6 +31,69 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
 });
 
+export function renderFormattedDescription(text: string | null | undefined) {
+  if (!text) return <p className="text-slate-400 italic">Tidak ada deskripsi.</p>;
+
+  const lines = text.split("\n");
+  const parsedElements: React.ReactNode[] = [];
+  let currentList: React.ReactNode[] = [];
+  let keyCounter = 0;
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      parsedElements.push(
+        <ul key={`list-${keyCounter++}`} className="list-disc pl-5 my-1.5 space-y-1 text-slate-700">
+          {currentList}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check if line starts with a list bullet
+    const isBullet = trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•");
+    const numberedMatch = trimmed.match(/^(\d+)\.\s(.*)/);
+
+    if (isBullet) {
+      const content = trimmed.substring(1).trim();
+      currentList.push(
+        <li key={`li-${keyCounter++}`} className="text-inherit leading-relaxed">
+          {content}
+        </li>
+      );
+    } else if (numberedMatch) {
+      flushList();
+      const content = numberedMatch[2].trim();
+      parsedElements.push(
+        <div key={`ol-${keyCounter++}`} className="pl-5 my-1 flex items-start gap-1 text-slate-700 leading-relaxed">
+          <span className="font-semibold shrink-0">{numberedMatch[1]}.</span>
+          <span>{content}</span>
+        </div>
+      );
+    } else if (trimmed === "") {
+      flushList();
+      if (parsedElements.length > 0 && parsedElements[parsedElements.length - 1] !== null) {
+        parsedElements.push(<div key={`space-${keyCounter++}`} className="h-2" />);
+      }
+    } else {
+      flushList();
+      parsedElements.push(
+        <p key={`p-${keyCounter++}`} className="leading-relaxed mb-1 last:mb-0 text-slate-700">
+          {line}
+        </p>
+      );
+    }
+  }
+
+  flushList();
+
+  return <div className="space-y-1">{parsedElements}</div>;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const normalized = (status || "").toLowerCase();
   if (normalized === "tersedia") {
@@ -798,12 +861,15 @@ export function ProductManagement() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Deskripsi Produk
                 </span>
+                <span className="block text-[11px] text-slate-400 normal-case font-normal mt-0.5">
+                  Mendukung paragraf baru (Enter) dan daftar poin (awali baris dengan - atau *)
+                </span>
                 <textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Berikan deskripsi detail tentang produk..."
-                  className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                  rows={5}
+                  placeholder="Berikan deskripsi detail tentang produk...&#10;Contoh:&#10;Paket lighting event indoor.&#10;&#10;Fitur utama:&#10;- Fixture lighting 8 unit&#10;- Controller DMX"
+                  className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                 />
               </label>
             </div>
@@ -964,8 +1030,8 @@ export function ProductManagement() {
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                     Deskripsi Produk
                   </h3>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-sm leading-6 text-slate-700 whitespace-pre-line">
-                    {selectedProduct.deskripsi}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-sm leading-6 text-slate-700">
+                    {renderFormattedDescription(selectedProduct.deskripsi)}
                   </div>
                 </div>
               )}

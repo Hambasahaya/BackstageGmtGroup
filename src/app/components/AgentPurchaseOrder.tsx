@@ -149,6 +149,69 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
 });
 
+export function renderFormattedDescription(text: string | null | undefined) {
+  if (!text) return <p className="text-slate-400 italic">Tidak ada deskripsi.</p>;
+
+  const lines = text.split("\n");
+  const parsedElements: React.ReactNode[] = [];
+  let currentList: React.ReactNode[] = [];
+  let keyCounter = 0;
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      parsedElements.push(
+        <ul key={`list-${keyCounter++}`} className="list-disc pl-5 my-1.5 space-y-1 text-slate-700">
+          {currentList}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check if line starts with a list bullet
+    const isBullet = trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•");
+    const numberedMatch = trimmed.match(/^(\d+)\.\s(.*)/);
+
+    if (isBullet) {
+      const content = trimmed.substring(1).trim();
+      currentList.push(
+        <li key={`li-${keyCounter++}`} className="text-inherit leading-relaxed text-xs">
+          {content}
+        </li>
+      );
+    } else if (numberedMatch) {
+      flushList();
+      const content = numberedMatch[2].trim();
+      parsedElements.push(
+        <div key={`ol-${keyCounter++}`} className="pl-5 my-1 flex items-start gap-1 text-slate-700 leading-relaxed text-xs">
+          <span className="font-semibold shrink-0">{numberedMatch[1]}.</span>
+          <span>{content}</span>
+        </div>
+      );
+    } else if (trimmed === "") {
+      flushList();
+      if (parsedElements.length > 0 && parsedElements[parsedElements.length - 1] !== null) {
+        parsedElements.push(<div key={`space-${keyCounter++}`} className="h-1.5" />);
+      }
+    } else {
+      flushList();
+      parsedElements.push(
+        <p key={`p-${keyCounter++}`} className="leading-relaxed mb-0.5 last:mb-0 text-slate-700 text-xs">
+          {line}
+        </p>
+      );
+    }
+  }
+
+  flushList();
+
+  return <div className="space-y-0.5">{parsedElements}</div>;
+}
+
 const newItem = (): PurchaseOrderItem => ({
   id: `item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   productId: defaultProducts[0].id,
@@ -966,11 +1029,9 @@ export function AgentPurchaseOrder() {
                             </div>
                           </td>
                           <td className="border border-slate-200 px-2 py-3">
-                            <textarea
-                              value={calculated.product.description}
-                              readOnly
-                              className="min-h-20 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-600 outline-none sm:text-sm"
-                            />
+                            <div className="min-h-20 max-h-32 w-full overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
+                              {renderFormattedDescription(calculated.product.description)}
+                            </div>
                           </td>
                           <td className="border border-slate-200 px-2 py-3">
                             <div className="mx-auto flex aspect-square w-full max-w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1.5">
@@ -1197,9 +1258,9 @@ export function AgentPurchaseOrder() {
               </div>
               <div className="col-span-2 border-t border-slate-100 -mx-4 px-4 pt-4 mt-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Deskripsi Produk</p>
-                <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line">
-                  {previewProduct.description || "-"}
-                </p>
+                <div className="mt-2 text-sm leading-relaxed text-slate-700">
+                  {renderFormattedDescription(previewProduct.description)}
+                </div>
               </div>
             </div>
           </div>
