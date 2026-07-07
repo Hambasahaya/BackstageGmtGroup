@@ -800,8 +800,8 @@ export function AgentPurchaseOrder() {
                         </label>
                       </div>
 
-                      <div className="grid grid-cols-[140px_1fr] gap-4">
-                        <div className="relative flex h-40 w-full items-center justify-center bg-slate-50 p-3">
+                      <div className="grid grid-cols-[100px_1fr] gap-3">
+                        <div className="relative flex h-28 w-full items-center justify-center bg-slate-50 p-2 rounded-md">
                           <img
                             src={calculated.product.photo}
                             alt={calculated.product.name}
@@ -810,14 +810,14 @@ export function AgentPurchaseOrder() {
                           <button
                             type="button"
                             onClick={() => setPreviewProduct(calculated.product)}
-                            className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-white"
+                            className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-white"
                             aria-label={`Lihat detail ${calculated.product.name}`}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-3.5 w-3.5" />
                           </button>
                         </div>
 
-                        <div className="min-w-0 py-1 pr-1">
+                        <div className="min-w-0 py-1 pr-1 flex flex-col justify-between">
                           <div className="flex items-start gap-2">
                             <div className="min-w-0 flex-1">
                               <p className="line-clamp-2 text-sm font-semibold leading-tight text-slate-950">{calculated.product.name}</p>
@@ -836,57 +836,58 @@ export function AgentPurchaseOrder() {
                             </button>
                           </div>
 
-                        <div className="mt-5 flex justify-end">
-                          <div className="grid grid-cols-[36px_28px_36px] items-center">
-                            <button
-                              type="button"
-                              onClick={() => updateItem(item.id, { qty: item.qty - 1 })}
-                              disabled={item.qty <= 1}
-                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
-                              aria-label="Kurangi qty"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            <span className="text-center text-sm font-semibold text-slate-950">{item.qty}</span>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(item.id, { qty: item.qty + 1 })}
-                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700"
-                              aria-label="Tambah qty"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 grid grid-cols-[auto_1fr] items-end gap-2">
-                          <select
-                            value={item.discountPercent}
-                            onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
-                            className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                          >
-                            {(calculated.product.commissionTiers
-                              ? Object.keys(calculated.product.commissionTiers)
-                                  .map((k) => parseInt(k.replace("%", ""), 10))
-                                  .sort((a, b) => a - b)
-                              : discountOptions
-                            ).map((discount) => (
-                              <option key={discount} value={discount}>
-                                Disc {discount}%
-                              </option>
-                            ))}
-                          </select>
-                          <div className="min-w-0 text-right">
-                            <p className="truncate text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
+                          <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+                            <span className="text-sm font-bold text-slate-950 whitespace-nowrap">
+                              {currencyFormatter.format(calculated.total)}
+                            </span>
                             {item.discountPercent > 0 && (
-                              <p className="truncate text-xs text-slate-400 line-through">
+                              <span className="text-xs text-slate-400 line-through whitespace-nowrap">
                                 {currencyFormatter.format(calculated.subtotal)}
-                              </p>
+                              </span>
                             )}
                           </div>
-                        </div>
 
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                            <select
+                              value={item.discountPercent}
+                              onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
+                              className="w-[90px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                            >
+                              {(calculated.product.commissionTiers
+                                ? Object.keys(calculated.product.commissionTiers)
+                                    .map((k) => parseInt(k.replace("%", ""), 10))
+                                    .sort((a, b) => a - b)
+                                : discountOptions
+                              ).map((discount) => (
+                                <option key={discount} value={discount}>
+                                  Disc {discount}%
+                                </option>
+                              ))}
+                            </select>
+
+                            <div className="flex items-center border border-slate-200 rounded-md overflow-hidden bg-white">
+                              <button
+                                type="button"
+                                onClick={() => updateItem(item.id, { qty: item.qty - 1 })}
+                                disabled={item.qty <= 1}
+                                className="inline-flex h-8 w-8 items-center justify-center bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                aria-label="Kurangi qty"
+                              >
+                                <Minus className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="w-8 text-center text-xs font-semibold text-slate-950">{item.qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateItem(item.id, { qty: item.qty + 1 })}
+                                className="inline-flex h-8 w-8 items-center justify-center bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                aria-label="Tambah qty"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                             <ItemStatusBadge status="ready" />
                             {item.selected && (
                               <span className="font-semibold text-[#0F766E]">
@@ -1107,7 +1108,7 @@ export function AgentPurchaseOrder() {
                   <>
                     <div className="min-w-0 md:hidden">
                       <p className="text-xs font-medium text-slate-500">Total price</p>
-                      <p className="truncate text-base font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.total)}</p>
+                      <p className="whitespace-nowrap text-base font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.total)}</p>
                     </div>
                     <button
                       type="button"
