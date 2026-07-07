@@ -460,7 +460,7 @@ export function ProductManagement() {
                 return (
                   <div
                     key={product.id}
-                    className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+                    className="group flex flex-col h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     {/* Card Header Image */}
                     <div className="relative aspect-[4/3] w-full bg-slate-100">
