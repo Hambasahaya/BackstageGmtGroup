@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Eye,
   FileDown,
   FileText,
@@ -686,22 +687,25 @@ export function AgentPurchaseOrder() {
       </section>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4">
-          <div className="my-4 w-full max-w-[96vw] rounded-lg bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 md:flex md:items-start md:justify-center md:bg-slate-950/50 md:p-4">
+          <div className="min-h-screen w-full bg-slate-50 md:my-4 md:min-h-0 md:max-w-[96vw] md:rounded-lg md:bg-white md:shadow-xl">
+            <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-4 md:static md:p-5">
+              <button onClick={closeModal} className="mt-0.5 rounded-md p-1 text-slate-700 hover:bg-slate-100 md:hidden" aria-label="Kembali">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">
                   {editingPoId ? "Edit Purchase Order" : "Buat Purchase Order"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">Tambahkan satu atau beberapa product dalam satu PO.</p>
               </div>
-              <button onClick={closeModal} className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+              <button onClick={closeModal} className="hidden rounded-md p-1 text-slate-500 hover:bg-slate-100 md:block">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="space-y-5 p-5">
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="space-y-4 p-4 pb-36 md:space-y-5 md:bg-white md:p-5">
+              <div className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:border-0 md:p-0 md:shadow-none lg:grid-cols-2">
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Nama customer</span>
                   <input
@@ -746,25 +750,29 @@ export function AgentPurchaseOrder() {
                   const calculated = calculateItem(products, item);
 
                   return (
-                    <div key={item.id} className="overflow-hidden rounded-lg border border-slate-300 bg-white">
-                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">No {index + 1}</p>
+                    <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product {index + 1}</p>
                         <button
                           type="button"
                           title="Hapus item"
                           onClick={() => removeItem(item.id)}
                           disabled={items.length === 1}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-[92px_1fr] text-sm">
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Item
+                      <div className="flex gap-3">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2">
+                          <img
+                            src={calculated.product.photo}
+                            alt={calculated.product.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
                         </div>
-                        <div className="border-b border-slate-200 px-3 py-3">
+                        <div className="min-w-0 flex-1 space-y-3">
                           <select
                             value={item.productId}
                             onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
@@ -776,37 +784,19 @@ export function AgentPurchaseOrder() {
                               </option>
                             ))}
                           </select>
-                          <p className="mt-2 text-xs text-slate-500">{calculated.product.unit}</p>
-                        </div>
-
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Description
-                        </div>
-                        <div className="border-b border-slate-200 px-3 py-3">
-                          <textarea
-                            value={calculated.product.description}
-                            readOnly
-                            className="min-h-20 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 outline-none"
-                          />
-                        </div>
-
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Foto
-                        </div>
-                        <div className="border-b border-slate-200 px-3 py-3">
-                          <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2">
-                            <img
-                              src={calculated.product.photo}
-                              alt={calculated.product.name}
-                              className="max-h-full max-w-full object-contain"
-                            />
+                          <p className="line-clamp-2 text-xs text-slate-500">{calculated.product.description}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <ItemStatusBadge status="ready" />
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                              {calculated.product.unit}
+                            </span>
                           </div>
                         </div>
+                      </div>
 
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Qty
-                        </div>
-                        <div className="border-b border-slate-200 px-3 py-3">
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <label className="block">
+                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Qty</span>
                           <input
                             value={item.qty}
                             type="number"
@@ -814,26 +804,9 @@ export function AgentPurchaseOrder() {
                             onChange={(event) => updateItem(item.id, { qty: Number(event.target.value) })}
                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                           />
-                        </div>
-
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Status
-                        </div>
-                        <div className="border-b border-slate-200 px-3 py-3">
-                          <ItemStatusBadge status="ready" />
-                        </div>
-
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Unit Price
-                        </div>
-                        <div className="border-b border-slate-200 px-3 py-3 font-semibold text-slate-900">
-                          {currencyFormatter.format(calculated.product.price)}
-                        </div>
-
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Disc
-                        </div>
-                        <div className="border-b border-slate-200 px-3 py-3">
+                        </label>
+                        <label className="block">
+                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Diskon</span>
                           <select
                             value={item.discountPercent}
                             onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
@@ -850,23 +823,25 @@ export function AgentPurchaseOrder() {
                               </option>
                             ))}
                           </select>
-                          <p className="mt-2 text-xs font-medium text-slate-500">
-                            {currencyFormatter.format(calculated.discountTotal)}
-                          </p>
-                        </div>
+                        </label>
+                      </div>
 
-                        <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Total Price
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3">
+                        <div>
+                          <p className="text-xs text-slate-500">Unit price</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{currencyFormatter.format(calculated.product.price)}</p>
                         </div>
-                        <div className="border-b border-slate-200 px-3 py-3 font-bold text-slate-950">
-                          {currencyFormatter.format(calculated.total)}
+                        <div>
+                          <p className="text-xs text-slate-500">Diskon</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{currencyFormatter.format(calculated.discountTotal)}</p>
                         </div>
-
-                        <div className="border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Komisi
+                        <div>
+                          <p className="text-xs text-slate-500">Total price</p>
+                          <p className="mt-1 text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
                         </div>
-                        <div className="px-3 py-3 font-bold text-[#0F766E]">
-                          {currencyFormatter.format(calculated.commission)}
+                        <div>
+                          <p className="text-xs text-slate-500">Komisi</p>
+                          <p className="mt-1 text-sm font-bold text-[#0F766E]">{currencyFormatter.format(calculated.commission)}</p>
                         </div>
                       </div>
                     </div>
@@ -1037,7 +1012,7 @@ export function AgentPurchaseOrder() {
                 />
               </label>
 
-              <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4 md:bg-slate-50 md:shadow-none">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</p>
                   <p className="mt-1 text-base font-bold text-slate-950">{currencyFormatter.format(orderSummary.subtotal)}</p>
@@ -1067,12 +1042,16 @@ export function AgentPurchaseOrder() {
                 </div>
               )}
 
-              <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+              <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:static md:flex md:flex-row md:justify-end md:border-t md:p-0 md:pt-5 md:shadow-none">
+                <div className="min-w-0 md:hidden">
+                  <p className="text-xs font-medium text-slate-500">Total price</p>
+                  <p className="truncate text-base font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.total)}</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => persistPurchaseOrder("draft")}
                   disabled={isPersistingPo}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:px-4"
                 >
                   <FileText className="h-4 w-4" />
                   {isPersistingPo ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
@@ -1081,7 +1060,7 @@ export function AgentPurchaseOrder() {
                   type="button"
                   onClick={() => persistPurchaseOrder("in_review")}
                   disabled={isPersistingPo}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#115E59] md:px-4"
                 >
                   <Send className="h-4 w-4" />
                   {isPersistingPo ? "Mengirim..." : "Send PO"}
@@ -1089,7 +1068,7 @@ export function AgentPurchaseOrder() {
                 <button
                   type="button"
                   onClick={handlePrintPdf}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="hidden items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:inline-flex"
                 >
                   <FileDown className="h-4 w-4" />
                   Cetak PDF
