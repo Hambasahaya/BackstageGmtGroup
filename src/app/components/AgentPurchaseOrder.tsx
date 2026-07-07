@@ -859,15 +859,7 @@ export function AgentPurchaseOrder() {
                           </div>
                         </div>
 
-                        <div className="mt-2 grid grid-cols-[1fr_auto] items-end gap-2">
-                          <div className="min-w-0 text-right">
-                            <p className="truncate text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
-                            {item.discountPercent > 0 && (
-                              <p className="truncate text-xs text-slate-400 line-through">
-                                {currencyFormatter.format(calculated.subtotal)}
-                              </p>
-                            )}
-                          </div>
+                        <div className="mt-2 grid grid-cols-[auto_1fr] items-end gap-2">
                           <select
                             value={item.discountPercent}
                             onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
@@ -884,6 +876,14 @@ export function AgentPurchaseOrder() {
                               </option>
                             ))}
                           </select>
+                          <div className="min-w-0 text-right">
+                            <p className="truncate text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
+                            {item.discountPercent > 0 && (
+                              <p className="truncate text-xs text-slate-400 line-through">
+                                {currencyFormatter.format(calculated.subtotal)}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
