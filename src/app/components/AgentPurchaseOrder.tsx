@@ -836,7 +836,7 @@ export function AgentPurchaseOrder() {
                             </button>
                           </div>
 
-                        <div className="mt-5 flex items-end justify-between gap-3">
+                        <div className="mt-5 flex justify-end">
                           <div className="grid grid-cols-[36px_28px_36px] items-center">
                             <button
                               type="button"
@@ -857,33 +857,33 @@ export function AgentPurchaseOrder() {
                               <Plus className="h-4 w-4" />
                             </button>
                           </div>
+                        </div>
 
+                        <div className="mt-2 grid grid-cols-[1fr_auto] items-end gap-2">
                           <div className="min-w-0 text-right">
-                            <p className="text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
+                            <p className="truncate text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
                             {item.discountPercent > 0 && (
-                              <p className="text-xs text-slate-400 line-through">
+                              <p className="truncate text-xs text-slate-400 line-through">
                                 {currencyFormatter.format(calculated.subtotal)}
                               </p>
                             )}
-                            <div className="mt-2 flex items-center gap-2">
-                              <select
-                                value={item.discountPercent}
-                                onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
-                                className="max-w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                              >
-                                {(calculated.product.commissionTiers
-                                  ? Object.keys(calculated.product.commissionTiers)
-                                      .map((k) => parseInt(k.replace("%", ""), 10))
-                                      .sort((a, b) => a - b)
-                                  : discountOptions
-                                ).map((discount) => (
-                                  <option key={discount} value={discount}>
-                                    Disc {discount}%
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
                           </div>
+                          <select
+                            value={item.discountPercent}
+                            onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
+                            className="w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                          >
+                            {(calculated.product.commissionTiers
+                              ? Object.keys(calculated.product.commissionTiers)
+                                  .map((k) => parseInt(k.replace("%", ""), 10))
+                                  .sort((a, b) => a - b)
+                              : discountOptions
+                            ).map((discount) => (
+                              <option key={discount} value={discount}>
+                                Disc {discount}%
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
