@@ -1,3 +1,64 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* AVL Stage Light Custom Animations */
+@keyframes avl-glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(15, 118, 110, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(15, 118, 110, 0.7));
+  }
+}
+
+.avl-lamp-glow {
+  animation: avl-glow-pulse 3.5s infinite ease-in-out;
+}
+
+@keyframes avl-rgb-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px rgba(15, 118, 110, 0.7)); /* Teal */
+  }
+  33% {
+    filter: drop-shadow(0 0 10px rgba(219, 39, 119, 0.7)); /* Pink/Magenta */
+  }
+  66% {
+    filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.7)); /* Blue */
+  }
+}
+
+.avl-lamp-rgb-hover:hover {
+  animation: avl-rgb-glow 4.5s infinite linear;
+  transition: filter 0.3s ease;
+}
+
+.avl-spotlight-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.avl-spotlight-container::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 30%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  transition: all 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.avl-spotlight-container:hover::after {
+  left: 130%;
+  opacity: 1;
+}
+

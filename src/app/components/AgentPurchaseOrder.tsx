@@ -864,11 +864,11 @@ export function AgentPurchaseOrder() {
                       </div>
 
                       <div className="grid grid-cols-[100px_1fr] gap-3">
-                        <div className="relative flex h-28 w-full items-center justify-center bg-slate-50 p-2 rounded-md">
+                        <div className="relative flex h-28 w-full items-center justify-center bg-slate-50 p-2 rounded-md avl-spotlight-container">
                           <img
                             src={calculated.product.photo}
                             alt={calculated.product.name}
-                            className="max-h-full max-w-full object-contain"
+                            className="max-h-full max-w-full object-contain avl-lamp-glow avl-lamp-rgb-hover"
                           />
                           <button
                             type="button"
@@ -1034,11 +1034,11 @@ export function AgentPurchaseOrder() {
                             </div>
                           </td>
                           <td className="border border-slate-200 px-2 py-3">
-                            <div className="mx-auto flex aspect-square w-full max-w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1.5">
+                            <div className="mx-auto flex aspect-square w-full max-w-16 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-1.5 avl-spotlight-container">
                               <img
                                 src={calculated.product.photo}
                                 alt={calculated.product.name}
-                                className="max-h-full max-w-full object-contain"
+                                className="max-h-full max-w-full object-contain avl-lamp-glow avl-lamp-rgb-hover"
                               />
                             </div>
                           </td>
@@ -1249,11 +1249,11 @@ export function AgentPurchaseOrder() {
                   {previewProduct.unit}
                 </p>
               </div>
-              <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-slate-50 p-2 sm:p-4 border border-slate-100">
+              <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-slate-50 p-2 sm:p-4 border border-slate-100 avl-spotlight-container">
                 <img
                   src={previewProduct.photo}
                   alt={previewProduct.name}
-                  className="max-h-full max-w-full object-contain"
+                  className="max-h-full max-w-full object-contain avl-lamp-glow avl-lamp-rgb-hover"
                 />
               </div>
               <div className="col-span-2 border-t border-slate-100 -mx-4 px-4 pt-4 mt-2">

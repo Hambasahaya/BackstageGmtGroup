@@ -526,12 +526,12 @@ export function ProductManagement() {
                     className="group flex flex-col h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     {/* Card Header Image */}
-                    <div className="relative w-full h-48 bg-slate-100 overflow-hidden">
+                    <div className="relative w-full h-48 bg-slate-100 overflow-hidden avl-spotlight-container">
                       {product.foto && !failedImageIds[product.id] ? (
                         <img
                           src={resolveApiAssetUrl(product.foto)}
                           alt={product.namaproduct}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105 avl-lamp-glow avl-lamp-rgb-hover"
                           onError={() => {
                             setFailedImageIds((prev) => ({ ...prev, [product.id]: true }));
                           }}
@@ -931,12 +931,12 @@ export function ProductManagement() {
             <div className="p-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* Photo Column */}
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center aspect-[4/3] relative">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center aspect-[4/3] relative avl-spotlight-container">
                   {selectedProduct.foto && !failedImageIds[selectedProduct.id] ? (
                     <img
                       src={resolveApiAssetUrl(selectedProduct.foto)}
                       alt={selectedProduct.namaproduct}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover avl-lamp-glow avl-lamp-rgb-hover"
                       onError={() => {
                         setFailedImageIds((prev) => ({ ...prev, [selectedProduct.id]: true }));
                       }}
