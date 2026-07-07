@@ -334,6 +334,7 @@ export function AgentPurchaseOrder() {
   const [downloadingQuotationId, setDownloadingQuotationId] = useState<number | null>(null);
   const [editingPoId, setEditingPoId] = useState<number | null>(null);
   const [previewPo, setPreviewPo] = useState<PurchaseOrder | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPersistingPo, setIsPersistingPo] = useState(false);
@@ -755,45 +756,55 @@ export function AgentPurchaseOrder() {
                   const calculated = calculateItem(products, item);
 
                   return (
-                    <div key={item.id} className="grid grid-cols-[124px_1fr] gap-3 bg-white py-2">
-                      <div className="flex h-32 w-full items-center justify-center bg-slate-50 p-3">
-                        <img
-                          src={calculated.product.photo}
-                          alt={calculated.product.name}
-                          className="max-h-full max-w-full object-contain"
-                        />
-                      </div>
+                    <div key={item.id} className="bg-white py-2">
+                      <select
+                        value={item.productId}
+                        onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
+                        className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                        aria-label={`Pilih product ${index + 1}`}
+                      >
+                        {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}
+                          </option>
+                        ))}
+                      </select>
 
-                      <div className="min-w-0 py-1 pr-1">
-                        <div className="flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <select
-                              value={item.productId}
-                              onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
-                              className="w-full appearance-none bg-transparent text-sm font-semibold leading-tight text-slate-950 outline-none"
-                              aria-label={`Product ${index + 1}`}
-                            >
-                              {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                  {product.name}
-                                </option>
-                              ))}
-                            </select>
-                            <p className="mt-1 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              {calculated.product.unit}
-                            </p>
-                            <p className="mt-1 line-clamp-1 text-xs text-slate-400">{calculated.product.description}</p>
-                          </div>
+                      <div className="grid grid-cols-[124px_1fr] gap-3">
+                        <div className="relative flex h-32 w-full items-center justify-center bg-slate-50 p-3">
+                          <img
+                            src={calculated.product.photo}
+                            alt={calculated.product.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
                           <button
                             type="button"
-                            title="Hapus item"
-                            onClick={() => removeItem(item.id)}
-                            disabled={items.length === 1}
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-slate-400 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-200"
+                            onClick={() => setPreviewProduct(calculated.product)}
+                            className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-white"
+                            aria-label={`Lihat detail ${calculated.product.name}`}
                           >
-                            <X className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </button>
                         </div>
+
+                        <div className="min-w-0 py-1 pr-1">
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="line-clamp-2 text-sm font-semibold leading-tight text-slate-950">{calculated.product.name}</p>
+                              <p className="mt-1 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                {calculated.product.unit}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              title="Hapus item"
+                              onClick={() => removeItem(item.id)}
+                              disabled={items.length === 1}
+                              className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-slate-400 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-200"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
 
                         <div className="mt-5 flex items-end justify-between gap-3">
                           <div className="min-w-0">
@@ -845,11 +856,12 @@ export function AgentPurchaseOrder() {
                           </div>
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                          <ItemStatusBadge status="ready" />
-                          <span className="font-semibold text-[#0F766E]">
-                            Komisi {currencyFormatter.format(calculated.commission)}
-                          </span>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                            <ItemStatusBadge status="ready" />
+                            <span className="font-semibold text-[#0F766E]">
+                              Komisi {currencyFormatter.format(calculated.commission)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1081,6 +1093,40 @@ export function AgentPurchaseOrder() {
                   <FileDown className="h-4 w-4" />
                   Cetak PDF
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-semibold text-slate-950">{previewProduct.name}</h3>
+                <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{previewProduct.unit}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewProduct(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+                aria-label="Tutup detail product"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-4">
+              <div className="flex h-64 items-center justify-center rounded-lg bg-slate-50 p-4">
+                <img
+                  src={previewProduct.photo}
+                  alt={previewProduct.name}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Deskripsi product</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{previewProduct.description || "-"}</p>
               </div>
             </div>
           </div>
