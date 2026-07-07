@@ -766,14 +766,14 @@ export function AgentPurchaseOrder() {
                 </label>
               </div>
 
-              <div className={`${mobilePoStep === "cart" ? "space-y-2 bg-white" : "hidden"} md:hidden`}>
+              <div className={`${mobilePoStep === "cart" ? "space-y-4" : "hidden"} md:hidden`}>
                 {items.map((item, index) => {
                   const calculated = calculateItem(products, item);
 
                   return (
                     <div
                       key={item.id}
-                      className={`rounded-lg bg-white p-3 ${item.selected ? "ring-1 ring-inset ring-teal-100" : ""}`}
+                      className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm ${item.selected ? "ring-1 ring-inset ring-teal-100 border-teal-200" : ""}`}
                     >
                       <div className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2">
                         <select
@@ -810,10 +810,10 @@ export function AgentPurchaseOrder() {
                           <button
                             type="button"
                             onClick={() => setPreviewProduct(calculated.product)}
-                            className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-white"
+                            className="absolute right-1 bottom-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-200/50"
                             aria-label={`Lihat detail ${calculated.product.name}`}
                           >
-                            <Eye className="h-3.5 w-3.5" />
+                            <Eye className="h-4 w-4" />
                           </button>
                         </div>
 
@@ -889,16 +889,17 @@ export function AgentPurchaseOrder() {
                               )}
                             </div>
                           </div>
-
-                          {item.selected && (
-                            <div className="mt-3 pt-2 border-t border-black text-right text-xs">
-                              <span className="font-semibold text-[#0F766E]">
-                                Komisi {currencyFormatter.format(calculated.commission)}
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
+
+                      {item.selected && (
+                        <div className="mt-3 pt-2 border-t border-black flex items-center justify-between text-xs">
+                          <span className="font-semibold text-slate-500">Komisi</span>
+                          <span className="font-bold text-[#0F766E]">
+                            {currencyFormatter.format(calculated.commission)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1168,12 +1169,9 @@ export function AgentPurchaseOrder() {
 
       {previewProduct && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
+          <div className="w-full max-w-xl overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-              <div className="min-w-0">
-                <h3 className="truncate text-base font-semibold text-slate-950">{previewProduct.name}</h3>
-                <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{previewProduct.unit}</p>
-              </div>
+              <span className="text-sm font-bold text-slate-900">Detail Produk</span>
               <button
                 type="button"
                 onClick={() => setPreviewProduct(null)}
@@ -1183,17 +1181,25 @@ export function AgentPurchaseOrder() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="space-y-4 p-4">
-              <div className="flex h-64 items-center justify-center rounded-lg bg-slate-50 p-4">
+            <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-[200px_1fr]">
+              <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-slate-50 p-4 border border-slate-100">
                 <img
                   src={previewProduct.photo}
                   alt={previewProduct.name}
                   className="max-h-full max-w-full object-contain"
                 />
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Deskripsi product</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{previewProduct.description || "-"}</p>
+              <div className="flex flex-col">
+                <h3 className="text-lg font-bold text-slate-950 leading-tight">{previewProduct.name}</h3>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {previewProduct.unit}
+                </p>
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Deskripsi Produk</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+                    {previewProduct.description || "-"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
