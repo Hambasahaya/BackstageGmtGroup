@@ -55,6 +55,8 @@ const verificationInitial: VerificationForm = {
   domicile: "",
 };
 
+const TERMS_PDF_URL = "/nda/NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE.pdf";
+
 function TextField({
   label,
   value,
@@ -245,6 +247,42 @@ export function ApplyAgent() {
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [regions, setRegions] = useState<{ id: string; regency: string }[]>([]);
+
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsReadCompleted, setTermsReadCompleted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsTimeLeft, setTermsTimeLeft] = useState(30);
+  const [termsScrolledBottom, setTermsScrolledBottom] = useState(false);
+
+  useEffect(() => {
+    let timer: number;
+    if (showTermsModal) {
+      setTermsTimeLeft(30);
+      setTermsScrolledBottom(false);
+      timer = window.setInterval(() => {
+        setTermsTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [showTermsModal]);
+
+  const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 15;
+    if (isAtBottom) {
+      setTermsScrolledBottom(true);
+    }
+  };
 
   useEffect(() => {
     fetch("https://raw.githubusercontent.com/Caknoooo/provinces-cities-indonesia/master/json/regencies.json")
@@ -512,8 +550,36 @@ export function ApplyAgent() {
 
             <TextField label="Produk apa yang anda targetkan?" value={applyForm.target_product} onChange={(value) => setApplyForm((current) => ({ ...current, target_product: value }))} placeholder="Contoh: lighting, sound system, event equipment" />
 
+            <div className="border-t border-slate-200 pt-5">
+              <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-4 transition-colors hover:bg-slate-100/80">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    if (!termsReadCompleted) {
+                      e.preventDefault();
+                      setShowTermsModal(true);
+                    } else {
+                      setTermsAccepted(e.target.checked);
+                    }
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E] cursor-pointer"
+                />
+                <span className="text-sm text-slate-700 select-none">
+                  I have read and agree to the{" "}
+                  <button
+                    type="button"
+                    onClick={() => setShowTermsModal(true)}
+                    className="text-[#0F766E] font-semibold underline hover:text-[#115E59]"
+                  >
+                    Terms of Use
+                  </button>
+                </span>
+              </label>
+            </div>
+
             <div className="flex justify-end border-t border-slate-200 pt-5">
-              <button type="submit" disabled={isSubmitting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
+              <button type="submit" disabled={isSubmitting || !termsAccepted} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
                 <Send className="h-4 w-4" />
                 {isSubmitting ? "Mengirim..." : "Kirim pengajuan"}
               </button>
@@ -544,6 +610,122 @@ export function ApplyAgent() {
             }}
           />
         </Suspense>
+      )}
+
+      {showTermsModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden max-h-[90vh] border border-slate-100 animate-slide-up">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 bg-slate-50">
+              <div className="flex items-center gap-2 text-[#0F766E]">
+                <Clock3 className="h-5 w-5 animate-pulse" />
+                <h2 className="text-lg font-bold text-slate-950">Terms of Use</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTermsModal(false);
+                }}
+                className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Instructions Banner */}
+            <div className={`p-4 text-sm font-medium border-b ${
+              termsTimeLeft > 0 || !termsScrolledBottom
+                ? "bg-amber-50 text-amber-800 border-amber-100"
+                : "bg-emerald-50 text-emerald-800 border-emerald-100"
+            }`}>
+              {termsTimeLeft > 0 || !termsScrolledBottom ? (
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <span>
+                    Silakan baca Terms of Use di bawah. Anda harus membaca minimal selama 30 detik dan men-scroll hingga ke bagian paling bawah.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Anda telah memenuhi syarat membaca. Silakan tekan tombol "Saya Setuju & Lanjutkan".</span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Content - Scrollable wrapper around the PDF iframe */}
+            <div
+              onScroll={handleTermsScroll}
+              className="flex-1 overflow-y-auto p-5 bg-slate-100/50 min-h-[400px] max-h-[60vh] scroll-smooth"
+            >
+              {/* Wrapping container representing the document context */}
+              <div className="bg-white rounded-xl border border-slate-200/80 shadow-inner overflow-hidden h-[1200px]">
+                <iframe
+                  src={TERMS_PDF_URL}
+                  className="w-full h-full border-none"
+                  title="Terms of Use PDF"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer / Progress indicators */}
+            <div className="border-t border-slate-100 p-5 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-wrap gap-4 text-xs font-semibold">
+                <div className="flex items-center gap-1.5">
+                  <span className={`inline-flex h-5 items-center gap-1 rounded-full px-2 py-0.5 ${
+                    termsTimeLeft > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                  }`}>
+                    {termsTimeLeft > 0 ? (
+                      <>
+                        <Clock3 className="h-3 w-3" />
+                        <span>Membaca: {termsTimeLeft}s</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        <span>Waktu Membaca Cukup</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`inline-flex h-5 items-center gap-1 rounded-full px-2 py-0.5 ${
+                    !termsScrolledBottom ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                  }`}>
+                    {!termsScrolledBottom ? (
+                      <>
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                        <span>Scroll ke Bawah: Belum</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        <span>Scroll ke Bawah: Selesai</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={termsTimeLeft > 0 || !termsScrolledBottom}
+                onClick={() => {
+                  setTermsReadCompleted(true);
+                  setTermsAccepted(true);
+                  setShowTermsModal(false);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#115E59] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400 transition"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Saya Setuju & Lanjutkan
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
