@@ -342,6 +342,7 @@ export function AgentPurchaseOrder() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPersistingPo, setIsPersistingPo] = useState(false);
   const [paymentMode, setPaymentMode] = useState<"100%" | "50%">("100%");
+  const [mobilePoStep, setMobilePoStep] = useState<"cart" | "details">("cart");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -385,6 +386,7 @@ export function AgentPurchaseOrder() {
     setPdfMessage("");
     setEditingPoId(null);
     setPaymentMode("100%");
+    setMobilePoStep("cart");
   };
 
   const closeModal = () => {
@@ -696,7 +698,17 @@ export function AgentPurchaseOrder() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 md:flex md:items-start md:justify-center md:bg-slate-950/50 md:p-4">
           <div className="min-h-screen w-full bg-slate-50 md:my-4 md:min-h-0 md:max-w-[96vw] md:rounded-lg md:bg-white md:shadow-xl">
             <div className="sticky top-0 z-20 grid grid-cols-[40px_1fr_40px] items-center border-b border-slate-200 bg-white px-3 py-3 md:static md:flex md:items-start md:justify-between md:gap-4 md:p-5">
-              <button onClick={closeModal} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden" aria-label="Kembali">
+              <button
+                onClick={() => {
+                  if (mobilePoStep === "details") {
+                    setMobilePoStep("cart");
+                    return;
+                  }
+                  closeModal();
+                }}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden"
+                aria-label="Kembali"
+              >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 text-center md:text-left">
@@ -714,7 +726,7 @@ export function AgentPurchaseOrder() {
             </div>
 
             <div className="space-y-4 p-4 pb-36 md:space-y-5 md:bg-white md:p-5">
-              <div className="hidden grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:border-0 md:p-0 md:shadow-none lg:grid-cols-2">
+              <div className={`${mobilePoStep === "details" ? "grid" : "hidden"} grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:border-0 md:p-0 md:shadow-none lg:grid-cols-2`}>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Nama customer</span>
                   <input
@@ -754,7 +766,7 @@ export function AgentPurchaseOrder() {
                 </label>
               </div>
 
-              <div className="space-y-2 bg-white md:hidden">
+              <div className={`${mobilePoStep === "cart" ? "space-y-2 bg-white" : "hidden"} md:hidden`}>
                 {items.map((item, index) => {
                   const calculated = calculateItem(products, item);
 
@@ -1017,13 +1029,13 @@ export function AgentPurchaseOrder() {
               <button
                 type="button"
                 onClick={() => setItems((currentItems) => [...currentItems, newItem()])}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className={`${mobilePoStep === "cart" ? "inline-flex" : "hidden"} items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:inline-flex`}
               >
                 <Plus className="h-4 w-4" />
                 Tambah product
               </button>
 
-              <label className="hidden md:block">
+              <label className={`${mobilePoStep === "details" ? "block" : "hidden"} md:block`}>
                 <span className="mb-2 block text-sm font-medium text-slate-700">Skema Pembayaran</span>
                 <select
                   value={paymentMode}
@@ -1042,7 +1054,7 @@ export function AgentPurchaseOrder() {
                 )}
               </label>
 
-              <label className="hidden md:block">
+              <label className={`${mobilePoStep === "details" ? "block" : "hidden"} md:block`}>
                 <span className="mb-2 block text-sm font-medium text-slate-700">Catatan</span>
                 <textarea
                   value={notes}
@@ -1052,7 +1064,7 @@ export function AgentPurchaseOrder() {
                 />
               </label>
 
-              <div className="hidden grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:grid-cols-4 md:bg-slate-50 md:shadow-none">
+              <div className={`${mobilePoStep === "details" ? "grid" : "hidden"} grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:grid-cols-4 md:bg-slate-50 md:shadow-none`}>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</p>
                   <p className="mt-1 text-base font-bold text-slate-950">{currencyFormatter.format(orderSummary.subtotal)}</p>
@@ -1083,28 +1095,60 @@ export function AgentPurchaseOrder() {
               )}
 
               <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:static md:flex md:flex-row md:justify-end md:border-t md:p-0 md:pt-5 md:shadow-none">
-                <div className="min-w-0 md:hidden">
-                  <p className="text-xs font-medium text-slate-500">Total price</p>
-                  <p className="truncate text-base font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.total)}</p>
+                {mobilePoStep === "cart" ? (
+                  <button
+                    type="button"
+                    onClick={() => setMobilePoStep("details")}
+                    className="col-span-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-3 text-sm font-semibold text-white hover:bg-[#115E59] md:hidden"
+                  >
+                    Lanjut
+                  </button>
+                ) : (
+                  <>
+                    <div className="min-w-0 md:hidden">
+                      <p className="text-xs font-medium text-slate-500">Total price</p>
+                      <p className="truncate text-base font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.total)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => persistPurchaseOrder("draft")}
+                      disabled={isPersistingPo}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {isPersistingPo ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => persistPurchaseOrder("in_review")}
+                      disabled={isPersistingPo}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#115E59] md:hidden"
+                    >
+                      <Send className="h-4 w-4" />
+                      {isPersistingPo ? "Mengirim..." : "Send PO"}
+                    </button>
+                  </>
+                )}
+                <div className="hidden md:contents">
+                  <button
+                    type="button"
+                    onClick={() => persistPurchaseOrder("draft")}
+                    disabled={isPersistingPo}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {isPersistingPo ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => persistPurchaseOrder("in_review")}
+                    disabled={isPersistingPo}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                  >
+                    <Send className="h-4 w-4" />
+                    {isPersistingPo ? "Mengirim..." : "Send PO"}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => persistPurchaseOrder("draft")}
-                  disabled={isPersistingPo}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:px-4"
-                >
-                  <FileText className="h-4 w-4" />
-                  {isPersistingPo ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => persistPurchaseOrder("in_review")}
-                  disabled={isPersistingPo}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#115E59] md:px-4"
-                >
-                  <Send className="h-4 w-4" />
-                  {isPersistingPo ? "Mengirim..." : "Send PO"}
-                </button>
                 <button
                   type="button"
                   onClick={handlePrintPdf}
