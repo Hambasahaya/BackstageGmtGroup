@@ -835,9 +835,6 @@ export function AgentPurchaseOrder() {
 
                           <div className="mt-1.5 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                {calculated.product.unit}
-                              </span>
                               <ItemStatusBadge status="ready" />
                             </div>
 
@@ -894,7 +891,7 @@ export function AgentPurchaseOrder() {
                           </div>
 
                           {item.selected && (
-                            <div className="mt-2 text-right text-xs">
+                            <div className="mt-3 pt-2 border-t border-black text-right text-xs">
                               <span className="font-semibold text-[#0F766E]">
                                 Komisi {currencyFormatter.format(calculated.commission)}
                               </span>
