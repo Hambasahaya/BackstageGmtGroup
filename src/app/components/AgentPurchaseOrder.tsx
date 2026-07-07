@@ -710,7 +710,7 @@ export function AgentPurchaseOrder() {
             </div>
 
             <div className="space-y-4 p-4 pb-36 md:space-y-5 md:bg-white md:p-5">
-              <div className="grid grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:border-0 md:p-0 md:shadow-none lg:grid-cols-2">
+              <div className="hidden grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:border-0 md:p-0 md:shadow-none lg:grid-cols-2">
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Nama customer</span>
                   <input
@@ -991,7 +991,7 @@ export function AgentPurchaseOrder() {
                 Tambah product
               </button>
 
-              <label className="block">
+              <label className="hidden md:block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Skema Pembayaran</span>
                 <select
                   value={paymentMode}
@@ -1010,7 +1010,7 @@ export function AgentPurchaseOrder() {
                 )}
               </label>
 
-              <label className="block">
+              <label className="hidden md:block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Catatan</span>
                 <textarea
                   value={notes}
@@ -1019,25 +1019,6 @@ export function AgentPurchaseOrder() {
                   placeholder="Catatan tambahan untuk PO"
                 />
               </label>
-
-              <div className="space-y-3 bg-white py-3 text-sm md:hidden">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-slate-700">Subtotal:</span>
-                  <span className="font-bold text-slate-950">{currencyFormatter.format(orderSummary.subtotal)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-slate-700">Total diskon:</span>
-                  <span className="font-bold text-slate-950">{currencyFormatter.format(orderSummary.discountTotal)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-slate-700">Total price:</span>
-                  <span className="font-bold text-slate-950">{currencyFormatter.format(orderSummary.total)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-slate-700">Total komisi:</span>
-                  <span className="font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.commissionTotal)}</span>
-                </div>
-              </div>
 
               <div className="hidden grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:grid-cols-4 md:bg-slate-50 md:shadow-none">
                 <div>
