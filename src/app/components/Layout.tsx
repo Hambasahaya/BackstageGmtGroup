@@ -15,6 +15,7 @@ import {
   Loader2,
   Megaphone,
   Menu,
+  Package,
   ShoppingCart,
   Search,
   Settings,
@@ -52,6 +53,7 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Overview", path: "/dashboard", roles: ["super_admin"] },
+  { icon: Package, label: "Manajemen Produk", path: "/products", roles: ["super_admin"] },
   { icon: Globe2, label: "Websites", path: "/websites", roles: ["super_admin"] },
   { icon: BarChart3, label: "SEO Management", path: "/seo", roles: ["super_admin"] },
   { icon: Megaphone, label: "Marketing Integrations", path: "/integrations", roles: ["super_admin"] },

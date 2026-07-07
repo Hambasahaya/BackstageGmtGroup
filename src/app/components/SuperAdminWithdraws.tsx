@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock3, Search, ShieldCheck, Wallet } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type WithdrawDto, type WithdrawStatus } from "../services/api";
+import Swal from "sweetalert2";
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -74,11 +75,39 @@ export function SuperAdminWithdraws() {
       return;
     }
 
+    const result = await Swal.fire({
+      title: "Approve Pengajuan?",
+      text: `Apakah Anda yakin ingin menyetujui pengajuan withdraw ${withdraw.withdraw_number ?? `WD-${withdraw.id}`} senilai ${currencyFormatter.format(withdraw.amount)}?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#0F766E",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Ya, Setujui",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
     try {
       await api.approveWithdraw(withdraw.id);
       await loadWithdraws();
+      await Swal.fire({
+        icon: "success",
+        title: "Disetujui!",
+        text: "Pengajuan withdraw berhasil disetujui.",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal approve withdraw.");
+      const msg = error instanceof Error ? error.message : "Gagal approve withdraw.";
+      setErrorMessage(msg);
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: msg,
+        confirmButtonColor: "#0F766E",
+      });
     }
   };
 

@@ -12,7 +12,11 @@ export type ProductDto = {
   deskripsi?: string | null;
   unit?: string | null;
   price: number;
+  status?: string | null;
+  komisi?: number | null;
   commission_tiers?: Record<string, number>;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type PreorderItemDto = {
@@ -763,7 +767,21 @@ export const api = {
   session: () => apiRequest<{ authenticated: boolean; user: UserSession }>("/api/auth/session"),
   me: () => apiRequest<{ user: UserSession }>("/api/auth/me"),
   logout: () => apiRequest<{ message: string }>("/api/auth/logout", { method: "POST" }),
-  products: (search?: string) => apiRequest<{ products: ProductDto[] }>("/api/products", { auth: false, query: { search } }),
+  products: (search?: string) => apiRequest<{ products: ProductDto[] }>("/api/products", { auth: true, query: { search } }),
+  productDetail: (id: number) => apiRequest<{ product: ProductDto }>(`/api/products/${id}`),
+  createProduct: (payload: FormData | Record<string, unknown>) => {
+    return apiRequest<{ message: string; product: ProductDto }>("/api/products", {
+      method: "POST",
+      body: payload instanceof FormData ? payload : JSON.stringify(payload),
+    });
+  },
+  updateProduct: (id: number, payload: FormData | Record<string, unknown>) => {
+    return apiRequest<{ message: string; product: ProductDto }>(`/api/products/${id}`, {
+      method: "PUT",
+      body: payload instanceof FormData ? payload : JSON.stringify(payload),
+    });
+  },
+  deleteProduct: (id: number) => apiRequest<{ message: string }>(`/api/products/${id}`, { method: "DELETE" }),
   agentPreorders: (status?: PreorderStatus) =>
     apiRequest<{ preorders: PreorderDto[] }>("/api/agent/preorders", { query: { status } }),
   preorders: (query?: { search?: string; status?: PreorderStatus }) =>

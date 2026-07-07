@@ -1,6 +1,7 @@
 import { CheckCircle2, Eye, Search, ShieldCheck, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, resolveApiAssetUrl, type AgentApplicationDto, type AgentApplicationStatus } from "../services/api";
+import Swal from "sweetalert2";
 
 const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit",
@@ -106,12 +107,50 @@ export function AgentApplications() {
   );
 
   const updateStatus = async (applicationId: number, status: AgentApplicationStatus) => {
+    const statusLabels: Record<AgentApplicationStatus, string> = {
+      not_verif: "Not Verified",
+      verif: "Verified",
+      official_agent: "Official Agent",
+      stopped_agent: "Nonaktifkan Agent",
+    };
+
+    const actionText = status === "stopped_agent" ? "menonaktifkan" : `mengubah status menjadi ${statusLabels[status]}`;
+
+    const result = await Swal.fire({
+      title: "Ubah Status Agent?",
+      text: `Apakah Anda yakin ingin ${actionText} untuk agent ini?`,
+      icon: status === "stopped_agent" ? "warning" : "question",
+      showCancelButton: true,
+      confirmButtonColor: status === "stopped_agent" ? "#D33" : "#0F766E",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Ya, Lanjutkan",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
     try {
       const response = await api.updateAgentApplicationStatus(applicationId, status);
       setApplications((current) => current.map((item) => (item.id === applicationId ? response.user : item)));
       setSelectedApplication((current) => (current?.id === applicationId ? response.user : current));
+
+      await Swal.fire({
+        icon: "success",
+        title: "Status Diperbarui",
+        text: `Status agent berhasil diubah menjadi ${statusLabels[status]}.`,
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal mengubah status agent.");
+      const msg = error instanceof Error ? error.message : "Gagal mengubah status agent.";
+      setErrorMessage(msg);
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: msg,
+        confirmButtonColor: "#0F766E",
+      });
     }
   };
 

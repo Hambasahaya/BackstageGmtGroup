@@ -19,6 +19,7 @@ import { Register } from "./components/Register";
 import { SalesOrders } from "./components/SalesOrders";
 import { SsoCallback } from "./components/SsoCallback";
 import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
+import { ProductManagement } from "./components/ProductManagement";
 import {
   ArticleManagement,
   MediaLibrary,
@@ -116,6 +117,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={superAdminOnly}>
             <Dashboard />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "products",
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <ProductManagement />
           </RoleGate>
         ),
       },

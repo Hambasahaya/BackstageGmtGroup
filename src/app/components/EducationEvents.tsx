@@ -1,6 +1,7 @@
 import { CalendarDays, Edit3, Eye, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type EducationDto, type EducationParticipantDto, type EducationPayload } from "../services/api";
+import Swal from "sweetalert2";
 
 const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -264,25 +265,60 @@ export function EducationEvents() {
       }
       setIsFormOpen(false);
       setEditingEvent(null);
+      await Swal.fire({
+        icon: "success",
+        title: editingEvent ? "Event Diperbarui" : "Event Ditambahkan",
+        text: "Data education event berhasil disimpan.",
+        confirmButtonColor: "#0F766E",
+      });
       await loadEvents();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal menyimpan event.");
+      const msg = error instanceof Error ? error.message : "Gagal menyimpan event.";
+      setErrorMessage(msg);
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal Menyimpan",
+        text: msg,
+        confirmButtonColor: "#0F766E",
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const deleteEvent = async (event: EducationDto) => {
-    const confirmed = window.confirm(`Hapus event "${event.title}"?`);
-    if (!confirmed) return;
+    const result = await Swal.fire({
+      title: "Hapus Event?",
+      text: `Apakah Anda yakin ingin menghapus event "${event.title}"?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#D33",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    });
+    if (!result.isConfirmed) return;
 
     setErrorMessage("");
     try {
       await api.deleteEducation(event.id);
       await loadEvents();
       setSelectedEvent((current) => (current?.id === event.id ? null : current));
+      void Swal.fire({
+        icon: "success",
+        title: "Event Dihapus",
+        text: "Education event berhasil dihapus.",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal menghapus event.");
+      const msg = error instanceof Error ? error.message : "Gagal menghapus event.";
+      setErrorMessage(msg);
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal Menghapus",
+        text: msg,
+        confirmButtonColor: "#0F766E",
+      });
     }
   };
 
