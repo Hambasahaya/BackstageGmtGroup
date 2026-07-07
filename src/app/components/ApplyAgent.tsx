@@ -651,16 +651,13 @@ export function ApplyAgent() {
           {/* Modal Content - Scrollable wrapper around the PDF iframe */}
           <div
             onScroll={handleTermsScroll}
-            className="flex-1 overflow-y-auto p-6 bg-slate-100/50 scroll-smooth"
+            className="flex-1 overflow-y-auto bg-white scroll-smooth"
           >
-            {/* Wrapping container representing the document context */}
-            <div className="mx-auto max-w-5xl bg-white rounded-xl border border-slate-200/80 shadow-md overflow-hidden h-[2200px]">
-              <iframe
-                src={TERMS_PDF_URL}
-                className="w-full h-full border-none"
-                title="Terms of Use PDF"
-              />
-            </div>
+            <iframe
+              src={`${TERMS_PDF_URL}#toolbar=0&navpanes=0&scrollbar=0`}
+              className="w-full h-[2200px] border-none block"
+              title="Terms of Use PDF"
+            />
           </div>
 
           {/* Modal Footer / Progress indicators */}
