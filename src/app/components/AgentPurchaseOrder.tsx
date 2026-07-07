@@ -598,7 +598,7 @@ export function AgentPurchaseOrder() {
           <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">Belum dikirim ke sales</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
-          <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">Estimasi komisi</p>
+          <p className="text-xs sm:text-sm font-bold text-slate-700 line-clamp-1">Estimasi komisi</p>
           <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">
             {currencyFormatter.format(purchaseOrders.reduce((sum, po) => sum + po.commissionTotal, 0))}
           </p>
@@ -632,7 +632,7 @@ export function AgentPurchaseOrder() {
                 <th className="px-4 py-3 font-semibold">Customer</th>
                 <th className="px-4 py-3 font-semibold">Item</th>
                 <th className="px-4 py-3 font-semibold">Total</th>
-                <th className="px-4 py-3 font-semibold">Komisi</th>
+                <th className="px-4 py-3 font-bold">Komisi</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold">Payment</th>
                 <th className="px-4 py-3 font-semibold">Tanggal</th>
@@ -894,7 +894,7 @@ export function AgentPurchaseOrder() {
 
                       {item.selected && (
                         <div className="mt-3 pt-2 border-t border-black flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-500">Komisi</span>
+                          <span className="font-bold text-slate-700">Komisi</span>
                           <span className="font-bold text-[#0F766E]">
                             {currencyFormatter.format(calculated.commission)}
                           </span>
@@ -930,7 +930,7 @@ export function AgentPurchaseOrder() {
                       <th className="border border-slate-200 px-2 py-3 font-semibold">Unit Price</th>
                       <th className="border border-slate-200 px-2 py-3 font-semibold">Disc</th>
                       <th className="border border-slate-200 px-2 py-3 font-semibold">Total Price</th>
-                      <th className="border border-slate-200 px-2 py-3 font-semibold">Komisi</th>
+                      <th className="border border-slate-200 px-2 py-3 font-bold">Komisi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1082,7 +1082,7 @@ export function AgentPurchaseOrder() {
                   <p className="mt-1 text-base font-bold text-slate-950">{currencyFormatter.format(orderSummary.total)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Total komisi</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#0F766E]">Total komisi</p>
                   <p className="mt-1 text-base font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.commissionTotal)}</p>
                 </div>
               </div>
@@ -1181,25 +1181,25 @@ export function AgentPurchaseOrder() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-[200px_1fr]">
-              <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-slate-50 p-4 border border-slate-100">
+            <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-[1fr_200px]">
+              <div className="flex flex-col justify-center order-2 sm:order-1">
+                <h3 className="text-lg font-bold text-slate-950 leading-tight">{previewProduct.name}</h3>
+                <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {previewProduct.unit}
+                </p>
+              </div>
+              <div className="flex aspect-square w-full max-w-[200px] sm:max-w-none mx-auto items-center justify-center rounded-lg bg-slate-50 p-4 border border-slate-100 order-1 sm:order-2">
                 <img
                   src={previewProduct.photo}
                   alt={previewProduct.name}
                   className="max-h-full max-w-full object-contain"
                 />
               </div>
-              <div className="flex flex-col">
-                <h3 className="text-lg font-bold text-slate-950 leading-tight">{previewProduct.name}</h3>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {previewProduct.unit}
+              <div className="col-span-1 sm:col-span-2 border-t border-slate-100 -mx-4 px-4 pt-4 mt-2 order-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Deskripsi Produk</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+                  {previewProduct.description || "-"}
                 </p>
-                <div className="mt-4 border-t border-slate-100 pt-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Deskripsi Produk</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-700 whitespace-pre-line">
-                    {previewProduct.description || "-"}
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -1492,7 +1492,7 @@ export function AgentPurchaseOrder() {
                   <p className="mt-1 font-bold text-slate-950">{currencyFormatter.format(previewPo.total)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#0F766E]">Total komisi</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#0F766E]">Total komisi</p>
                   <p className="mt-1 font-bold text-[#0F766E]">{currencyFormatter.format(previewPo.commissionTotal)}</p>
                 </div>
               </section>

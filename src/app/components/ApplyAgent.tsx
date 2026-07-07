@@ -63,12 +63,14 @@ function TextField({
   onChange,
   placeholder,
   list,
+  required = true,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   list?: string;
+  required?: boolean;
 }) {
   return (
     <label className="block">
@@ -78,10 +80,11 @@ function TextField({
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
         placeholder={placeholder}
-        required
+        required={required}
         list={list}
       />
     </label>
+  
   );
 }
 
@@ -283,6 +286,20 @@ export function ApplyAgent() {
       setTermsScrolledBottom(true);
     }
   };
+
+  const isFormIncomplete = !applyForm.job.trim() ||
+    !verificationForm.photo ||
+    !verificationForm.ktp_photo ||
+    !verificationForm.bank_name.trim() ||
+    !verificationForm.account_number.trim() ||
+    !verificationForm.tempat_lahir.trim() ||
+    !verificationForm.tanggal_lahir.trim() ||
+    !(verificationForm.domicile ?? "").trim() ||
+    !verificationForm.full_address.trim() ||
+    !applyForm.agent_motivation.trim() ||
+    (applyForm.referral_source === "teman_kerabat" && !applyForm.referral_name?.trim()) ||
+    (applyForm.referral_source === "lainnya" && !applyForm.referral_other?.trim()) ||
+    !applyForm.target_product.trim();
 
   useEffect(() => {
     fetch("https://raw.githubusercontent.com/Caknoooo/provinces-cities-indonesia/master/json/regencies.json")
@@ -491,9 +508,9 @@ export function ApplyAgent() {
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data pengajuan</h3>
               <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} placeholder="Sales Executive" />
-                <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" />
-                <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" />
-                <TextField label="Facebook" value={applyForm.facebook} onChange={(value) => setApplyForm((current) => ({ ...current, facebook: value }))} placeholder="User FB" />
+                <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" required={false} />
+                <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" required={false} />
+                <TextField label="Facebook" value={applyForm.facebook} onChange={(value) => setApplyForm((current) => ({ ...current, facebook: value }))} placeholder="User FB" required={false} />
               </div>
             </div>
 
@@ -579,7 +596,7 @@ export function ApplyAgent() {
             </div>
 
             <div className="flex justify-end border-t border-slate-200 pt-5">
-              <button type="submit" disabled={isSubmitting || !termsAccepted} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
+              <button type="submit" disabled={isSubmitting || !termsAccepted || isFormIncomplete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
                 <Send className="h-4 w-4" />
                 {isSubmitting ? "Mengirim..." : "Kirim pengajuan"}
               </button>
@@ -613,117 +630,54 @@ export function ApplyAgent() {
       )}
 
       {showTermsModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden max-h-[90vh] border border-slate-100 animate-slide-up">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 bg-slate-50">
-              <div className="flex items-center gap-2 text-[#0F766E]">
-                <Clock3 className="h-5 w-5 animate-pulse" />
-                <h2 className="text-lg font-bold text-slate-950">Terms of Use</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowTermsModal(false);
-                }}
-                className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <div className="fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in h-screen w-screen">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 bg-slate-50 shrink-0">
+            <div className="flex items-center gap-2 text-[#0F766E]">
+              <Clock3 className="h-5 w-5 animate-pulse" />
+              <h2 className="text-lg font-bold text-slate-950">NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE</h2>
             </div>
-
-            {/* Modal Instructions Banner */}
-            <div className={`p-4 text-sm font-medium border-b ${
-              termsTimeLeft > 0 || !termsScrolledBottom
-                ? "bg-amber-50 text-amber-800 border-amber-100"
-                : "bg-emerald-50 text-emerald-800 border-emerald-100"
-            }`}>
-              {termsTimeLeft > 0 || !termsScrolledBottom ? (
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                  <span>
-                    Silakan baca Terms of Use di bawah. Anda harus membaca minimal selama 30 detik dan men-scroll hingga ke bagian paling bawah.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>Anda telah memenuhi syarat membaca. Silakan tekan tombol "Saya Setuju & Lanjutkan".</span>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Content - Scrollable wrapper around the PDF iframe */}
-            <div
-              onScroll={handleTermsScroll}
-              className="flex-1 overflow-y-auto p-5 bg-slate-100/50 min-h-[400px] max-h-[60vh] scroll-smooth"
+            <button
+              type="button"
+              onClick={() => {
+                setShowTermsModal(false);
+              }}
+              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
             >
-              {/* Wrapping container representing the document context */}
-              <div className="bg-white rounded-xl border border-slate-200/80 shadow-inner overflow-hidden h-[1200px]">
-                <iframe
-                  src={TERMS_PDF_URL}
-                  className="w-full h-full border-none"
-                  title="Terms of Use PDF"
-                />
-              </div>
-            </div>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
 
-            {/* Modal Footer / Progress indicators */}
-            <div className="border-t border-slate-100 p-5 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex flex-wrap gap-4 text-xs font-semibold">
-                <div className="flex items-center gap-1.5">
-                  <span className={`inline-flex h-5 items-center gap-1 rounded-full px-2 py-0.5 ${
-                    termsTimeLeft > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
-                  }`}>
-                    {termsTimeLeft > 0 ? (
-                      <>
-                        <Clock3 className="h-3 w-3" />
-                        <span>Membaca: {termsTimeLeft}s</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                        <span>Waktu Membaca Cukup</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`inline-flex h-5 items-center gap-1 rounded-full px-2 py-0.5 ${
-                    !termsScrolledBottom ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
-                  }`}>
-                    {!termsScrolledBottom ? (
-                      <>
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                        <span>Scroll ke Bawah: Belum</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                        <span>Scroll ke Bawah: Selesai</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={termsTimeLeft > 0 || !termsScrolledBottom}
-                onClick={() => {
-                  setTermsReadCompleted(true);
-                  setTermsAccepted(true);
-                  setShowTermsModal(false);
-                }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#115E59] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400 transition"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Saya Setuju & Lanjutkan
-              </button>
+          {/* Modal Content - Scrollable wrapper around the PDF iframe */}
+          <div
+            onScroll={handleTermsScroll}
+            className="flex-1 overflow-y-auto p-6 bg-slate-100/50 scroll-smooth"
+          >
+            {/* Wrapping container representing the document context */}
+            <div className="mx-auto max-w-5xl bg-white rounded-xl border border-slate-200/80 shadow-md overflow-hidden h-[2200px]">
+              <iframe
+                src={TERMS_PDF_URL}
+                className="w-full h-full border-none"
+                title="Terms of Use PDF"
+              />
             </div>
+          </div>
+
+          {/* Modal Footer / Progress indicators */}
+          <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 shrink-0 flex justify-end">
+            <button
+              type="button"
+              disabled={termsTimeLeft > 0 || !termsScrolledBottom}
+              onClick={() => {
+                setTermsReadCompleted(true);
+                setTermsAccepted(true);
+                setShowTermsModal(false);
+              }}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#115E59] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400 transition"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Saya Setuju & Lanjutkan
+            </button>
           </div>
         </div>
       )}
