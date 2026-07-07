@@ -3,6 +3,8 @@ import {
   Eye,
   FileDown,
   FileText,
+  Minus,
+  MoreHorizontal,
   Pencil,
   Plus,
   Send,
@@ -689,16 +691,19 @@ export function AgentPurchaseOrder() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 md:flex md:items-start md:justify-center md:bg-slate-950/50 md:p-4">
           <div className="min-h-screen w-full bg-slate-50 md:my-4 md:min-h-0 md:max-w-[96vw] md:rounded-lg md:bg-white md:shadow-xl">
-            <div className="sticky top-0 z-20 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-4 md:static md:p-5">
-              <button onClick={closeModal} className="mt-0.5 rounded-md p-1 text-slate-700 hover:bg-slate-100 md:hidden" aria-label="Kembali">
+            <div className="sticky top-0 z-20 grid grid-cols-[40px_1fr_40px] items-center border-b border-slate-200 bg-white px-3 py-3 md:static md:flex md:items-start md:justify-between md:gap-4 md:p-5">
+              <button onClick={closeModal} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden" aria-label="Kembali">
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">
+              <div className="min-w-0 text-center md:text-left">
+                <h2 className="truncate text-base font-semibold text-slate-950 md:text-lg">
                   {editingPoId ? "Edit Purchase Order" : "Buat Purchase Order"}
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">Tambahkan satu atau beberapa product dalam satu PO.</p>
+                <p className="mt-1 hidden text-sm text-slate-500 md:block">Tambahkan satu atau beberapa product dalam satu PO.</p>
               </div>
+              <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden" aria-label="Menu">
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
               <button onClick={closeModal} className="hidden rounded-md p-1 text-slate-500 hover:bg-slate-100 md:block">
                 <X className="h-5 w-5" />
               </button>
@@ -745,103 +750,106 @@ export function AgentPurchaseOrder() {
                 </label>
               </div>
 
-              <div className="space-y-3 md:hidden">
+              <div className="space-y-2 bg-white md:hidden">
                 {items.map((item, index) => {
                   const calculated = calculateItem(products, item);
 
                   return (
-                    <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product {index + 1}</p>
-                        <button
-                          type="button"
-                          title="Hapus item"
-                          onClick={() => removeItem(item.id)}
-                          disabled={items.length === 1}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                    <div key={item.id} className="grid grid-cols-[124px_1fr] gap-3 bg-white py-2">
+                      <div className="flex h-32 w-full items-center justify-center bg-slate-50 p-3">
+                        <img
+                          src={calculated.product.photo}
+                          alt={calculated.product.name}
+                          className="max-h-full max-w-full object-contain"
+                        />
                       </div>
 
-                      <div className="flex gap-3">
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-2">
-                          <img
-                            src={calculated.product.photo}
-                            alt={calculated.product.name}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-3">
-                          <select
-                            value={item.productId}
-                            onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                          >
-                            {products.map((product) => (
-                              <option key={product.id} value={product.id}>
-                                {product.name}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="line-clamp-2 text-xs text-slate-500">{calculated.product.description}</p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <ItemStatusBadge status="ready" />
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                      <div className="min-w-0 py-1 pr-1">
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <select
+                              value={item.productId}
+                              onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
+                              className="w-full appearance-none bg-transparent text-sm font-semibold leading-tight text-slate-950 outline-none"
+                              aria-label={`Product ${index + 1}`}
+                            >
+                              {products.map((product) => (
+                                <option key={product.id} value={product.id}>
+                                  {product.name}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="mt-1 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">
                               {calculated.product.unit}
-                            </span>
+                            </p>
+                            <p className="mt-1 line-clamp-1 text-xs text-slate-400">{calculated.product.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            title="Hapus item"
+                            onClick={() => removeItem(item.id)}
+                            disabled={items.length === 1}
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-slate-400 hover:text-rose-600 disabled:cursor-not-allowed disabled:text-slate-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="mt-5 flex items-end justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
+                            {item.discountPercent > 0 && (
+                              <p className="text-xs text-slate-400 line-through">
+                                {currencyFormatter.format(calculated.subtotal)}
+                              </p>
+                            )}
+                            <div className="mt-2 flex items-center gap-2">
+                              <select
+                                value={item.discountPercent}
+                                onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
+                                className="max-w-24 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                              >
+                                {(calculated.product.commissionTiers
+                                  ? Object.keys(calculated.product.commissionTiers)
+                                      .map((k) => parseInt(k.replace("%", ""), 10))
+                                      .sort((a, b) => a - b)
+                                  : discountOptions
+                                ).map((discount) => (
+                                  <option key={discount} value={discount}>
+                                    Disc {discount}%
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[36px_28px_36px] items-center">
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { qty: item.qty - 1 })}
+                              disabled={item.qty <= 1}
+                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                              aria-label="Kurangi qty"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <span className="text-center text-sm font-semibold text-slate-950">{item.qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { qty: item.qty + 1 })}
+                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700"
+                              aria-label="Tambah qty"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <label className="block">
-                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Qty</span>
-                          <input
-                            value={item.qty}
-                            type="number"
-                            min="1"
-                            onChange={(event) => updateItem(item.id, { qty: Number(event.target.value) })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Diskon</span>
-                          <select
-                            value={item.discountPercent}
-                            onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                          >
-                            {(calculated.product.commissionTiers
-                              ? Object.keys(calculated.product.commissionTiers)
-                                  .map((k) => parseInt(k.replace("%", ""), 10))
-                                  .sort((a, b) => a - b)
-                              : discountOptions
-                            ).map((discount) => (
-                              <option key={discount} value={discount}>
-                                {discount}%
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3">
-                        <div>
-                          <p className="text-xs text-slate-500">Unit price</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-900">{currencyFormatter.format(calculated.product.price)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500">Diskon</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-900">{currencyFormatter.format(calculated.discountTotal)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500">Total price</p>
-                          <p className="mt-1 text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500">Komisi</p>
-                          <p className="mt-1 text-sm font-bold text-[#0F766E]">{currencyFormatter.format(calculated.commission)}</p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                          <ItemStatusBadge status="ready" />
+                          <span className="font-semibold text-[#0F766E]">
+                            Komisi {currencyFormatter.format(calculated.commission)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1012,7 +1020,26 @@ export function AgentPurchaseOrder() {
                 />
               </label>
 
-              <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4 md:bg-slate-50 md:shadow-none">
+              <div className="space-y-3 bg-white py-3 text-sm md:hidden">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-slate-700">Subtotal:</span>
+                  <span className="font-bold text-slate-950">{currencyFormatter.format(orderSummary.subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-slate-700">Total diskon:</span>
+                  <span className="font-bold text-slate-950">{currencyFormatter.format(orderSummary.discountTotal)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-slate-700">Total price:</span>
+                  <span className="font-bold text-slate-950">{currencyFormatter.format(orderSummary.total)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-medium text-slate-700">Total komisi:</span>
+                  <span className="font-bold text-[#0F766E]">{currencyFormatter.format(orderSummary.commissionTotal)}</span>
+                </div>
+              </div>
+
+              <div className="hidden grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:grid-cols-4 md:bg-slate-50 md:shadow-none">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subtotal</p>
                   <p className="mt-1 text-base font-bold text-slate-950">{currencyFormatter.format(orderSummary.subtotal)}</p>
