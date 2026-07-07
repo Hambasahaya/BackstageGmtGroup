@@ -1258,7 +1258,7 @@ export function AgentPurchaseOrder() {
               </div>
               <div className="col-span-2 border-t border-slate-100 -mx-4 px-4 pt-4 mt-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Deskripsi Produk</p>
-                <div className="mt-2 text-sm leading-relaxed text-slate-700">
+                <div className="mt-2 text-sm leading-relaxed text-slate-700 max-h-48 overflow-y-auto pr-2">
                   {renderFormattedDescription(previewProduct.description)}
                 </div>
               </div>

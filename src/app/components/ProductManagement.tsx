@@ -1030,7 +1030,7 @@ export function ProductManagement() {
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                     Deskripsi Produk
                   </h3>
-                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-sm leading-6 text-slate-700">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-sm leading-6 text-slate-700 max-h-48 overflow-y-auto pr-2">
                     {renderFormattedDescription(selectedProduct.deskripsi)}
                   </div>
                 </div>
