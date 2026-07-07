@@ -31,6 +31,7 @@ type PurchaseOrderItem = {
   qty: number;
   discountPercent: number;
   itemStatus: "ready" | "po";
+  selected?: boolean;
 };
 
 type PurchaseOrder = {
@@ -154,6 +155,7 @@ const newItem = (): PurchaseOrderItem => ({
   qty: 1,
   discountPercent: 0,
   itemStatus: "ready",
+  selected: false,
 });
 
 function mapProduct(product: ProductDto): Product {
@@ -190,6 +192,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
       qty: item.qty,
       discountPercent: item.discount_percent,
       itemStatus: "ready",
+      selected: true,
     })),
     subtotal: preorder.subtotal,
     discountTotal: preorder.total_discount ?? preorder.total_diskon ?? 0,
@@ -756,22 +759,37 @@ export function AgentPurchaseOrder() {
                   const calculated = calculateItem(products, item);
 
                   return (
-                    <div key={item.id} className="bg-white py-2">
-                      <select
-                        value={item.productId}
-                        onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
-                        className="mb-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                        aria-label={`Pilih product ${index + 1}`}
-                      >
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
-                          </option>
-                        ))}
-                      </select>
+                    <div
+                      key={item.id}
+                      className={`rounded-lg bg-white p-3 ${item.selected ? "ring-1 ring-inset ring-teal-100" : ""}`}
+                    >
+                      <div className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2">
+                        <select
+                          value={item.productId}
+                          onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                          aria-label={`Pilih product ${index + 1}`}
+                        >
+                          {products.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                            </option>
+                          ))}
+                        </select>
+                        <label className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(item.selected)}
+                            onChange={(event) => updateItem(item.id, { selected: event.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300 accent-[#0F766E]"
+                            aria-label={`Masukkan ${calculated.product.name} ke list`}
+                          />
+                          Pilih
+                        </label>
+                      </div>
 
-                      <div className="grid grid-cols-[124px_1fr] gap-3">
-                        <div className="relative flex h-32 w-full items-center justify-center bg-slate-50 p-3">
+                      <div className="grid grid-cols-[140px_1fr] gap-4">
+                        <div className="relative flex h-40 w-full items-center justify-center bg-slate-50 p-3">
                           <img
                             src={calculated.product.photo}
                             alt={calculated.product.name}
@@ -807,7 +825,28 @@ export function AgentPurchaseOrder() {
                           </div>
 
                         <div className="mt-5 flex items-end justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="grid grid-cols-[36px_28px_36px] items-center">
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { qty: item.qty - 1 })}
+                              disabled={item.qty <= 1}
+                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                              aria-label="Kurangi qty"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <span className="text-center text-sm font-semibold text-slate-950">{item.qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { qty: item.qty + 1 })}
+                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700"
+                              aria-label="Tambah qty"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="min-w-0 text-right">
                             <p className="text-sm font-bold text-slate-950">{currencyFormatter.format(calculated.total)}</p>
                             {item.discountPercent > 0 && (
                               <p className="text-xs text-slate-400 line-through">
@@ -833,34 +872,15 @@ export function AgentPurchaseOrder() {
                               </select>
                             </div>
                           </div>
-
-                          <div className="grid grid-cols-[36px_28px_36px] items-center">
-                            <button
-                              type="button"
-                              onClick={() => updateItem(item.id, { qty: item.qty - 1 })}
-                              disabled={item.qty <= 1}
-                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
-                              aria-label="Kurangi qty"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            <span className="text-center text-sm font-semibold text-slate-950">{item.qty}</span>
-                            <button
-                              type="button"
-                              onClick={() => updateItem(item.id, { qty: item.qty + 1 })}
-                              className="inline-flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700"
-                              aria-label="Tambah qty"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          </div>
                         </div>
 
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                             <ItemStatusBadge status="ready" />
-                            <span className="font-semibold text-[#0F766E]">
-                              Komisi {currencyFormatter.format(calculated.commission)}
-                            </span>
+                            {item.selected && (
+                              <span className="font-semibold text-[#0F766E]">
+                                Komisi {currencyFormatter.format(calculated.commission)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
