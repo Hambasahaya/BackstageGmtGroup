@@ -65,6 +65,7 @@ export function ProductManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [failedImageIds, setFailedImageIds] = useState<Record<number, boolean>>({});
 
   // Modals state
   const [selectedProduct, setSelectedProduct] = useState<ProductDto | null>(null);
@@ -463,26 +464,26 @@ export function ProductManagement() {
                   >
                     {/* Card Header Image */}
                     <div className="relative aspect-[4/3] w-full bg-slate-100">
-                      {product.foto ? (
+                      {product.foto && !failedImageIds[product.id] ? (
                         <img
                           src={resolveApiAssetUrl(product.foto)}
                           alt={product.namaproduct}
                           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          onError={(e) => {
-                            // Fallback if asset fails to load
-                            e.currentTarget.src = "";
-                            e.currentTarget.className = "hidden";
+                          onError={() => {
+                            setFailedImageIds((prev) => ({ ...prev, [product.id]: true }));
                           }}
                         />
                       ) : null}
 
                       {/* Fallback Placeholder */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 to-slate-100 p-4 text-slate-400 group-only:hidden">
-                        <Package className="h-10 w-10 text-slate-300 transition duration-300 group-hover:scale-110" />
-                        <span className="mt-2 text-[11px] font-medium tracking-wide uppercase text-slate-400">
-                          No Photo
-                        </span>
-                      </div>
+                      {(!product.foto || failedImageIds[product.id]) && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 to-slate-100 p-4 text-slate-400">
+                          <Package className="h-10 w-10 text-slate-300 transition duration-300 group-hover:scale-110" />
+                          <span className="mt-2 text-[11px] font-medium tracking-wide uppercase text-slate-400">
+                            No Photo
+                          </span>
+                        </div>
+                      )}
 
                       {/* Status Badge */}
                       <div className="absolute right-3 top-3">
@@ -865,11 +866,14 @@ export function ProductManagement() {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* Photo Column */}
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center aspect-[4/3] relative">
-                  {selectedProduct.foto ? (
+                  {selectedProduct.foto && !failedImageIds[selectedProduct.id] ? (
                     <img
                       src={resolveApiAssetUrl(selectedProduct.foto)}
                       alt={selectedProduct.namaproduct}
                       className="h-full w-full object-cover"
+                      onError={() => {
+                        setFailedImageIds((prev) => ({ ...prev, [selectedProduct.id]: true }));
+                      }}
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center text-slate-400 p-4">
