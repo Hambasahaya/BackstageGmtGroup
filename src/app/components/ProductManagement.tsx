@@ -463,7 +463,7 @@ export function ProductManagement() {
                     className="group flex flex-col h-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     {/* Card Header Image */}
-                    <div className="relative aspect-[4/3] w-full bg-slate-100">
+                    <div className="relative w-full h-48 bg-slate-100 overflow-hidden">
                       {product.foto && !failedImageIds[product.id] ? (
                         <img
                           src={resolveApiAssetUrl(product.foto)}
