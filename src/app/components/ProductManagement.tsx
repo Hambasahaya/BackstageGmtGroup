@@ -380,34 +380,32 @@ export function ProductManagement() {
   // Download CSV template
   const downloadCSVTemplate = () => {
     const headers = [
-      "namaproduct",
-      "price",
+      "model",
+      "pricelist",
       "unit",
-      "komisi",
+      "komisi @ 0%",
       "deskripsi",
       "status",
-      "komisi_0%",
-      "komisi_5%",
-      "komisi_10%",
-      "komisi_15%",
-      "komisi_20%",
-      "komisi_25%",
-      "komisi_28%"
+      "komisi @ 5%",
+      "komisi @ 10%",
+      "komisi @ 15%",
+      "komisi @ 20%",
+      "komisi @ 25%",
+      "komisi @ 28%"
     ];
     const sampleRow = [
-      "GMT Lighting Premium Package",
-      "25000000",
-      "paket",
-      "1500000",
-      "Paket lighting profesional untuk event.",
+      "ANTARI CH-1 Cinema Haze Machine",
+      "66050000",
+      "unit",
+      "3467000",
+      "Cinema Haze Machine high performance.",
       "tersedia",
-      "1500000",
-      "1337000",
-      "1175000",
-      "1012000",
-      "850000",
-      "687000",
-      "590000"
+      "3005000",
+      "2542000",
+      "2080000",
+      "1618000",
+      "1155000",
+      "878000"
     ];
     const csvContent = [headers.join(","), sampleRow.join(",")].join("\r\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -469,6 +467,17 @@ export function ProductManagement() {
 
     e.target.value = "";
 
+    const cleanNumber = (val: string | null | undefined): number => {
+      if (!val) return 0;
+      let clean = val.trim();
+      clean = clean.replace(/rp|idr|[$]/gi, "").trim();
+      if (clean === "-" || clean === "" || clean === "0") return 0;
+      clean = clean.replace(/[,.]00$/, "");
+      clean = clean.replace(/[^0-9-]/g, "");
+      const parsed = Number(clean);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
     const reader = new FileReader();
     reader.onload = async (event) => {
       const csvText = event.target?.result as string;
@@ -488,7 +497,7 @@ export function ProductManagement() {
           void Swal.fire({
             icon: "warning",
             title: "Data Tidak Cukup",
-            text: "Pastikan file CSV memiliki baris header dan minimal satu baris data.",
+            text: "Pastikan file CSV memiliki baris header and minimal satu baris data.",
             confirmButtonColor: "#0F766E",
           });
           return;
@@ -496,21 +505,31 @@ export function ProductManagement() {
 
         const headers = rows[0].map(h => h.trim().toLowerCase());
         
-        const nameIdx = headers.indexOf("namaproduct");
-        const priceIdx = headers.indexOf("price");
+        let nameIdx = headers.indexOf("model");
+        if (nameIdx === -1) nameIdx = headers.indexOf("namaproduct");
+        if (nameIdx === -1) nameIdx = headers.indexOf("name");
+        if (nameIdx === -1) nameIdx = headers.indexOf("nama");
+
+        let priceIdx = headers.indexOf("pricelist");
+        if (priceIdx === -1) priceIdx = headers.indexOf("price");
+        if (priceIdx === -1) priceIdx = headers.indexOf("harga");
+
         const unitIdx = headers.indexOf("unit");
-        let komisiIdx = headers.indexOf("komisi");
-        if (komisiIdx === -1) {
-          komisiIdx = headers.findIndex(h => h === "komisi_0%" || h === "komisi 0%" || h === "komisi_0");
-        }
-        const descIdx = headers.indexOf("deskripsi");
+
+        let komisiIdx = headers.indexOf("komisi @ 0%");
+        if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi_0%");
+        if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi 0%");
+        if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi");
+        if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi_0");
+
+        const descIdx = headers.indexOf("deskripsi") !== -1 ? headers.indexOf("deskripsi") : headers.indexOf("description");
         const statusIdx = headers.indexOf("status");
 
         if (nameIdx === -1 || priceIdx === -1) {
           void Swal.fire({
             icon: "error",
             title: "Format CSV Salah",
-            text: "Kolom 'namaproduct' dan 'price' wajib ada di baris header.",
+            text: "Kolom nama produk ('model' atau 'namaproduct') dan harga ('pricelist' atau 'price') wajib ada di baris header.",
             confirmButtonColor: "#0F766E",
           });
           return;
@@ -550,15 +569,15 @@ export function ProductManagement() {
             failedCount++;
             continue;
           }
-          const parsedPrice = Number(rawPrice);
-          if (isNaN(parsedPrice) || parsedPrice < 1) {
+          const parsedPrice = cleanNumber(rawPrice);
+          if (parsedPrice < 1) {
             failedCount++;
             continue;
           }
 
           const rawUnit = unitIdx !== -1 ? row[unitIdx]?.trim() || "paket" : "paket";
-          const rawKomisi = komisiIdx !== -1 ? Number(row[komisiIdx]?.trim() || "0") : 0;
-          const parsedKomisi = isNaN(rawKomisi) ? 0 : rawKomisi;
+          const rawKomisi = komisiIdx !== -1 ? row[komisiIdx]?.trim() || "0" : "0";
+          const parsedKomisi = cleanNumber(rawKomisi);
           const rawDesc = descIdx !== -1 ? row[descIdx] || "" : "";
           const rawStatus = statusIdx !== -1 ? row[statusIdx]?.trim() || "tersedia" : "tersedia";
 
