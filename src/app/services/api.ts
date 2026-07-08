@@ -154,6 +154,7 @@ export type DetailUserDto = {
 export type AuthResponse = {
   message: string;
   token: string;
+  refresh_token?: string;
   session: {
     session_id: string;
     user_id?: number;
@@ -304,7 +305,8 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
 const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
 const defaultLogoutRedirectUrl = import.meta.env.VITE_LOGOUT_REDIRECT_URL ?? "/";
-export const authTokenStorageKey = "gmt-auth-token";
+export const authTokenStorageKey = "token";
+export const authRefreshTokenStorageKey = "refresh_token";
 export const userStorageKey = "gmt-auth-user";
 export const loginSourceStorageKey = "gmt-login-source-url";
 export const authSessionUpdatedEvent = "gmt-auth-session-updated";
@@ -545,14 +547,18 @@ export function getAuthToken() {
   return window.localStorage.getItem(authTokenStorageKey);
 }
 
-export function saveAuthSession(token: string, user: UserSession) {
+export function saveAuthSession(token: string, user: UserSession, refreshToken?: string) {
   window.localStorage.setItem(authTokenStorageKey, token);
+  if (refreshToken) {
+    window.localStorage.setItem(authRefreshTokenStorageKey, refreshToken);
+  }
   window.localStorage.setItem(userStorageKey, JSON.stringify(user));
   window.dispatchEvent(new CustomEvent(authSessionUpdatedEvent, { detail: { user } }));
 }
 
 export function clearAuthSession() {
   window.localStorage.removeItem(authTokenStorageKey);
+  window.localStorage.removeItem(authRefreshTokenStorageKey);
   window.localStorage.removeItem(userStorageKey);
   window.localStorage.removeItem(legacyRoleStorageKey);
   window.dispatchEvent(new CustomEvent(authSessionUpdatedEvent, { detail: { user: null } }));
@@ -635,6 +641,47 @@ export function clearLoginSource() {
   window.localStorage.removeItem(loginSourceStorageKey);
 }
 
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    const refreshToken = window.localStorage.getItem(authRefreshTokenStorageKey);
+    if (!refreshToken) {
+      throw new Error("refresh failed");
+    }
+
+    const res = await fetch(buildUrl("/api/auth/refresh"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        refresh_token: refreshToken,
+        client: clientName,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("refresh failed");
+    }
+
+    const data = (await res.json()) as { token: string; refresh_token: string };
+    window.localStorage.setItem(authTokenStorageKey, data.token);
+    window.localStorage.setItem(authRefreshTokenStorageKey, data.refresh_token);
+
+    return data.token;
+  })();
+
+  try {
+    const newToken = await refreshPromise;
+    return newToken;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { auth = true, query, headers, body, ...requestOptions } = options;
   const token = getAuthToken();
@@ -648,13 +695,29 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     requestHeaders.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(buildUrl(path, query), {
+  let response = await fetch(buildUrl(path, query), {
     ...requestOptions,
     body,
     headers: requestHeaders,
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && auth && path !== "/api/auth/refresh") {
+    try {
+      const newToken = await refreshAccessToken();
+      const retryHeaders = new Headers(headers);
+      if (body && !retryHeaders.has("Content-Type") && !(body instanceof FormData)) {
+        retryHeaders.set("Content-Type", "application/json");
+      }
+      retryHeaders.set("Authorization", `Bearer ${newToken}`);
+      response = await fetch(buildUrl(path, query), {
+        ...requestOptions,
+        body,
+        headers: retryHeaders,
+      });
+    } catch {
+      clearAuthSession();
+    }
+  } else if (response.status === 401) {
     clearAuthSession();
   }
 

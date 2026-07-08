@@ -97,7 +97,7 @@ export function Register() {
         email: normalizedForm.email,
         password: normalizedForm.password,
       });
-      saveAuthSession(loginResponse.token, loginResponse.user);
+      saveAuthSession(loginResponse.token, loginResponse.user, loginResponse.refresh_token);
       try {
         await refreshStoredUser(loginResponse.token);
       } catch {

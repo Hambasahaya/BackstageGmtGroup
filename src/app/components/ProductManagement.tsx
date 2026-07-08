@@ -377,6 +377,242 @@ export function ProductManagement() {
     }
   };
 
+  // Download CSV template
+  const downloadCSVTemplate = () => {
+    const headers = ["namaproduct", "price", "unit", "komisi", "deskripsi", "status"];
+    const sampleRow = ["GMT Lighting Premium Package", "25000000", "paket", "1500000", "Paket lighting profesional untuk event.", "tersedia"];
+    const csvContent = [headers.join(","), sampleRow.join(",")].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "template_import_produk.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Helper parser
+  const parseCSV = (text: string): string[][] => {
+    const firstLine = text.split(/\r?\n/)[0] || "";
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const delimiter = semicolonCount > commaCount ? ";" : ",";
+
+    const lines: string[][] = [];
+    let row: string[] = [""];
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          row[row.length - 1] += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delimiter && !inQuotes) {
+        row.push("");
+      } else if ((char === '\r' || char === '\n') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+        if (row.length > 1 || row[0] !== "") {
+          lines.push(row);
+        }
+        row = [""];
+      } else {
+        row[row.length - 1] += char;
+      }
+    }
+    if (row.length > 1 || row[0] !== "") {
+      lines.push(row);
+    }
+    return lines;
+  };
+
+  // Handle CSV Import
+  const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+
+    e.target.value = "";
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const csvText = event.target?.result as string;
+      if (!csvText) {
+        void Swal.fire({
+          icon: "error",
+          title: "File Kosong",
+          text: "File CSV tidak memiliki data.",
+          confirmButtonColor: "#0F766E",
+        });
+        return;
+      }
+
+      try {
+        const rows = parseCSV(csvText);
+        if (rows.length < 2) {
+          void Swal.fire({
+            icon: "warning",
+            title: "Data Tidak Cukup",
+            text: "Pastikan file CSV memiliki baris header dan minimal satu baris data.",
+            confirmButtonColor: "#0F766E",
+          });
+          return;
+        }
+
+        const headers = rows[0].map(h => h.trim().toLowerCase());
+        
+        const nameIdx = headers.indexOf("namaproduct");
+        const priceIdx = headers.indexOf("price");
+        const unitIdx = headers.indexOf("unit");
+        const komisiIdx = headers.indexOf("komisi");
+        const descIdx = headers.indexOf("deskripsi");
+        const statusIdx = headers.indexOf("status");
+
+        if (nameIdx === -1 || priceIdx === -1) {
+          void Swal.fire({
+            icon: "error",
+            title: "Format CSV Salah",
+            text: "Kolom 'namaproduct' dan 'price' wajib ada di baris header.",
+            confirmButtonColor: "#0F766E",
+          });
+          return;
+        }
+
+        void Swal.fire({
+          title: "Sedang Mengimpor Produk...",
+          html: "Mengambil data produk saat ini...",
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+
+        const currentProductsResponse = await api.products();
+        const currentProducts = currentProductsResponse.products || [];
+
+        let createdCount = 0;
+        let updatedCount = 0;
+        let skippedCount = 0;
+        let failedCount = 0;
+
+        const dataRows = rows.slice(1);
+        const totalRows = dataRows.length;
+
+        for (let i = 0; i < totalRows; i++) {
+          const row = dataRows[i];
+          
+          if (row.length === 0 || (row.length === 1 && row[0].trim() === "")) {
+            continue;
+          }
+
+          const rawName = row[nameIdx]?.trim() || "";
+          const rawPrice = row[priceIdx]?.trim() || "";
+
+          if (!rawName) {
+            failedCount++;
+            continue;
+          }
+          const parsedPrice = Number(rawPrice);
+          if (isNaN(parsedPrice) || parsedPrice < 1) {
+            failedCount++;
+            continue;
+          }
+
+          const rawUnit = unitIdx !== -1 ? row[unitIdx]?.trim() || "paket" : "paket";
+          const rawKomisi = komisiIdx !== -1 ? Number(row[komisiIdx]?.trim() || "0") : 0;
+          const parsedKomisi = isNaN(rawKomisi) ? 0 : rawKomisi;
+          const rawDesc = descIdx !== -1 ? row[descIdx] || "" : "";
+          const rawStatus = statusIdx !== -1 ? row[statusIdx]?.trim() || "tersedia" : "tersedia";
+
+          Swal.update({
+            html: `Memproses <b>${i + 1}</b> dari <b>${totalRows}</b> produk...<br/>
+                   <span class="text-xs text-slate-500">Produk: ${rawName}</span>`
+          });
+
+          const existing = currentProducts.find(
+            p => (p.namaproduct || "").toLowerCase().trim() === rawName.toLowerCase().trim()
+          );
+
+          if (existing) {
+            const hasChanges =
+              existing.price !== parsedPrice ||
+              (existing.unit || "paket").toLowerCase().trim() !== rawUnit.toLowerCase().trim() ||
+              (existing.komisi || 0) !== parsedKomisi ||
+              (existing.deskripsi || "") !== rawDesc ||
+              (existing.status || "tersedia").toLowerCase().trim() !== rawStatus.toLowerCase().trim();
+
+            if (hasChanges) {
+              try {
+                const payload = {
+                  namaproduct: rawName,
+                  deskripsi: rawDesc,
+                  unit: rawUnit,
+                  price: parsedPrice,
+                  status: rawStatus,
+                  komisi: parsedKomisi,
+                };
+                await api.updateProduct(existing.id, payload);
+                updatedCount++;
+              } catch {
+                failedCount++;
+              }
+            } else {
+              skippedCount++;
+            }
+          } else {
+            try {
+              const payload = {
+                namaproduct: rawName,
+                deskripsi: rawDesc,
+                unit: rawUnit,
+                price: parsedPrice,
+                status: rawStatus,
+                komisi: parsedKomisi,
+              };
+              await api.createProduct(payload);
+              createdCount++;
+            } catch {
+              failedCount++;
+            }
+          }
+        }
+
+        await Swal.fire({
+          icon: "success",
+          title: "Import Selesai",
+          html: `<div class="text-left space-y-2">
+                  <p>Proses import CSV telah selesai dengan rincian:</p>
+                  <ul class="list-disc pl-5 text-sm space-y-1">
+                    <li>Dibuat Baru: <b class="text-emerald-600">${createdCount}</b></li>
+                    <li>Diperbarui: <b class="text-blue-600">${updatedCount}</b></li>
+                    <li>Diabaikan (Sama): <b class="text-slate-600">${skippedCount}</b></li>
+                    <li>Gagal: <b class="text-rose-600">${failedCount}</b></li>
+                  </ul>
+                 </div>`,
+          confirmButtonColor: "#0F766E",
+        });
+
+        await loadProducts();
+      } catch (error) {
+        void Swal.fire({
+          icon: "error",
+          title: "Import Gagal",
+          text: error instanceof Error ? error.message : "Terjadi kesalahan saat memproses CSV.",
+          confirmButtonColor: "#0F766E",
+        });
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
   // Filtered products list for rendering
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -417,13 +653,33 @@ export function ProductManagement() {
             Kelola data katalog produk, status ketersediaan, komisi dasar, dan lihat struktur tiered commission agent.
           </p>
         </div>
-        <button
-          onClick={() => openForm(null)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#115E59] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
-        >
-          <Plus className="h-4 w-4" />
-          Tambah Produk
-        </button>
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            onClick={downloadCSVTemplate}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-350 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+          >
+            Download Template
+          </button>
+          
+          <label className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-350 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm cursor-pointer transition hover:bg-slate-50 focus-within:ring-2 focus-within:ring-teal-500">
+            <UploadCloud className="h-4 w-4 text-slate-500" />
+            Import CSV
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCSVImport}
+              className="sr-only"
+            />
+          </label>
+
+          <button
+            onClick={() => openForm(null)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#115E59] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+          >
+            <Plus className="h-4 w-4" />
+            Tambah Produk
+          </button>
+        </div>
       </div>
 
       {/* Stats Board */}

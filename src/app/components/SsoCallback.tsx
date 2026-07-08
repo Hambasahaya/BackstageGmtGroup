@@ -38,7 +38,7 @@ export function SsoCallback() {
           return;
         }
 
-        saveAuthSession(response.token, response.user);
+        saveAuthSession(response.token, response.user, response.refresh_token);
         let user = response.user;
         try {
           user = await refreshStoredUser(response.token);

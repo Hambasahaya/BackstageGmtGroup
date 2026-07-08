@@ -1,3 +1,12 @@
+# Production Build Outputs
+dist/
+build/
+.vercel/
+
+# Dependencies
+node_modules/
+
+# Environment files and credentials
 .env
 .env.metaa
 .env.ref
@@ -6,4 +15,22 @@
 .env.*.local
 gmtgroup-498208-1233a8991761.json
 *-meta-token-store.json
-vite-*.log
+
+# Unused/Temporary Data & Scripts
+raw_products.json
+testhalaman.html
+xss_pentest.py
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS and Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

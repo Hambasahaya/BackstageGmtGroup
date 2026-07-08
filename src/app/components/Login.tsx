@@ -37,7 +37,7 @@ export function Login() {
 
     try {
       const response = await api.login({ email, password });
-      saveAuthSession(response.token, response.user);
+      saveAuthSession(response.token, response.user, response.refresh_token);
       let user = response.user;
       try {
         user = await refreshStoredUser(response.token);

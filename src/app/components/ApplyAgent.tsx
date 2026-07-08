@@ -400,7 +400,7 @@ export function ApplyAgent() {
         domicile: verificationForm.domicile,
         ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
       });
-      const token = localStorage.getItem("gmt-auth-token") ?? "";
+      const token = getAuthToken() ?? "";
       saveAuthSession(token, response.user);
       setStatus(response.user.detail_user?.status ?? "verif");
       setIsVerificationCompleted(true);
