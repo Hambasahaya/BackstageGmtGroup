@@ -142,6 +142,7 @@ export function ProductManagement() {
   const [formPrice, setFormPrice] = useState<number | "">("");
   const [formStatus, setFormStatus] = useState("tersedia");
   const [formKomisi, setFormKomisi] = useState<number | "">("");
+  const [formCommissionTiers, setFormCommissionTiers] = useState<Record<string, number>>({});
   const [formPhotoPath, setFormPhotoPath] = useState(""); // For editing manually or viewing path
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -200,6 +201,7 @@ export function ProductManagement() {
       setFormStatus(product.status || "tersedia");
       setFormKomisi(product.komisi ?? "");
       setFormPhotoPath(product.foto || "");
+      setFormCommissionTiers(product.commission_tiers || {});
     } else {
       setEditingProduct(null);
       setFormName("");
@@ -209,6 +211,7 @@ export function ProductManagement() {
       setFormStatus("tersedia");
       setFormKomisi(0);
       setFormPhotoPath("");
+      setFormCommissionTiers({});
     }
     setIsFormOpen(true);
   };
@@ -285,6 +288,7 @@ export function ProductManagement() {
         formData.append("status", formStatus);
         formData.append("komisi", String(parsedKomisi));
         formData.append("foto", selectedFile);
+        formData.append("commission_tiers", JSON.stringify(formCommissionTiers));
 
         if (editingProduct) {
           response = await api.updateProduct(editingProduct.id, formData);
@@ -300,6 +304,7 @@ export function ProductManagement() {
           price: parsedPrice,
           status: formStatus,
           komisi: parsedKomisi,
+          commission_tiers: formCommissionTiers,
           ...(formPhotoPath ? { foto: formPhotoPath } : {}),
         };
 
@@ -522,6 +527,22 @@ export function ProductManagement() {
         if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi");
         if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi_0");
 
+        const getTierIdx = (p: string) => {
+          let idx = headers.indexOf(`komisi @ ${p}`);
+          if (idx === -1) idx = headers.indexOf(`komisi_${p}`);
+          if (idx === -1) idx = headers.indexOf(`komisi ${p}`);
+          return idx;
+        };
+
+        const tierIdxs: Record<string, number> = {
+          "5%": getTierIdx("5%"),
+          "10%": getTierIdx("10%"),
+          "15%": getTierIdx("15%"),
+          "20%": getTierIdx("20%"),
+          "25%": getTierIdx("25%"),
+          "28%": getTierIdx("28%"),
+        };
+
         const descIdx = headers.indexOf("deskripsi") !== -1 ? headers.indexOf("deskripsi") : headers.indexOf("description");
         const statusIdx = headers.indexOf("status");
 
@@ -581,6 +602,16 @@ export function ProductManagement() {
           const rawDesc = descIdx !== -1 ? row[descIdx] || "" : "";
           const rawStatus = statusIdx !== -1 ? row[statusIdx]?.trim() || "tersedia" : "tersedia";
 
+          const commission_tiers: Record<string, number> = {};
+          Object.entries(tierIdxs).forEach(([key, idx]) => {
+            if (idx !== -1) {
+              const rawVal = row[idx]?.trim();
+              if (rawVal) {
+                commission_tiers[key] = cleanNumber(rawVal);
+              }
+            }
+          });
+
           Swal.update({
             html: `Memproses <b>${i + 1}</b> dari <b>${totalRows}</b> produk...<br/>
                    <span class="text-xs text-slate-500">Produk: ${rawName}</span>`
@@ -591,15 +622,31 @@ export function ProductManagement() {
           );
 
           if (existing) {
+            const tiersChanged = () => {
+              if (Object.keys(commission_tiers).length === 0) return false;
+              const existingTiers = existing.commission_tiers || {};
+              for (const key of ["5%", "10%", "15%", "20%", "25%", "28%"]) {
+                if (commission_tiers[key] !== undefined && commission_tiers[key] !== existingTiers[key]) {
+                  return true;
+                }
+              }
+              return false;
+            };
+
             const hasChanges =
               existing.price !== parsedPrice ||
               (existing.unit || "paket").toLowerCase().trim() !== rawUnit.toLowerCase().trim() ||
               (existing.komisi || 0) !== parsedKomisi ||
               (existing.deskripsi || "") !== rawDesc ||
-              (existing.status || "tersedia").toLowerCase().trim() !== rawStatus.toLowerCase().trim();
+              (existing.status || "tersedia").toLowerCase().trim() !== rawStatus.toLowerCase().trim() ||
+              tiersChanged();
 
             if (hasChanges) {
               try {
+                const mergedTiers = {
+                  ...(existing.commission_tiers || {}),
+                  ...commission_tiers,
+                };
                 const payload = {
                   namaproduct: rawName,
                   deskripsi: rawDesc,
@@ -607,6 +654,7 @@ export function ProductManagement() {
                   price: parsedPrice,
                   status: rawStatus,
                   komisi: parsedKomisi,
+                  commission_tiers: mergedTiers,
                 };
                 await api.updateProduct(existing.id, payload);
                 updatedCount++;
@@ -625,6 +673,7 @@ export function ProductManagement() {
                 price: parsedPrice,
                 status: rawStatus,
                 komisi: parsedKomisi,
+                commission_tiers,
               };
               await api.createProduct(payload);
               createdCount++;
@@ -1076,6 +1125,44 @@ export function ProductManagement() {
                   className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                 />
               </label>
+
+              {/* Tiering Commission Fields */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Tiering Komisi Agen Resmi (IDR)
+                </span>
+                <p className="text-[10px] text-slate-400 -mt-1.5">
+                  Nilai komisi untuk masing-masing tingkat diskon agen. Jika dikosongkan, sistem akan menghitung secara otomatis.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {["5%", "10%", "15%", "20%", "25%", "28%"].map((tier) => (
+                    <label key={tier} className="block">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase">
+                        Diskon {tier}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formCommissionTiers[tier] !== undefined ? formCommissionTiers[tier] : ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? "" : Number(e.target.value);
+                          setFormCommissionTiers((prev) => {
+                            const updated = { ...prev };
+                            if (val === "") {
+                              delete updated[tier];
+                            } else {
+                              updated[tier] = val;
+                            }
+                            return updated;
+                          });
+                        }}
+                        placeholder="Dihitung otomatis"
+                        className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs outline-none transition focus:border-[#0F766E]"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
 
               {/* Photo Input options */}
               <div className="space-y-2">
