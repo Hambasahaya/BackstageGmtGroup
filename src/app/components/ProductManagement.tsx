@@ -379,8 +379,36 @@ export function ProductManagement() {
 
   // Download CSV template
   const downloadCSVTemplate = () => {
-    const headers = ["namaproduct", "price", "unit", "komisi", "deskripsi", "status"];
-    const sampleRow = ["GMT Lighting Premium Package", "25000000", "paket", "1500000", "Paket lighting profesional untuk event.", "tersedia"];
+    const headers = [
+      "namaproduct",
+      "price",
+      "unit",
+      "komisi",
+      "deskripsi",
+      "status",
+      "komisi_0%",
+      "komisi_5%",
+      "komisi_10%",
+      "komisi_15%",
+      "komisi_20%",
+      "komisi_25%",
+      "komisi_28%"
+    ];
+    const sampleRow = [
+      "GMT Lighting Premium Package",
+      "25000000",
+      "paket",
+      "1500000",
+      "Paket lighting profesional untuk event.",
+      "tersedia",
+      "1500000",
+      "1337000",
+      "1175000",
+      "1012000",
+      "850000",
+      "687000",
+      "590000"
+    ];
     const csvContent = [headers.join(","), sampleRow.join(",")].join("\r\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -471,7 +499,10 @@ export function ProductManagement() {
         const nameIdx = headers.indexOf("namaproduct");
         const priceIdx = headers.indexOf("price");
         const unitIdx = headers.indexOf("unit");
-        const komisiIdx = headers.indexOf("komisi");
+        let komisiIdx = headers.indexOf("komisi");
+        if (komisiIdx === -1) {
+          komisiIdx = headers.findIndex(h => h === "komisi_0%" || h === "komisi 0%" || h === "komisi_0");
+        }
         const descIdx = headers.indexOf("deskripsi");
         const statusIdx = headers.indexOf("status");
 
