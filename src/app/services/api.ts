@@ -301,6 +301,42 @@ export type EducationPayload = {
   venue?: string;
 };
 
+export type ArticleSEO = {
+  title?: string;
+  description?: string;
+  canonical_url?: string;
+};
+
+export type ArticleDto = {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content?: string;
+  featured_image?: string;
+  author?: string;
+  source_url?: string;
+  status: string;
+  seo?: ArticleSEO;
+  published_at?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ArticlePayload = {
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content?: string;
+  featured_image?: string;
+  author?: string;
+  source_url?: string;
+  status?: string;
+  seo?: ArticleSEO;
+  published_at?: string;
+  updated_at?: string;
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
 const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
@@ -945,4 +981,26 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   deleteEducation: (id: string) => apiRequest<{ success?: boolean; message?: string }>(`/api/educations/${id}`, { method: "DELETE" }),
+  articles: (query?: { search?: string; status?: string; page?: number; limit?: number }) =>
+    apiRequest<{ articles: ArticleDto[]; meta: { total: number; page: number; limit: number; total_pages: number } }>("/api/articles", {
+      auth: false,
+      query,
+    }),
+  articleDetail: (id: string | number) => apiRequest<{ article: ArticleDto }>(`/api/articles/${id}`, { auth: false }),
+  createArticle: (payload: ArticlePayload) =>
+    apiRequest<{ message: string; article: ArticleDto }>("/api/articles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateArticle: (id: string | number, payload: ArticlePayload) =>
+    apiRequest<{ message: string; article: ArticleDto }>(`/api/articles/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteArticle: (id: string | number) => apiRequest<{ message: string }>(`/api/articles/${id}`, { method: "DELETE" }),
+  importArticles: (payload: { articles: ArticlePayload[] }) =>
+    apiRequest<{ message: string; created_count: number; skipped_count: number; created: ArticleDto[]; skipped_slugs: string[] }>("/api/articles/import", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

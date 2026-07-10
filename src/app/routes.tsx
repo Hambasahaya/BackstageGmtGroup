@@ -20,8 +20,8 @@ import { SalesOrders } from "./components/SalesOrders";
 import { SsoCallback } from "./components/SsoCallback";
 import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
 import { ProductManagement } from "./components/ProductManagement";
+import { ArticleManagement } from "./components/ArticleManagement";
 import {
-  ArticleManagement,
   MediaLibrary,
   MarketingIntegrations,
   ModelKnowledgeBaseManagement,

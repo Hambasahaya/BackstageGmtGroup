@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node ./node_modules/vite/bin/vite.js build",
-    "dev": "node ./node_modules/vite/bin/vite.js"
+    "dev": "node ./node_modules/vite/bin/vite.js",
+    "articles:migrate": "node ./scripts/migrate-old-articles.mjs"
   },
   "dependencies": {
     "@tensorflow-models/blazeface": "^0.1.0",
