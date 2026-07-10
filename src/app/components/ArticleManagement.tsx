@@ -46,6 +46,61 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function MultiSelectCheckbox({ 
+  items, 
+  selectedIds, 
+  onChange, 
+  placeholder = "Cari..." 
+}: { 
+  items: { id: number; label: string }[]; 
+  selectedIds: number[]; 
+  onChange: (ids: number[]) => void;
+  placeholder?: string;
+}) {
+  const [search, setSearch] = useState("");
+  
+  const filteredItems = items.filter(item => 
+    item.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleSelection = (id: number) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(val => val !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-slate-300 bg-white p-2">
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="block w-full rounded-md border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 border focus:border-[#0F766E] focus:ring-1 focus:ring-[#0F766E] outline-none"
+      />
+      <div className="max-h-40 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+        {filteredItems.length === 0 ? (
+          <p className="text-xs text-slate-500 py-2 text-center">Tidak ada data.</p>
+        ) : (
+          filteredItems.map(item => (
+            <label key={item.id} className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(item.id)}
+                onChange={() => toggleSelection(item.id)}
+                className="mt-0.5 rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
+              />
+              <span className="text-sm text-slate-700 leading-snug">{item.label}</span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ArticleManagement() {
   const [articles, setArticles] = useState<ArticleDto[]>([]);
   const [allProducts, setAllProducts] = useState<ProductDto[]>([]);
@@ -532,39 +587,29 @@ export function ArticleManagement() {
                   </div>
                   
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Products Employed</label>
-                    <select
-                      multiple
-                      value={formRelatedProducts.map(String)}
-                      onChange={(e) => {
-                        const values = Array.from(e.target.selectedOptions, option => Number(option.value));
-                        setFormRelatedProducts(values);
-                      }}
-                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E] h-24"
-                    >
-                      {allProducts.map(p => (
-                        <option key={p.id} value={p.id}>{p.namaproduct}</option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-xs text-slate-500">Tahan Ctrl/Cmd untuk memilih lebih dari satu.</p>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 flex justify-between">
+                      <span>Products Employed</span>
+                      <span className="text-xs text-[#0F766E] bg-teal-50 px-2 py-0.5 rounded-full">{formRelatedProducts.length} dipilih</span>
+                    </label>
+                    <MultiSelectCheckbox
+                      items={allProducts.map(p => ({ id: p.id, label: p.namaproduct }))}
+                      selectedIds={formRelatedProducts}
+                      onChange={setFormRelatedProducts}
+                      placeholder="Cari produk..."
+                    />
                   </div>
                   
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Similar Posts</label>
-                    <select
-                      multiple
-                      value={formRelatedArticles.map(String)}
-                      onChange={(e) => {
-                        const values = Array.from(e.target.selectedOptions, option => Number(option.value));
-                        setFormRelatedArticles(values);
-                      }}
-                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E] h-24"
-                    >
-                      {allArticles.map(a => (
-                        <option key={a.id} value={a.id}>{a.title}</option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-xs text-slate-500">Tahan Ctrl/Cmd untuk memilih lebih dari satu.</p>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 flex justify-between">
+                      <span>Similar Posts</span>
+                      <span className="text-xs text-[#0F766E] bg-teal-50 px-2 py-0.5 rounded-full">{formRelatedArticles.length} dipilih</span>
+                    </label>
+                    <MultiSelectCheckbox
+                      items={allArticles.filter(a => a.id !== editingArticle?.id).map(a => ({ id: a.id, label: a.title }))}
+                      selectedIds={formRelatedArticles}
+                      onChange={setFormRelatedArticles}
+                      placeholder="Cari artikel..."
+                    />
                   </div>
 
                   <div>
