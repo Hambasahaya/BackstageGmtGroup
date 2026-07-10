@@ -307,10 +307,17 @@ export type ArticleSEO = {
   canonical_url?: string;
 };
 
+export type ArticleMetadata = {
+  gallery?: string[];
+  related_products?: number[];
+  related_articles?: number[];
+};
+
 export type ArticleDto = {
   id: number;
   title: string;
   slug: string;
+  category?: string;
   excerpt?: string;
   content?: string;
   featured_image?: string;
@@ -318,6 +325,7 @@ export type ArticleDto = {
   source_url?: string;
   status: string;
   seo?: ArticleSEO;
+  metadata?: ArticleMetadata;
   published_at?: string;
   created_at?: string;
   updated_at?: string;
@@ -326,6 +334,7 @@ export type ArticleDto = {
 export type ArticlePayload = {
   title: string;
   slug: string;
+  category?: string;
   excerpt?: string;
   content?: string;
   featured_image?: string;
@@ -333,6 +342,7 @@ export type ArticlePayload = {
   source_url?: string;
   status?: string;
   seo?: ArticleSEO;
+  metadata?: ArticleMetadata;
   published_at?: string;
   updated_at?: string;
 };

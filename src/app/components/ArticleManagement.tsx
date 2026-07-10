@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { api, type ArticleDto, type ArticlePayload } from "../services/api";
+import { api, type ArticleDto, type ArticlePayload, type ProductDto } from "../services/api";
 
 const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit",
@@ -48,6 +48,8 @@ function StatusBadge({ status }: { status: string }) {
 
 export function ArticleManagement() {
   const [articles, setArticles] = useState<ArticleDto[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductDto[]>([]);
+  const [allArticles, setAllArticles] = useState<ArticleDto[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -66,6 +68,7 @@ export function ArticleManagement() {
   // Form inputs state
   const [formTitle, setFormTitle] = useState("");
   const [formSlug, setFormSlug] = useState("");
+  const [formCategory, setFormCategory] = useState("");
   const [formExcerpt, setFormExcerpt] = useState("");
   const [formContent, setFormContent] = useState("");
   const [formFeaturedImage, setFormFeaturedImage] = useState("");
@@ -76,6 +79,9 @@ export function ArticleManagement() {
   const [formSeoDesc, setFormSeoDesc] = useState("");
   const [formSeoCanonical, setFormSeoCanonical] = useState("");
   const [formPublishedAt, setFormPublishedAt] = useState("");
+  const [formGallery, setFormGallery] = useState("");
+  const [formRelatedProducts, setFormRelatedProducts] = useState<number[]>([]);
+  const [formRelatedArticles, setFormRelatedArticles] = useState<number[]>([]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -114,11 +120,18 @@ export function ArticleManagement() {
     void loadArticles(debouncedSearch, page, statusFilter);
   }, [debouncedSearch, page, statusFilter]);
 
+  useEffect(() => {
+    // Load products and all articles for the multi-select fields
+    void api.products().then((res) => setAllProducts(res.products || []));
+    void api.articles({ limit: 100 }).then((res) => setAllArticles(res.articles || []));
+  }, []);
+
   const openForm = (article: ArticleDto | null = null) => {
     if (article) {
       setEditingArticle(article);
       setFormTitle(article.title || "");
       setFormSlug(article.slug || "");
+      setFormCategory(article.category || "");
       setFormExcerpt(article.excerpt || "");
       setFormContent(article.content || "");
       setFormFeaturedImage(article.featured_image || "");
@@ -129,10 +142,14 @@ export function ArticleManagement() {
       setFormSeoDesc(article.seo?.description || "");
       setFormSeoCanonical(article.seo?.canonical_url || "");
       setFormPublishedAt(article.published_at ? new Date(article.published_at).toISOString().slice(0, 16) : "");
+      setFormGallery((article.metadata?.gallery || []).join("\n"));
+      setFormRelatedProducts(article.metadata?.related_products || []);
+      setFormRelatedArticles(article.metadata?.related_articles || []);
     } else {
       setEditingArticle(null);
       setFormTitle("");
       setFormSlug("");
+      setFormCategory("");
       setFormExcerpt("");
       setFormContent("");
       setFormFeaturedImage("");
@@ -143,6 +160,9 @@ export function ArticleManagement() {
       setFormSeoDesc("");
       setFormSeoCanonical("");
       setFormPublishedAt("");
+      setFormGallery("");
+      setFormRelatedProducts([]);
+      setFormRelatedArticles([]);
     }
     setIsFormOpen(true);
   };
@@ -162,9 +182,12 @@ export function ArticleManagement() {
 
     setIsSaving(true);
     try {
+      const galleryUrls = formGallery.split("\n").map(u => u.trim()).filter(u => u !== "");
+      
       const payload: ArticlePayload = {
         title: formTitle,
         slug: formSlug,
+        category: formCategory,
         excerpt: formExcerpt,
         content: formContent,
         featured_image: formFeaturedImage,
@@ -176,6 +199,11 @@ export function ArticleManagement() {
           description: formSeoDesc,
           canonical_url: formSeoCanonical,
         },
+        metadata: {
+          gallery: galleryUrls,
+          related_products: formRelatedProducts,
+          related_articles: formRelatedArticles,
+        }
       };
 
       if (formPublishedAt) {
@@ -439,7 +467,7 @@ export function ArticleManagement() {
                       required
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="mb-1 block text-sm font-medium text-slate-700">Slug URL *</label>
                     <input
                       type="text"
@@ -448,7 +476,16 @@ export function ArticleManagement() {
                       className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
                       required
                     />
-                    <p className="mt-1 text-xs text-slate-500">Unik dan digunakan pada URL (contoh: judul-artikel-keren).</p>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Kategori</label>
+                    <input
+                      type="text"
+                      value={formCategory}
+                      onChange={(e) => setFormCategory(e.target.value)}
+                      placeholder="Contoh: Media, Case Studies"
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
+                    />
                   </div>
 
                   <div className="col-span-2">
@@ -474,8 +511,8 @@ export function ArticleManagement() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 border-t border-slate-100 pt-6">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Gambar Utama (URL)</label>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Gambar Utama (Featured Image)</label>
                     <input
                       type="text"
                       value={formFeaturedImage}
@@ -483,6 +520,53 @@ export function ArticleManagement() {
                       className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
                     />
                   </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Galeri Carousel (1 URL per baris)</label>
+                    <textarea
+                      value={formGallery}
+                      onChange={(e) => setFormGallery(e.target.value)}
+                      rows={3}
+                      placeholder="https://url.com/img1.jpg&#10;https://url.com/img2.jpg"
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
+                    />
+                  </div>
+                  
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Products Employed</label>
+                    <select
+                      multiple
+                      value={formRelatedProducts.map(String)}
+                      onChange={(e) => {
+                        const values = Array.from(e.target.selectedOptions, option => Number(option.value));
+                        setFormRelatedProducts(values);
+                      }}
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E] h-24"
+                    >
+                      {allProducts.map(p => (
+                        <option key={p.id} value={p.id}>{p.namaproduct}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">Tahan Ctrl/Cmd untuk memilih lebih dari satu.</p>
+                  </div>
+                  
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Similar Posts</label>
+                    <select
+                      multiple
+                      value={formRelatedArticles.map(String)}
+                      onChange={(e) => {
+                        const values = Array.from(e.target.selectedOptions, option => Number(option.value));
+                        setFormRelatedArticles(values);
+                      }}
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E] h-24"
+                    >
+                      {allArticles.map(a => (
+                        <option key={a.id} value={a.id}>{a.title}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">Tahan Ctrl/Cmd untuk memilih lebih dari satu.</p>
+                  </div>
+
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">URL Sumber Referensi</label>
                     <input
