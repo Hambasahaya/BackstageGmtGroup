@@ -991,7 +991,7 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   deleteEducation: (id: string) => apiRequest<{ success?: boolean; message?: string }>(`/api/educations/${id}`, { method: "DELETE" }),
-  articles: (query?: { search?: string; status?: string; page?: number; limit?: number }) =>
+  articles: (query?: { search?: string; status?: string; category?: string; page?: number; limit?: number }) =>
     apiRequest<{ articles: ArticleDto[]; meta: { total: number; page: number; limit: number; total_pages: number } }>("/api/articles", {
       auth: false,
       query,

@@ -109,8 +109,16 @@ export function ArticleManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const articleCategories = useMemo(() => {
+    const cats = allArticles
+      .map((a) => a.category)
+      .filter((c): c is string => typeof c === "string" && c.trim() !== "");
+    return Array.from(new Set(cats));
+  }, [allArticles]);
 
   // Pagination (simple implementation for now, assuming max 100 items per request)
   const [page, setPage] = useState(1);
@@ -147,12 +155,13 @@ export function ArticleManagement() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  const loadArticles = async (searchVal = debouncedSearch, currentPage = page, status = statusFilter) => {
+  const loadArticles = async (searchVal = debouncedSearch, currentPage = page, status = statusFilter, category = categoryFilter) => {
     setIsLoading(true);
     try {
       const response = await api.articles({
         search: searchVal || undefined,
         status: status === "all" ? undefined : status,
+        category: category === "all" ? undefined : category,
         page: currentPage,
         limit,
       });
@@ -173,8 +182,8 @@ export function ArticleManagement() {
   };
 
   useEffect(() => {
-    void loadArticles(debouncedSearch, page, statusFilter);
-  }, [debouncedSearch, page, statusFilter]);
+    void loadArticles(debouncedSearch, page, statusFilter, categoryFilter);
+  }, [debouncedSearch, page, statusFilter, categoryFilter]);
 
   useEffect(() => {
     // Load products and all articles for the multi-select fields
@@ -280,6 +289,7 @@ export function ArticleManagement() {
       });
 
       setIsFormOpen(false);
+      void api.articles({ limit: 100 }).then((res) => setAllArticles(res.articles || []));
       await loadArticles();
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Gagal menyimpan artikel.";
@@ -316,6 +326,7 @@ export function ArticleManagement() {
         text: "Artikel berhasil dihapus.",
         confirmButtonColor: "#0F766E",
       });
+      void api.articles({ limit: 100 }).then((res) => setAllArticles(res.articles || []));
       await loadArticles();
     } catch (error) {
       void Swal.fire({
@@ -376,24 +387,48 @@ export function ArticleManagement() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="statusFilter" className="text-sm font-medium text-slate-700">
-            Status:
-          </label>
-          <select
-            id="statusFilter"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-3 pr-8 text-sm font-medium text-slate-700 focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
-          >
-            <option value="all">Semua</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="archived">Archived</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="categoryFilter" className="text-sm font-medium text-slate-700">
+              Kategori:
+            </label>
+            <select
+              id="categoryFilter"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-3 pr-8 text-sm font-medium text-slate-700 focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
+            >
+              <option value="all">Semua Kategori</option>
+              {articleCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="statusFilter" className="text-sm font-medium text-slate-700">
+              Status:
+            </label>
+            <select
+              id="statusFilter"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-slate-300 bg-slate-50 py-2.5 pl-3 pr-8 text-sm font-medium text-slate-700 focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
+            >
+              <option value="all">Semua Status</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -404,6 +439,7 @@ export function ArticleManagement() {
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-6 py-4 font-semibold text-slate-900">Judul & Slug</th>
+                <th className="px-6 py-4 font-semibold text-slate-900">Kategori</th>
                 <th className="px-6 py-4 font-semibold text-slate-900">Penulis</th>
                 <th className="px-6 py-4 font-semibold text-slate-900">Status</th>
                 <th className="px-6 py-4 font-semibold text-slate-900">Tanggal Publish</th>
@@ -413,13 +449,13 @@ export function ArticleManagement() {
             <tbody className="divide-y divide-slate-200 bg-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     Memuat data artikel...
                   </td>
                 </tr>
               ) : articles.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     <FileText className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                     Tidak ada artikel yang ditemukan.
                   </td>
@@ -430,6 +466,15 @@ export function ArticleManagement() {
                     <td className="px-6 py-4">
                       <div className="font-semibold text-slate-900 line-clamp-1">{article.title}</div>
                       <div className="mt-1 text-xs text-slate-500 line-clamp-1 truncate max-w-xs">{article.slug}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {article.category ? (
+                        <span className="inline-flex items-center rounded-md bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700 ring-1 ring-inset ring-teal-600/20">
+                          {article.category}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-slate-600">{article.author || "-"}</td>
                     <td className="px-6 py-4">
