@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { api, type ArticleDto, type ArticlePayload, type ProductDto } from "../services/api";
+import { RichTextEditor } from "./RichTextEditor";
 
 const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit",
@@ -554,13 +555,11 @@ export function ArticleManagement() {
                   </div>
 
                   <div className="col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Konten Artikel (HTML)</label>
-                    <textarea
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Konten Artikel (Word & Visual)</label>
+                    <RichTextEditor
                       value={formContent}
-                      onChange={(e) => setFormContent(e.target.value)}
-                      rows={8}
-                      className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono text-slate-700 focus:border-[#0F766E] focus:outline-none focus:ring-1 focus:ring-[#0F766E]"
-                      placeholder="<h1>Judul</h1><p>Isi paragraf...</p>"
+                      onChange={setFormContent}
+                      placeholder="Tulis konten artikel Anda di sini..."
                     />
                   </div>
                 </div>
