@@ -117,7 +117,7 @@ export function ResetPassword() {
             onChange={(event) => setNewPassword(event.target.value)}
             type="password"
             className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none transition placeholder:text-[#555] focus:border-white"
-            placeholder="confirm new password" // matching placeholder in mockup
+            placeholder="confirm new password"
             required
           />
         </label>
