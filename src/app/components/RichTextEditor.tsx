@@ -17,7 +17,9 @@ import {
   ListOrdered,
   RemoveFormatting,
   Strikethrough,
+  Table,
   Underline,
+  Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -127,6 +129,68 @@ export function RichTextEditor({ value, onChange, placeholder = "Mulai menulis d
     if (url) {
       executeCommand("insertImage", url);
     }
+  };
+
+  const handleUploadImage = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          alert("Ukuran gambar melebihi 2MB. Silakan pilih file yang lebih kecil.");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          const base64 = readerEvent.target?.result as string;
+          if (base64) {
+            const imgHtml = `<img src="${base64}" alt="${file.name}" class="max-w-full h-auto rounded-lg shadow-md my-4 block mx-auto" />`;
+            executeCommand("insertHTML", imgHtml);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleInsertTable = () => {
+    const rowsStr = prompt("Masukkan jumlah baris (Rows):", "3");
+    if (!rowsStr) return;
+    const colsStr = prompt("Masukkan jumlah kolom (Columns):", "3");
+    if (!colsStr) return;
+    
+    const rows = parseInt(rowsStr, 10);
+    const cols = parseInt(colsStr, 10);
+    
+    if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
+      alert("Jumlah baris dan kolom harus berupa angka lebih besar dari 0.");
+      return;
+    }
+    
+    let tableHtml = `<table class="wysiwyg-table w-full border-collapse border border-slate-300 my-4 text-sm">`;
+    
+    // Header
+    tableHtml += `<thead><tr class="bg-slate-50">`;
+    for (let c = 1; c <= cols; c++) {
+      tableHtml += `<th class="border border-slate-300 p-2 font-semibold text-slate-700 text-left">Header ${c}</th>`;
+    }
+    tableHtml += `</tr></thead>`;
+    
+    // Body
+    tableHtml += `<tbody>`;
+    for (let r = 1; r <= rows; r++) {
+      tableHtml += `<tr>`;
+      for (let c = 1; c <= cols; c++) {
+        tableHtml += `<td class="border border-slate-300 p-2">Baris ${r}, Kolom ${c}</td>`;
+      }
+      tableHtml += `</tr>`;
+    }
+    tableHtml += `</tbody></table><p><br></p>`;
+    
+    executeCommand("insertHTML", tableHtml);
   };
 
   const handleFormatBlock = (tag: string) => {
@@ -348,6 +412,24 @@ export function RichTextEditor({ value, onChange, placeholder = "Mulai menulis d
             title="Sisipkan Gambar URL"
           >
             <ImageIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            disabled={isSourceMode}
+            onClick={handleUploadImage}
+            className="rounded p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition disabled:opacity-50"
+            title="Unggah Gambar File"
+          >
+            <Upload className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            disabled={isSourceMode}
+            onClick={handleInsertTable}
+            className="rounded p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition disabled:opacity-50"
+            title="Sisipkan Tabel"
+          >
+            <Table className="h-4 w-4" />
           </button>
         </div>
 

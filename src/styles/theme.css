@@ -273,3 +273,32 @@
   margin: 2rem 0 !important;
 }
 
+/* WYSIWYG Visual Table Styling */
+.wysiwyg-content table.wysiwyg-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 1.5rem 0 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+}
+
+.wysiwyg-content table.wysiwyg-table th {
+  border: 1px solid #cbd5e1 !important;
+  background-color: #f1f5f9 !important;
+  padding: 0.625rem 0.875rem !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  text-align: left !important;
+}
+
+.wysiwyg-content table.wysiwyg-table td {
+  border: 1px solid #e2e8f0 !important;
+  padding: 0.625rem 0.875rem !important;
+  color: #334155 !important;
+  background-color: #ffffff !important;
+}
+
+.wysiwyg-content table.wysiwyg-table tr:nth-child(even) td {
+  background-color: #f8fafc !important;
+}
+
