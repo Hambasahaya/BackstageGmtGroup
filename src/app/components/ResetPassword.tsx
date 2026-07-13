@@ -60,7 +60,7 @@ export function ResetPassword() {
       });
 
       setSuccessMessage(response.message || "Password updated successfully! Redirecting to login...");
-      
+
       setTimeout(() => {
         navigate("/login");
       }, 2000);

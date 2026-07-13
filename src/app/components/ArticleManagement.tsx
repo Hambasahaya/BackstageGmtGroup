@@ -1,7 +1,9 @@
 import {
   Check,
   Edit3,
+  EyeOff,
   FileText,
+  Globe,
   Plus,
   RefreshCw,
   Search,
@@ -338,6 +340,61 @@ export function ArticleManagement() {
     }
   };
 
+  const handleTogglePublish = async (article: ArticleDto) => {
+    const isPublishing = article.status !== "published";
+    const newStatus = isPublishing ? "published" : "draft";
+
+    const result = await Swal.fire({
+      title: isPublishing ? "Publikasikan Artikel?" : "Kembalikan ke Draft?",
+      text: `Apakah Anda yakin ingin mengubah status "${article.title}" menjadi ${newStatus}?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#0F766E",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: isPublishing ? "Ya, Publikasikan!" : "Ya, Jadikan Draft",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const payload: ArticlePayload = {
+        title: article.title,
+        slug: article.slug,
+        category: article.category,
+        excerpt: article.excerpt,
+        content: article.content,
+        featured_image: article.featured_image,
+        author: article.author,
+        source_url: article.source_url,
+        status: newStatus,
+        seo: article.seo,
+        metadata: article.metadata,
+        published_at: isPublishing ? new Date().toISOString() : article.published_at,
+      };
+
+      await api.updateArticle(article.id, payload);
+
+      await Swal.fire({
+        icon: "success",
+        title: isPublishing ? "Artikel Dipublikasikan" : "Artikel Dijadikan Draft",
+        text: `Status artikel berhasil diubah menjadi ${newStatus}.`,
+        confirmButtonColor: "#0F766E",
+      });
+
+      void api.articles({ limit: 100 }).then((res) => setAllArticles(res.articles || []));
+      await loadArticles();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Gagal memperbarui status artikel.";
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: msg,
+        confirmButtonColor: "#0F766E",
+      });
+    }
+  };
+
   const stats = useMemo(() => {
     return {
       total: articles.length, // Displaying current page items count for simplicity, actual total needs a separate endpoint or from meta
@@ -485,6 +542,23 @@ export function ArticleManagement() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {article.status === "published" ? (
+                          <button
+                            onClick={() => handleTogglePublish(article)}
+                            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-amber-50 hover:text-amber-600"
+                            title="Kembalikan ke Draft"
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleTogglePublish(article)}
+                            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-600"
+                            title="Publikasikan Artikel"
+                          >
+                            <Globe className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => openForm(article)}
                           className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-50 hover:text-[#0F766E]"
