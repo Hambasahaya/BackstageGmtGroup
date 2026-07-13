@@ -388,16 +388,16 @@ export function RichTextEditor({ value, onChange, placeholder = "Mulai menulis d
       </div>
 
       {/* Editor Canvas Page (Word Style) */}
-      <div className="bg-slate-100 p-4 sm:p-6 overflow-y-auto max-h-[550px] custom-scrollbar flex justify-center">
+      <div className="bg-slate-100 p-4 sm:p-6 overflow-y-auto max-h-[550px] custom-scrollbar">
         {isSourceMode ? (
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full max-w-3xl min-h-[450px] rounded-lg border border-slate-350 bg-slate-950 p-5 font-mono text-xs text-slate-200 outline-none focus:ring-1 focus:ring-slate-500"
+            className="w-full max-w-3xl mx-auto block min-h-[450px] rounded-lg border border-slate-350 bg-slate-950 p-5 font-mono text-xs text-slate-200 outline-none focus:ring-1 focus:ring-slate-500"
             placeholder="<h1>Judul</h1><p>Tulis kode HTML di sini...</p>"
           />
         ) : (
-          <div className="w-full max-w-3xl rounded-md bg-white p-8 sm:p-12 shadow-md border border-slate-200 relative min-h-[450px] transition-all hover:shadow-lg">
+          <div className="w-full max-w-3xl mx-auto rounded-md bg-white p-8 sm:p-12 shadow-md border border-slate-200 relative min-h-[450px] transition-all hover:shadow-lg">
             {/* Native style target */}
             <div
               ref={editorRef}
