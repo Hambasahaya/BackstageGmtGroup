@@ -78,7 +78,7 @@ const ACHIEVEMENT_TIERS: AchievementTier[] = [
   },
   {
     name: "Elite Diamond Agent",
-    target: 1200000000, // 1.2 Miliar
+    target: 1200000000, //
     reward: "Extra Komisi 3.0% + Trip Liburan Tahunan ke Bali (Full Akomodasi)",
     commissionBonus: "+3% Rate",
     color: "text-blue-600 border-blue-200 bg-blue-50",
@@ -469,8 +469,6 @@ export function AgentAchievement() {
           </span>
         </div>
       </section>
-
-      {/* HISTORY CONTRIBUTING PREORDERS (TABLE OF APPROVED PREORDERS) */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-950">Histori Penjualan Berkontribusi</h2>
         <p className="mt-1 text-sm text-slate-500">Daftar Preorder Anda yang disetujui dan terhitung dalam persentase progres di atas.</p>
@@ -523,7 +521,7 @@ export function AgentAchievement() {
             <AlertCircle className="mx-auto h-8 w-8 text-slate-400" />
             <p className="mt-2 text-sm font-semibold text-slate-900">Belum Ada Penjualan Real yang Disetujui</p>
             <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
-              Penjualan real Anda dari menu **Purchase Order** akan terhitung otomatis di halaman ini setelah disetujui oleh pihak GMT Admin.
+              Penjualan real Anda dari menu **Purchase Order** akan terhitung otomatis di halaman ini setelah disetujui oleh pihak GMT Suites.
             </p>
           </div>
         )}

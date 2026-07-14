@@ -27,7 +27,7 @@ export function SsoCallback() {
 
       if (!code) {
         setStatus("error");
-        setMessage("terjadi kesalahan");
+        setMessage("Uh-oh! Something went wrong");
         return;
       }
 
@@ -46,7 +46,7 @@ export function SsoCallback() {
           // SSO response still carries role for the normal redirect path.
         }
         setStatus("success");
-        setMessage("Authentikasi berhasil! Mengarahkan ke halaman utama...");
+        setMessage("Hang tight... we're getting everything ready for you.");
         navigate(getRoleHomePath(user), { replace: true });
       } catch (error) {
         if (!isActive) {
@@ -54,7 +54,7 @@ export function SsoCallback() {
         }
 
         setStatus("error");
-        setMessage(error instanceof Error ? error.message : "Gagal menukar kode SSO.");
+        setMessage(error instanceof Error ? error.message : "Soryy,terjadi error");
       }
     };
 
@@ -75,9 +75,8 @@ export function SsoCallback() {
     <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-4 text-slate-900">
       <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
         <div
-          className={`mx-auto flex h-12 w-12 items-center justify-center rounded-lg ${
-            status === "error" ? "bg-rose-50 text-rose-600" : "bg-teal-50 text-[#0F766E]"
-          }`}
+          className={`mx-auto flex h-12 w-12 items-center justify-center rounded-lg ${status === "error" ? "bg-rose-50 text-rose-600" : "bg-teal-50 text-[#0F766E]"
+            }`}
         >
           <Icon className="h-6 w-6" />
         </div>

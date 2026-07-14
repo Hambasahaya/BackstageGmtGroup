@@ -54,7 +54,7 @@ export function renderFormattedDescription(text: string | null | undefined) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Check if line starts with a list bullet
+
     const isBullet = trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•");
     const numberedMatch = trimmed.match(/^(\d+)\.\s(.*)/);
 
@@ -509,7 +509,7 @@ export function ProductManagement() {
         }
 
         const headers = rows[0].map(h => h.trim().toLowerCase());
-        
+
         let nameIdx = headers.indexOf("model");
         if (nameIdx === -1) nameIdx = headers.indexOf("namaproduct");
         if (nameIdx === -1) nameIdx = headers.indexOf("name");
@@ -578,7 +578,7 @@ export function ProductManagement() {
 
         for (let i = 0; i < totalRows; i++) {
           const row = dataRows[i];
-          
+
           if (row.length === 0 || (row.length === 1 && row[0].trim() === "")) {
             continue;
           }
@@ -720,6 +720,75 @@ export function ProductManagement() {
     });
   }, [products, statusFilter]);
 
+  const handleBulkStatusChange = async (newStatus: "tersedia" | "draft" | "habis") => {
+    const actionText = newStatus === "tersedia" 
+      ? "mengaktifkan (Tersedia)" 
+      : newStatus === "habis" ? "mengubah menjadi Habis" : "men-draft (Nonaktif)";
+    
+    const result = await Swal.fire({
+      title: `Ubah Status Menjadi ${newStatus === "tersedia" ? "Aktif" : newStatus === "habis" ? "Habis" : "Draft"}?`,
+      text: `Apakah Anda yakin ingin ${actionText} semua produk yang sedang ditampilkan (${filteredProducts.length} produk)?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#0F766E",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Ya, Lanjutkan!",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) return;
+
+    void Swal.fire({
+      title: "Sedang Memproses...",
+      html: `Mohon tunggu, mengubah status produk menjadi <b>${newStatus}</b>...`,
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const product of filteredProducts) {
+        if (product.status !== newStatus) {
+          try {
+            const payload = {
+              namaproduct: product.namaproduct,
+              deskripsi: product.deskripsi || "",
+              unit: product.unit || "paket",
+              price: product.price,
+              status: newStatus,
+              komisi: product.komisi || 0,
+              commission_tiers: product.commission_tiers || {},
+            };
+            await api.updateProduct(product.id, payload);
+            successCount++;
+          } catch (error) {
+            failCount++;
+          }
+        }
+      }
+
+      await loadProducts();
+
+      await Swal.fire({
+        icon: "success",
+        title: "Proses Selesai",
+        text: `Berhasil mengubah ${successCount} produk. Gagal: ${failCount} produk.`,
+        confirmButtonColor: "#0F766E",
+      });
+    } catch (error) {
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: "Terjadi kesalahan saat memproses data.",
+        confirmButtonColor: "#0F766E",
+      });
+    }
+  };
+
   // Statistics calculation
   const stats = useMemo(() => {
     let tersedia = 0;
@@ -759,7 +828,7 @@ export function ProductManagement() {
           >
             Download Template
           </button>
-          
+
           <label className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-350 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm cursor-pointer transition hover:bg-slate-50 focus-within:ring-2 focus-within:ring-teal-500">
             <UploadCloud className="h-4 w-4 text-slate-500" />
             Import CSV
@@ -860,6 +929,30 @@ export function ProductManagement() {
             >
               <RefreshCw className="h-4 w-4 text-slate-500" />
               Refresh
+            </button>
+            <button
+              onClick={() => void handleBulkStatusChange('tersedia')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-700 shadow-sm transition hover:bg-teal-100"
+              title="Aktifkan semua produk yang ditampilkan"
+            >
+              <Check className="h-4 w-4 text-teal-500" />
+              Aktifkan Semua
+            </button>
+            <button
+              onClick={() => void handleBulkStatusChange('draft')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+              title="Draft semua produk yang ditampilkan"
+            >
+              <Layers className="h-4 w-4 text-slate-500" />
+              Draft Semua
+            </button>
+            <button
+              onClick={() => void handleBulkStatusChange('habis')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
+              title="Habiskan semua produk yang ditampilkan"
+            >
+              <AlertCircle className="h-4 w-4 text-rose-500" />
+              Habis Semua
             </button>
           </div>
         </div>

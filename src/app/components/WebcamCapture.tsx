@@ -32,7 +32,7 @@ export function WebcamCapture({
           setValidationMessage("Menganalisa kamera...");
         }
       } catch (err) {
-        if (isMounted) setError("Gagal memuat model AI TensorFlow.");
+        if (isMounted) setError("Uh-oh! Something went wrong");
       }
     };
     void loadModel();
@@ -52,14 +52,14 @@ export function WebcamCapture({
       if (video.readyState === 4) { // HAVE_ENOUGH_DATA
         try {
           const predictions = await model.estimateFaces(video, false);
-          
+
           if (overlayType === "ktp") {
             if (predictions.length > 0) {
               const face = predictions[0];
               const topLeft = face.topLeft as [number, number];
               const bottomRight = face.bottomRight as [number, number];
               const faceCenterX = topLeft[0] + (bottomRight[0] - topLeft[0]) / 2;
-              
+
               // Cek apakah pusat wajah berada di sisi kanan dari video
               const isRightSide = faceCenterX > video.videoWidth * 0.45;
 
@@ -81,10 +81,10 @@ export function WebcamCapture({
               const topLeft = face.topLeft as [number, number];
               const bottomRight = face.bottomRight as [number, number];
               const faceCenterX = topLeft[0] + (bottomRight[0] - topLeft[0]) / 2;
-              
+
               // Cek apakah pusat wajah ada di tengah (sekitar 30% hingga 70% dari lebar video)
               const isCentered = faceCenterX > video.videoWidth * 0.3 && faceCenterX < video.videoWidth * 0.7;
-              
+
               if (isCentered) {
                 setIsValid(true);
                 setValidationMessage("Posisi wajah sudah pas");
@@ -148,16 +148,16 @@ export function WebcamCapture({
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    
+
     // Set canvas dimensions to match video intrinsic size for max resolution
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    
+
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    
+
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
+
     canvas.toBlob((blob) => {
       if (blob) {
         const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
@@ -189,7 +189,7 @@ export function WebcamCapture({
               muted
               className="absolute inset-0 h-full w-full object-cover"
             />
-            
+
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center overflow-hidden p-6">
               {overlayType === "ktp" && (
                 <div className={`relative aspect-[856/540] w-full max-w-md rounded-xl border-2 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
@@ -198,7 +198,7 @@ export function WebcamCapture({
                   <div className={`absolute -right-1 -top-1 h-8 w-8 border-r-4 border-t-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
                   <div className={`absolute -bottom-1 -left-1 h-8 w-8 border-b-4 border-l-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
                   <div className={`absolute -bottom-1 -right-1 h-8 w-8 border-b-4 border-r-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
-                  
+
                   {/* Tanda area kanan (panduan visual) */}
                   <div className="absolute bottom-0 right-0 top-0 w-1/3 border-l-2 border-dashed border-white/20 bg-white/5"></div>
                 </div>
@@ -213,7 +213,7 @@ export function WebcamCapture({
                   </div>
                 </div>
               )}
-              
+
               <div className="mt-8 rounded-full bg-black/60 px-4 py-2 backdrop-blur-sm">
                 {!model ? (
                   <p className="flex items-center gap-2 text-sm font-semibold text-white/90">
@@ -240,7 +240,7 @@ export function WebcamCapture({
           <Camera className="h-8 w-8" />
         </button>
       </div>
-      
+
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
