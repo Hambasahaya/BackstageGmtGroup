@@ -14,12 +14,54 @@ export function WebcamCapture({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState("");
   const [model, setModel] = useState<blazeface.BlazeFaceModel | null>(null);
   const [isValid, setIsValid] = useState<boolean>(false);
   const [validationMessage, setValidationMessage] = useState<string>("Memuat AI...");
   const validationLoopRef = useRef<number>(undefined);
+
+  const getGuideBoundsInVideo = useCallback(() => {
+    const video = videoRef.current;
+    const preview = previewRef.current;
+    const guide = guideRef.current;
+    if (!video || !preview || !guide || !video.videoWidth || !video.videoHeight) return null;
+
+    const previewRect = preview.getBoundingClientRect();
+    const guideRect = guide.getBoundingClientRect();
+    if (!previewRect.width || !previewRect.height || !guideRect.width || !guideRect.height) return null;
+
+    const videoAspect = video.videoWidth / video.videoHeight;
+    const previewAspect = previewRect.width / previewRect.height;
+    const renderedVideo =
+      videoAspect > previewAspect
+        ? {
+            width: previewRect.height * videoAspect,
+            height: previewRect.height,
+            x: (previewRect.width - previewRect.height * videoAspect) / 2,
+            y: 0,
+          }
+        : {
+            width: previewRect.width,
+            height: previewRect.width / videoAspect,
+            x: 0,
+            y: (previewRect.height - previewRect.width / videoAspect) / 2,
+          };
+
+    const left = ((guideRect.left - previewRect.left - renderedVideo.x) / renderedVideo.width) * video.videoWidth;
+    const top = ((guideRect.top - previewRect.top - renderedVideo.y) / renderedVideo.height) * video.videoHeight;
+    const right = ((guideRect.right - previewRect.left - renderedVideo.x) / renderedVideo.width) * video.videoWidth;
+    const bottom = ((guideRect.bottom - previewRect.top - renderedVideo.y) / renderedVideo.height) * video.videoHeight;
+
+    return {
+      left: Math.max(0, Math.min(video.videoWidth, left)),
+      top: Math.max(0, Math.min(video.videoHeight, top)),
+      right: Math.max(0, Math.min(video.videoWidth, right)),
+      bottom: Math.max(0, Math.min(video.videoHeight, bottom)),
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,9 +101,13 @@ export function WebcamCapture({
               const topLeft = face.topLeft as [number, number];
               const bottomRight = face.bottomRight as [number, number];
               const faceCenterX = topLeft[0] + (bottomRight[0] - topLeft[0]) / 2;
+              const guideBounds = getGuideBoundsInVideo();
+              const rightSideStart = guideBounds
+                ? guideBounds.left + (guideBounds.right - guideBounds.left) * 0.62
+                : video.videoWidth * 0.45;
 
-              // Cek apakah pusat wajah berada di sisi kanan dari video
-              const isRightSide = faceCenterX > video.videoWidth * 0.45;
+              // Cek apakah pusat wajah berada di area kanan frame KTP yang tampil.
+              const isRightSide = faceCenterX > rightSideStart;
 
               if (isRightSide) {
                 setIsValid(true);
@@ -80,14 +126,44 @@ export function WebcamCapture({
               const face = predictions[0];
               const topLeft = face.topLeft as [number, number];
               const bottomRight = face.bottomRight as [number, number];
+              const faceWidth = bottomRight[0] - topLeft[0];
+              const faceHeight = bottomRight[1] - topLeft[1];
               const faceCenterX = topLeft[0] + (bottomRight[0] - topLeft[0]) / 2;
+              const faceCenterY = topLeft[1] + faceHeight / 2;
+              const guideBounds = getGuideBoundsInVideo();
 
-              // Cek apakah pusat wajah ada di tengah (sekitar 30% hingga 70% dari lebar video)
-              const isCentered = faceCenterX > video.videoWidth * 0.3 && faceCenterX < video.videoWidth * 0.7;
+              const guideWidth = guideBounds ? guideBounds.right - guideBounds.left : video.videoWidth * 0.4;
+              const guideHeight = guideBounds ? guideBounds.bottom - guideBounds.top : video.videoHeight * 0.5;
+              const guideLeft = guideBounds ? guideBounds.left : video.videoWidth * 0.3;
+              const guideTop = guideBounds ? guideBounds.top : video.videoHeight * 0.25;
+              const guideRight = guideBounds ? guideBounds.right : video.videoWidth * 0.7;
+              const guideBottom = guideBounds ? guideBounds.bottom : video.videoHeight * 0.75;
 
-              if (isCentered) {
+              // Validasi mengikuti oval yang benar-benar tampil, termasuk crop object-cover di mobile Safari.
+              const centerPaddingX = guideWidth * 0.12;
+              const centerPaddingY = guideHeight * 0.12;
+              const faceWidthRatio = faceWidth / guideWidth;
+              const faceHeightRatio = faceHeight / guideHeight;
+              const isCentered =
+                faceCenterX > guideLeft + centerPaddingX &&
+                faceCenterX < guideRight - centerPaddingX &&
+                faceCenterY > guideTop + centerPaddingY &&
+                faceCenterY < guideBottom - centerPaddingY;
+              const isGoodSize =
+                faceWidthRatio >= 0.32 &&
+                faceWidthRatio <= 0.88 &&
+                faceHeightRatio >= 0.32 &&
+                faceHeightRatio <= 0.92;
+
+              if (isCentered && isGoodSize) {
                 setIsValid(true);
                 setValidationMessage("Posisi wajah sudah pas");
+              } else if (faceWidthRatio > 0.88 || faceHeightRatio > 0.92) {
+                setIsValid(false);
+                setValidationMessage("Jauhkan wajah sedikit dari kamera");
+              } else if (faceWidthRatio < 0.32 || faceHeightRatio < 0.32) {
+                setIsValid(false);
+                setValidationMessage("Dekatkan wajah ke dalam oval");
               } else {
                 setIsValid(false);
                 setValidationMessage("Posisikan wajah Anda tepat di tengah oval");
@@ -115,7 +191,7 @@ export function WebcamCapture({
         cancelAnimationFrame(validationLoopRef.current);
       }
     };
-  }, [model, stream, overlayType]);
+  }, [getGuideBoundsInVideo, model, stream, overlayType]);
 
   useEffect(() => {
     let activeStream: MediaStream | null = null;
@@ -175,7 +251,7 @@ export function WebcamCapture({
         </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-slate-900">
+      <div ref={previewRef} className="relative flex flex-1 items-center justify-center overflow-hidden bg-slate-900">
         {error ? (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm font-medium text-rose-500">
             {error}
@@ -192,7 +268,7 @@ export function WebcamCapture({
 
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center overflow-hidden p-6">
               {overlayType === "ktp" && (
-                <div className={`relative aspect-[856/540] w-full max-w-md rounded-xl border-2 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                <div ref={guideRef} className={`relative aspect-[856/540] w-full max-w-md rounded-xl border-2 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   {/* Corners */}
                   <div className={`absolute -left-1 -top-1 h-8 w-8 border-l-4 border-t-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
                   <div className={`absolute -right-1 -top-1 h-8 w-8 border-r-4 border-t-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
@@ -205,7 +281,7 @@ export function WebcamCapture({
               )}
 
               {overlayType === "selfie" && (
-                <div className={`relative h-72 w-56 sm:h-80 sm:w-64 rounded-[100px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                <div ref={guideRef} className={`relative aspect-[7/9] w-[min(68vw,17.5rem)] max-h-[58vh] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <p className="px-4 text-center text-sm font-bold text-white/80 drop-shadow-md">
                       Posisikan wajah Anda di dalam oval ini
