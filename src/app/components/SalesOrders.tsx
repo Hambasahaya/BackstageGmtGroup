@@ -8,6 +8,8 @@ type PurchaseOrderStatus = "draft" | "in_review" | "approve" | "invalid";
 type PurchaseOrderItem = {
   id: string;
   productId: number;
+  productName: string;
+  productUnit: string;
   qty: number;
   discountPercent: number;
 };
@@ -39,58 +41,6 @@ type PurchaseOrder = {
   invalidReason?: string;
 };
 
-type Product = {
-  id: number;
-  name: string;
-  unit: string;
-};
-
-const products: Product[] = [
-  { id: 1, name: "GMT Lighting Package", unit: "paket" },
-  { id: 2, name: "GMT Truss System", unit: "unit" },
-  { id: 3, name: "GMT Training Seat", unit: "seat" },
-];
-
-const defaultPurchaseOrders: PurchaseOrder[] = [
-  {
-    id: 1008,
-    poNumber: "PO-1008",
-    status: "in_review",
-    customerName: "PT Cahaya Eventindo",
-    customerEmail: "procurement@cahayaevent.id",
-    customerPhone: "081234567890",
-    customerAddress: "Jl. Gatot Subroto No. 12, Jakarta",
-    notes: "Butuh instalasi sebelum akhir bulan.",
-    items: [
-      { id: "item-1", productId: 1, qty: 1, discountPercent: 5 },
-      { id: "item-2", productId: 2, qty: 1, discountPercent: 7 },
-    ],
-    subtotal: 55000000,
-    discountTotal: 3450000,
-    total: 51550000,
-    commissionTotal: 5155000,
-    paymentStatus: "unpaid",
-    createdAt: "2026-06-11T09:15:00.000Z",
-  },
-  {
-    id: 1007,
-    poNumber: "PO-1007",
-    status: "draft",
-    customerName: "Bina Kreatif Production",
-    customerEmail: "admin@binakreatif.id",
-    customerPhone: "082112345678",
-    customerAddress: "Jl. Diponegoro No. 8, Bandung",
-    notes: "Masih menunggu konfirmasi qty tambahan.",
-    items: [{ id: "item-1", productId: 3, qty: 4, discountPercent: 5 }],
-    subtotal: 20000000,
-    discountTotal: 1000000,
-    total: 19000000,
-    commissionTotal: 1900000,
-    paymentStatus: "unpaid",
-    createdAt: "2026-06-09T13:40:00.000Z",
-  },
-];
-
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",
@@ -105,12 +55,46 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
 });
 
-function getProduct(productId: number) {
-  return products.find((product) => product.id === productId) ?? products[0];
-}
-
 function getItemProductId(item: PreorderItemDto) {
   return item.id_product ?? item.product_id ?? item.product?.id ?? 0;
+}
+
+function getProductSnapshotValue(snapshot: string | undefined, keys: string[]) {
+  if (!snapshot) return "";
+
+  try {
+    const parsed = JSON.parse(snapshot);
+    if (!parsed || typeof parsed !== "object") return "";
+
+    for (const key of keys) {
+      const value = (parsed as Record<string, unknown>)[key];
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  } catch {
+    return snapshot.trim();
+  }
+
+  return "";
+}
+
+function getItemProductName(item: PreorderItemDto) {
+  return (
+    item.product?.namaproduct?.trim() ||
+    item.product_name?.trim() ||
+    item.namaproduct?.trim() ||
+    getProductSnapshotValue(item.product_snapshot, ["namaproduct", "product_name", "name"]) ||
+    (getItemProductId(item) ? `Produk #${getItemProductId(item)}` : "Produk tidak tersedia")
+  );
+}
+
+function getItemProductUnit(item: PreorderItemDto) {
+  return (
+    item.product?.unit?.trim() ||
+    getProductSnapshotValue(item.product_snapshot, ["unit", "satuan"]) ||
+    "unit"
+  );
 }
 
 function mapPreorder(preorder: PreorderDto): PurchaseOrder {
@@ -128,6 +112,8 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     items: rawItems.map((item, index) => ({
       id: String(item.id ?? `${preorder.id}-${index}`),
       productId: getItemProductId(item),
+      productName: getItemProductName(item),
+      productUnit: getItemProductUnit(item),
       qty: item.qty,
       discountPercent: item.discount_percent,
     })),
@@ -235,7 +221,7 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
 }
 
 export function SalesOrders() {
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(defaultPurchaseOrders);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | "all">("in_review");
   const [searchTerm, setSearchTerm] = useState("");
   const [previewPo, setPreviewPo] = useState<PurchaseOrder | null>(null);
@@ -874,20 +860,16 @@ export function SalesOrders() {
                     </tr>
                   </thead>
                   <tbody>
-                    {previewPo.items.map((item) => {
-                      const product = getProduct(item.productId);
-
-                      return (
-                        <tr key={item.id} className="border-b border-slate-100 text-sm last:border-0">
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-950">{product.name}</p>
-                            <p className="text-xs text-slate-500">{product.unit}</p>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">{item.qty}</td>
-                          <td className="px-4 py-3 text-slate-700">{item.discountPercent}%</td>
-                        </tr>
-                      );
-                    })}
+                    {previewPo.items.map((item) => (
+                      <tr key={item.id} className="border-b border-slate-100 text-sm last:border-0">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-950">{item.productName}</p>
+                          <p className="text-xs text-slate-500">{item.productUnit}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{item.qty}</td>
+                        <td className="px-4 py-3 text-slate-700">{item.discountPercent}%</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

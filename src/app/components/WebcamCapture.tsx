@@ -244,7 +244,7 @@ export function WebcamCapture({
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-slate-950">
-      <div className="absolute inset-x-0 top-0 z-10 flex h-16 items-center justify-between bg-black/40 px-4 text-white">
+      <div className="relative z-10 flex h-16 shrink-0 items-center justify-between bg-black/60 px-4 text-white">
         <h2 className="text-lg font-semibold">{overlayType === "ktp" ? "Ambil Foto KTP" : "Ambil Selfie"}</h2>
         <button onClick={onClose} className="rounded-full p-2 hover:bg-white/20">
           <X className="h-6 w-6" />
@@ -266,7 +266,7 @@ export function WebcamCapture({
               className="absolute inset-0 h-full w-full object-cover"
             />
 
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center overflow-hidden p-6">
+            <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden p-6">
               {overlayType === "ktp" && (
                 <div ref={guideRef} className={`relative aspect-[856/540] w-full max-w-md rounded-xl border-2 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   {/* Corners */}
@@ -281,7 +281,7 @@ export function WebcamCapture({
               )}
 
               {overlayType === "selfie" && (
-                <div ref={guideRef} className={`relative aspect-[7/9] w-[min(68vw,17.5rem)] max-h-[58vh] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                <div ref={guideRef} className={`relative aspect-[7/9] h-[min(58vh,22rem)] max-w-[68vw] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <p className="px-4 text-center text-sm font-bold text-white/80 drop-shadow-md">
                       Posisikan wajah Anda di dalam oval ini
@@ -290,7 +290,7 @@ export function WebcamCapture({
                 </div>
               )}
 
-              <div className="mt-8 rounded-full bg-black/60 px-4 py-2 backdrop-blur-sm">
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 backdrop-blur-sm">
                 {!model ? (
                   <p className="flex items-center gap-2 text-sm font-semibold text-white/90">
                     <Loader2 className="h-4 w-4 animate-spin text-teal-400" />

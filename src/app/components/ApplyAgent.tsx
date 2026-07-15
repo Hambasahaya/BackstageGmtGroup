@@ -177,18 +177,14 @@ function hasCompletedVerification(detailUser: DetailUserDto | undefined) {
   );
 }
 
-function WaitingCta({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+function WaitingCta() {
   return (
-    <section className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <img src="/imgloading/loadinganimation.png" alt="Menunggu verifikasi" className="mb-4 h-32 w-32 object-contain" />
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      <p className="mt-2 max-w-md text-sm text-slate-500">{description}</p>
+    <section className="flex justify-center py-8 sm:py-12">
+      <img
+        src="/imgloading/loadinganimation.png"
+        alt="Menunggu verifikasi"
+        className="w-full max-w-3xl object-contain"
+      />
     </section>
   );
 }
@@ -255,13 +251,11 @@ export function ApplyAgent() {
   const [termsReadCompleted, setTermsReadCompleted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsTimeLeft, setTermsTimeLeft] = useState(30);
-  const [termsScrolledBottom, setTermsScrolledBottom] = useState(false);
 
   useEffect(() => {
     let timer: number;
     if (showTermsModal) {
       setTermsTimeLeft(30);
-      setTermsScrolledBottom(false);
       timer = window.setInterval(() => {
         setTermsTimeLeft((prev) => {
           if (prev <= 1) {
@@ -278,14 +272,6 @@ export function ApplyAgent() {
       }
     };
   }, [showTermsModal]);
-
-  const handleTermsScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 15;
-    if (isAtBottom) {
-      setTermsScrolledBottom(true);
-    }
-  };
 
   const isFormIncomplete = !applyForm.job.trim() ||
     !verificationForm.photo ||
@@ -369,7 +355,7 @@ export function ApplyAgent() {
       setFeedbackDialog({
         type: "success",
         title: "Upload berhasil",
-        message: `${message} Status halaman sudah diperbarui.`,
+        message: `Pengajuan dan data verifikasi berhasil dikirim.`,
       });
       void syncLatestStatus();
     } catch (error) {
@@ -454,16 +440,10 @@ export function ApplyAgent() {
           Akun kamu sudah menjadi official agent. Fitur agent penuh sudah tersedia di menu.
         </section>
       ) : status === "not_verif" ? (
-        <WaitingCta
-          title="Menunggu verifikasi admin"
-          description="Pengajuan awal kamu sudah masuk. Tim admin akan mengecek data terlebih dahulu sebelum membuka tahap upload data verifikasi."
-        />
+        <WaitingCta />
       ) : status === "verif" ? (
         isVerificationCompleted ? (
-          <WaitingCta
-            title="Menunggu aktivasi official agent"
-            description="Data verifikasi kamu sudah lengkap dan sedang ditinjau. Setelah admin menyetujui, status akan berubah menjadi official_agent."
-          />
+          <WaitingCta />
         ) : (
           <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-5">
@@ -630,12 +610,12 @@ export function ApplyAgent() {
       )}
 
       {showTermsModal && (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-white animate-fade-in h-screen w-screen">
+        <div className="fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col overflow-hidden bg-white animate-fade-in">
           {/* Modal Header */}
-          <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 bg-slate-50 shrink-0">
+          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex items-center gap-2 text-[#0F766E]">
-              <Clock3 className="h-5 w-5 animate-pulse" />
-              <h2 className="text-lg font-bold text-slate-950">NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE</h2>
+              <Clock3 className="h-5 w-5 shrink-0 animate-pulse" />
+              <h2 className="text-base font-bold text-slate-950 sm:text-lg">NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE</h2>
             </div>
             <button
               type="button"
@@ -649,22 +629,19 @@ export function ApplyAgent() {
           </div>
 
           {/* Modal Content - Scrollable wrapper around the PDF iframe */}
-          <div
-            onScroll={handleTermsScroll}
-            className="flex-1 overflow-y-auto bg-white scroll-smooth"
-          >
+          <div className="min-h-0 flex-1 overflow-hidden bg-white">
             <iframe
               src={`${TERMS_PDF_URL}#toolbar=0&navpanes=0&scrollbar=0`}
-              className="w-full h-[2200px] border-none block"
+              className="block h-full w-full border-none"
               title="Terms of Use PDF"
             />
           </div>
 
           {/* Modal Footer / Progress indicators */}
-          <div className="border-t border-slate-200 px-6 py-4 bg-slate-50 shrink-0 flex justify-end">
+          <div className="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
             <button
               type="button"
-              disabled={termsTimeLeft > 0 || !termsScrolledBottom}
+              disabled={termsTimeLeft > 0}
               onClick={() => {
                 setTermsReadCompleted(true);
                 setTermsAccepted(true);
