@@ -3,6 +3,7 @@ import {
   Eye,
   FileDown,
   FileText,
+  Loader2,
   Minus,
   MoreHorizontal,
   Pencil,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
+import Swal from "sweetalert2";
 
 type Product = {
   id: number;
@@ -60,6 +62,13 @@ type PurchaseOrder = {
   lastPaymentStage?: string;
   createdAt: string;
 };
+
+type AgentActionLoading =
+  | { type: "persist"; mode: "draft" | "in_review" }
+  | { type: "delete"; poId: number }
+  | { type: "print"; poId: number }
+  | { type: "quotation"; poId: number }
+  | null;
 
 const commissionPercent = 10;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -391,6 +400,18 @@ function ItemStatusBadge({ status }: { status: PurchaseOrderItem["itemStatus"] }
   );
 }
 
+function openProcessingAlert(title: string, text: string) {
+  void Swal.fire({
+    title,
+    text,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+}
+
 export function AgentPurchaseOrder() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(defaultPurchaseOrders);
   const [products, setProducts] = useState<Product[]>(defaultProducts);
@@ -412,12 +433,20 @@ export function AgentPurchaseOrder() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isPersistingPo, setIsPersistingPo] = useState(false);
+  const [actionLoading, setActionLoading] = useState<AgentActionLoading>(null);
   const [paymentMode, setPaymentMode] = useState<"100%" | "50%">("100%");
   const [mobilePoStep, setMobilePoStep] = useState<"cart" | "details">("cart");
   const [expandedMobilePoId, setExpandedMobilePoId] = useState<number | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const isDeletingPo = (poId: number) => actionLoading?.type === "delete" && actionLoading.poId === poId;
+  const isPrintingPo = (poId: number) => actionLoading?.type === "print" && actionLoading.poId === poId;
+  const isDownloadingQuotation = (poId: number) =>
+    actionLoading?.type === "quotation" && actionLoading.poId === poId;
+
+  const loadData = async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     setErrorMessage("");
 
     try {
@@ -428,12 +457,26 @@ export function AgentPurchaseOrder() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal memuat data PO agent.");
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    const handleAgentPreorderUpdated = () => {
+      void loadData(true);
+    };
+
+    window.addEventListener("agent-preorder-updated", handleAgentPreorderUpdated);
+
+    return () => {
+      window.removeEventListener("agent-preorder-updated", handleAgentPreorderUpdated);
+    };
   }, []);
 
   const orderSummary = useMemo(() => calculateOrder(products, items), [items, products]);
@@ -554,15 +597,35 @@ export function AgentPurchaseOrder() {
     setIsModalOpen(true);
   };
 
-  const deletePurchaseOrder = (po: PurchaseOrder) => {
-    if (po.status !== "draft") {
+  const deletePurchaseOrder = async (po: PurchaseOrder) => {
+    if (po.status !== "draft" || actionLoading || isPersistingPo) {
       return;
     }
 
-    void api
-      .deletePreorder(po.id)
-      .then(loadData)
-      .catch((error) => setErrorMessage(error instanceof Error ? error.message : "Gagal menghapus PO."));
+    setActionLoading({ type: "delete", poId: po.id });
+    openProcessingAlert("Menghapus PO", "Mohon tunggu sampai PO benar-benar terhapus.");
+
+    try {
+      await api.deletePreorder(po.id);
+      await loadData(true);
+      await Swal.fire({
+        title: "PO terhapus",
+        text: "Purchase order berhasil dihapus dan daftar PO sudah diperbarui.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
+    } catch (error) {
+      Swal.close();
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menghapus PO.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal menghapus PO.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const validateForm = () => {
@@ -594,7 +657,7 @@ export function AgentPurchaseOrder() {
   };
 
   const persistPurchaseOrder = async (status: PurchaseOrder["status"]) => {
-    if (isPersistingPo) {
+    if (isPersistingPo || actionLoading) {
       return;
     }
 
@@ -608,17 +671,43 @@ export function AgentPurchaseOrder() {
     const payload = toPreorderPayload(companyName, customerName, normalizedEmail, customerPhone, customerAddress, notes, paymentMode, items);
 
     setIsPersistingPo(true);
+    setActionLoading({ type: "persist", mode: status === "in_review" ? "in_review" : "draft" });
+    openProcessingAlert(
+      status === "in_review" ? "Mengirim PO" : editingPoId ? "Mengupdate draft" : "Menyimpan draft",
+      status === "in_review"
+        ? "Mohon tunggu sampai PO tersimpan dan terkirim ke sales."
+        : "Mohon tunggu sampai draft PO benar-benar tersimpan.",
+    );
+
     try {
+      const wasEditing = Boolean(editingPoId);
       const response = editingPoId ? await api.updatePreorder(editingPoId, payload) : await api.createPreorder(payload);
       if (status === "in_review") {
         await api.submitPreorder(response.preorder.id);
       }
       closeModal();
-      await loadData();
+      await loadData(true);
+      await Swal.fire({
+        title: status === "in_review" ? "PO terkirim" : wasEditing ? "Draft terupdate" : "Draft tersimpan",
+        text:
+          status === "in_review"
+            ? "Purchase order berhasil dikirim ke sales dan data PO sudah diperbarui."
+            : "Purchase order berhasil disimpan dan data PO sudah diperbarui.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
+      Swal.close();
       setFormError(error instanceof Error ? error.message : "Gagal menyimpan PO.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal menyimpan PO.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
     } finally {
       setIsPersistingPo(false);
+      setActionLoading(null);
     }
   };
 
@@ -628,19 +717,47 @@ export function AgentPurchaseOrder() {
       return;
     }
 
+    if (actionLoading || isPersistingPo) {
+      return;
+    }
+
+    setActionLoading({ type: "print", poId: editingPoId });
+    openProcessingAlert("Mencetak PDF", "Mohon tunggu sampai dokumen PO selesai dibuat.");
+
     try {
       const pdf = await api.preorderPdf(editingPoId);
       const pdfUrl = URL.createObjectURL(pdf);
       window.open(pdfUrl, "_blank", "noopener,noreferrer");
       setPdfMessage("");
+      await Swal.fire({
+        title: "PDF siap",
+        text: "Dokumen PO berhasil dibuat.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
+      Swal.close();
       setPdfMessage(error instanceof Error ? error.message : "Gagal mencetak PDF PO.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal mencetak PDF PO.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const downloadQuotationPdf = async (po: PurchaseOrder) => {
+    if (actionLoading || isPersistingPo) {
+      return;
+    }
+
     setDownloadingQuotationId(po.id);
+    setActionLoading({ type: "quotation", poId: po.id });
     setQuotationMessage("");
+    openProcessingAlert("Menyiapkan quotation", "Mohon tunggu sampai dokumen quotation selesai dibuat.");
 
     try {
       const pdf = await api.preorderPdf(po.id);
@@ -653,10 +770,24 @@ export function AgentPurchaseOrder() {
       link.remove();
       URL.revokeObjectURL(pdfUrl);
       setQuotationMessage("Quotation berhasil didownload.");
+      await Swal.fire({
+        title: "Quotation siap",
+        text: "Dokumen quotation berhasil didownload.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
+      Swal.close();
       setQuotationMessage(error instanceof Error ? error.message : "Gagal mendownload quotation.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal mendownload quotation.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
     } finally {
       setDownloadingQuotationId(null);
+      setActionLoading(null);
     }
   };
 
@@ -672,7 +803,8 @@ export function AgentPurchaseOrder() {
         </div>
         <button
           onClick={openCreateModal}
-          className="inline-flex w-fit items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+          disabled={Boolean(actionLoading) || isPersistingPo}
+          className="inline-flex w-fit items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Plus className="h-4 w-4" />
           Buat Purchase Order
@@ -730,6 +862,8 @@ export function AgentPurchaseOrder() {
           ) : (
             purchaseOrders.map((po) => {
               const isExpanded = expandedMobilePoId === po.id;
+              const isDeleting = isDeletingPo(po.id);
+              const isDownloading = isDownloadingQuotation(po.id);
 
               return (
                 <article key={po.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -825,7 +959,7 @@ export function AgentPurchaseOrder() {
                         <button
                           type="button"
                           onClick={() => openEditModal(po)}
-                          disabled={po.status !== "draft"}
+                          disabled={po.status !== "draft" || Boolean(actionLoading) || isPersistingPo}
                           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -834,20 +968,20 @@ export function AgentPurchaseOrder() {
                         <button
                           type="button"
                           onClick={() => deletePurchaseOrder(po)}
-                          disabled={po.status !== "draft"}
+                          disabled={po.status !== "draft" || Boolean(actionLoading) || isPersistingPo}
                           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Hapus
+                          {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          {isDeleting ? "Menghapus" : "Hapus"}
                         </button>
                         <button
                           type="button"
                           onClick={() => downloadQuotationPdf(po)}
-                          disabled={downloadingQuotationId === po.id}
+                          disabled={Boolean(actionLoading) || isPersistingPo || downloadingQuotationId === po.id}
                           className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#115E59] disabled:cursor-wait disabled:bg-[#0F766E]/60"
                         >
-                          <Send className="h-3.5 w-3.5" />
-                          {downloadingQuotationId === po.id ? "Loading" : "Send Invoice"}
+                          {isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          {isDownloading ? "Loading" : "Send Invoice"}
                         </button>
                       </div>
                     </div>
@@ -874,7 +1008,10 @@ export function AgentPurchaseOrder() {
               </tr>
             </thead>
             <tbody>
-              {purchaseOrders.map((po) => (
+              {purchaseOrders.map((po) => {
+                const isDeleting = isDeletingPo(po.id);
+
+                return (
                 <tr key={po.id} className="border-b border-slate-100 text-sm last:border-0">
                   <td className="px-4 py-3 font-semibold text-slate-950">{po.poNumber}</td>
                   <td className="px-4 py-3">
@@ -906,7 +1043,7 @@ export function AgentPurchaseOrder() {
                       </button>
                       <button
                         onClick={() => openEditModal(po)}
-                        disabled={po.status !== "draft"}
+                        disabled={po.status !== "draft" || Boolean(actionLoading) || isPersistingPo}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                       >
                         <Pencil className="h-3.5 w-3.5" />
@@ -914,16 +1051,17 @@ export function AgentPurchaseOrder() {
                       </button>
                       <button
                         onClick={() => deletePurchaseOrder(po)}
-                        disabled={po.status !== "draft"}
+                        disabled={po.status !== "draft" || Boolean(actionLoading) || isPersistingPo}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Hapus
+                        {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        {isDeleting ? "Menghapus..." : "Hapus"}
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1359,20 +1497,28 @@ export function AgentPurchaseOrder() {
                     <button
                       type="button"
                       onClick={() => persistPurchaseOrder("draft")}
-                      disabled={isPersistingPo}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:hidden"
+                      disabled={isPersistingPo || Boolean(actionLoading)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 md:hidden"
                     >
-                      <FileText className="h-4 w-4" />
-                      {isPersistingPo ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
+                      {actionLoading?.type === "persist" && actionLoading.mode === "draft" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                      {actionLoading?.type === "persist" && actionLoading.mode === "draft" ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
                     </button>
                     <button
                       type="button"
                       onClick={() => persistPurchaseOrder("in_review")}
-                      disabled={isPersistingPo}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#115E59] md:hidden"
+                      disabled={isPersistingPo || Boolean(actionLoading)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300 md:hidden"
                     >
-                      <Send className="h-4 w-4" />
-                      {isPersistingPo ? "Mengirim..." : "Send PO"}
+                      {actionLoading?.type === "persist" && actionLoading.mode === "in_review" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      {actionLoading?.type === "persist" && actionLoading.mode === "in_review" ? "Mengirim..." : "Send PO"}
                     </button>
                   </>
                 )}
@@ -1380,29 +1526,42 @@ export function AgentPurchaseOrder() {
                   <button
                     type="button"
                     onClick={() => persistPurchaseOrder("draft")}
-                    disabled={isPersistingPo}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    disabled={isPersistingPo || Boolean(actionLoading)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                   >
-                    <FileText className="h-4 w-4" />
-                    {isPersistingPo ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
+                    {actionLoading?.type === "persist" && actionLoading.mode === "draft" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )}
+                    {actionLoading?.type === "persist" && actionLoading.mode === "draft" ? "Menyimpan..." : editingPoId ? "Update draft" : "Save"}
                   </button>
                   <button
                     type="button"
                     onClick={() => persistPurchaseOrder("in_review")}
-                    disabled={isPersistingPo}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                    disabled={isPersistingPo || Boolean(actionLoading)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    <Send className="h-4 w-4" />
-                    {isPersistingPo ? "Mengirim..." : "Send PO"}
+                    {actionLoading?.type === "persist" && actionLoading.mode === "in_review" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {actionLoading?.type === "persist" && actionLoading.mode === "in_review" ? "Mengirim..." : "Send PO"}
                   </button>
                 </div>
                 <button
                   type="button"
                   onClick={handlePrintPdf}
-                  className="hidden items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:inline-flex"
+                  disabled={Boolean(actionLoading) || isPersistingPo}
+                  className="hidden items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 md:inline-flex"
                 >
-                  <FileDown className="h-4 w-4" />
-                  Cetak PDF
+                  {editingPoId && isPrintingPo(editingPoId) ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4" />
+                  )}
+                  {editingPoId && isPrintingPo(editingPoId) ? "Mencetak..." : "Cetak PDF"}
                 </button>
               </div>
             </div>
@@ -1671,11 +1830,15 @@ export function AgentPurchaseOrder() {
                     <button
                       type="button"
                       onClick={() => downloadQuotationPdf(previewPo)}
-                      disabled={downloadingQuotationId === previewPo.id}
+                      disabled={Boolean(actionLoading) || isPersistingPo || downloadingQuotationId === previewPo.id}
                       className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-wait disabled:bg-[#0F766E]/60"
                     >
-                      <FileDown className="h-4 w-4" />
-                      {downloadingQuotationId === previewPo.id ? "Mendownload..." : "Download Ulang Quotation"}
+                      {isDownloadingQuotation(previewPo.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="h-4 w-4" />
+                      )}
+                      {isDownloadingQuotation(previewPo.id) ? "Mendownload..." : "Download Ulang Quotation"}
                     </button>
                   </div>
                 </div>

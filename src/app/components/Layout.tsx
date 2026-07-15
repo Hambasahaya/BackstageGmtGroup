@@ -35,9 +35,11 @@ import {
   authSessionUpdatedEvent,
   clearAuthSession,
   clearLoginSource,
+  connectAgentPreorderStream,
   connectSalesNotificationStream,
   getLogoutRedirectUrl,
   getStoredUser,
+  type PreorderDto,
   type AgentApplicationStatus,
   type NotificationDto,
   type UserSession,
@@ -84,6 +86,9 @@ let notificationAudioContext: AudioContext | null = null;
 let notificationAudioElement: HTMLAudioElement | null = null;
 const notificationSoundUrl = "https://www.myinstants.com/media/sounds/fahhhhhhhhhhhhhh.mp3";
 const salesAudioEnabledStorageKey = "gmt-sales-notification-audio-enabled";
+const agentAudioEnabledStorageKey = "gmt-agent-notification-audio-enabled";
+const salesNotificationPollIntervalMs = 8000;
+const agentPreorderPollIntervalMs = 10000;
 
 function getNotificationAudioContext() {
   const AudioContextCtor = window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
@@ -125,8 +130,66 @@ async function playNotificationSound() {
     audioElement.currentTime = 0;
     await audioElement.play();
   } catch {
-    // Browsers can block audio until the sales user interacts with the page.
+    // Browsers can block audio until the user interacts with the page.
   }
+}
+
+function getNotificationAudioStorageKey(role: AppRole) {
+  return role === "agent" ? agentAudioEnabledStorageKey : salesAudioEnabledStorageKey;
+}
+
+function getNotificationKey(notification: NotificationDto) {
+  if (notification.id) {
+    return `id:${notification.id}`;
+  }
+
+  const data = typeof notification.data === "string" ? notification.data : JSON.stringify(notification.data ?? "");
+  return [notification.title ?? "", notification.message ?? "", data].join("|");
+}
+
+function getPreorderUpdateKey(preorder: Partial<PreorderDto>) {
+  return [
+    preorder.id ?? "",
+    preorder.status ?? "",
+    preorder.payment_status ?? "",
+    preorder.payment_url ?? "",
+    preorder.dp_proof ?? "",
+    preorder.remaining_proof ?? "",
+    preorder.payment_proof ?? "",
+  ].join("|");
+}
+
+function getAgentPreorderNotification(preorder: Partial<PreorderDto>): NotificationDto | null {
+  const poNumber = preorder.po_number ?? (preorder.id ? `PO-${preorder.id}` : "PO");
+
+  if (preorder.status === "approve") {
+    return {
+      title: "PO Disetujui Sales",
+      message: `${poNumber} sudah di-approve oleh sales.`,
+      status: "belum_terbaca",
+      data: { preorder_id: preorder.id, status: preorder.status },
+    };
+  }
+
+  if (preorder.status === "invalid") {
+    return {
+      title: "PO Ditandai Invalid",
+      message: `${poNumber} ditandai invalid oleh sales${preorder.invalid_reason ? `: ${preorder.invalid_reason}` : "."}`,
+      status: "belum_terbaca",
+      data: { preorder_id: preorder.id, status: preorder.status },
+    };
+  }
+
+  if (preorder.payment_status === "paid") {
+    return {
+      title: "Pembayaran PO Selesai",
+      message: `${poNumber} sudah tercatat lunas.`,
+      status: "belum_terbaca",
+      data: { preorder_id: preorder.id, payment_status: preorder.payment_status },
+    };
+  }
+
+  return null;
 }
 
 export function Layout() {
@@ -139,12 +202,17 @@ export function Layout() {
   const [notificationError, setNotificationError] = useState("");
   const [showSalesAudioPrompt, setShowSalesAudioPrompt] = useState(false);
   const [unreadSalesNotifications, setUnreadSalesNotifications] = useState(0);
+  const [unreadAgentPreorderUpdates, setUnreadAgentPreorderUpdates] = useState(0);
   const [latestSalesNotification, setLatestSalesNotification] = useState<NotificationDto | null>(null);
+  const [latestAgentNotification, setLatestAgentNotification] = useState<NotificationDto | null>(null);
   const [salesStreamStatus, setSalesStreamStatus] = useState<"idle" | "connected" | "reconnecting">("idle");
+  const [agentStreamStatus, setAgentStreamStatus] = useState<"idle" | "connected" | "reconnecting">("idle");
   const [storedUser, setStoredUser] = useState<UserSession | null>(() => getStoredUser());
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
   const latestNotificationTimerRef = useRef<number>();
   const notificationPanelRef = useRef<HTMLDivElement>(null);
+  const knownNotificationKeysRef = useRef<Set<string>>(new Set());
+  const knownAgentPreorderKeysRef = useRef<Map<number, string>>(new Map());
   const currentRole = getCurrentRole();
   const currentAgentStatus = getCurrentAgentStatus();
   const visibleMenuItems = menuItems.filter((item) => {
@@ -185,7 +253,11 @@ export function Layout() {
     (notification) => notification.status === "belum_terbaca" || !notification.read_at,
   ).length;
   const notificationBadgeCount =
-    currentRole === "sales" ? Math.max(unreadNotificationCount, unreadSalesNotifications) : unreadNotificationCount;
+    currentRole === "sales"
+      ? Math.max(unreadNotificationCount, unreadSalesNotifications)
+      : currentRole === "agent"
+        ? Math.max(unreadNotificationCount, unreadAgentPreorderUpdates)
+        : unreadNotificationCount;
 
   const loadNotifications = async (silent = false) => {
     if (!silent) {
@@ -195,7 +267,9 @@ export function Layout() {
 
     try {
       const response = await api.notifications();
-      setNotifications(Array.isArray(response.notifications) ? response.notifications : []);
+      const nextNotifications = Array.isArray(response.notifications) ? response.notifications : [];
+      knownNotificationKeysRef.current = new Set(nextNotifications.map(getNotificationKey));
+      setNotifications(nextNotifications);
     } catch (error) {
       setNotificationError(error instanceof Error ? error.message : "Gagal memuat notifikasi.");
     } finally {
@@ -221,6 +295,7 @@ export function Layout() {
     try {
       await api.markAllNotificationsRead();
       setUnreadSalesNotifications(0);
+      setUnreadAgentPreorderUpdates(0);
       setNotifications((current) =>
         current.map((notification) => ({
           ...notification,
@@ -234,6 +309,12 @@ export function Layout() {
   };
 
   const openNotificationTarget = (notification: NotificationDto) => {
+    if (currentRole === "agent") {
+      navigate("/agent-purchase-orders");
+      setNotificationOpen(false);
+      return;
+    }
+
     if (currentRole === "sales") {
       navigate("/sales-orders");
       setNotificationOpen(false);
@@ -263,6 +344,7 @@ export function Layout() {
     }
 
     setUnreadSalesNotifications((count) => Math.max(0, count - 1));
+    setUnreadAgentPreorderUpdates((count) => Math.max(0, count - 1));
     openNotificationTarget(notification);
   };
 
@@ -283,7 +365,7 @@ export function Layout() {
   const enableSalesNotificationAudio = async () => {
     primeNotificationAudio();
     await playNotificationSound();
-    window.localStorage.setItem(salesAudioEnabledStorageKey, "true");
+    window.localStorage.setItem(getNotificationAudioStorageKey(currentRole), "true");
     setShowSalesAudioPrompt(false);
   };
 
@@ -312,7 +394,7 @@ export function Layout() {
   }, [currentRole, currentAgentStatus]);
 
   useEffect(() => {
-    if (currentRole !== "sales") {
+    if (currentRole !== "sales" && currentRole !== "agent") {
       return;
     }
 
@@ -330,7 +412,10 @@ export function Layout() {
   }, [currentRole]);
 
   useEffect(() => {
-    if (currentRole === "sales" && window.localStorage.getItem(salesAudioEnabledStorageKey) !== "true") {
+    if (
+      (currentRole === "sales" || currentRole === "agent") &&
+      window.localStorage.getItem(getNotificationAudioStorageKey(currentRole)) !== "true"
+    ) {
       setShowSalesAudioPrompt(true);
     }
   }, [currentRole]);
@@ -364,33 +449,184 @@ export function Layout() {
 
     const restoreTitle = document.title;
 
+    const showSalesNotification = (notification: NotificationDto) => {
+      setLatestSalesNotification(notification);
+      void playNotificationSound();
+      window.dispatchEvent(new CustomEvent("sales-notification", { detail: notification }));
+
+      if (document.hidden) {
+        document.title = `PO baru - ${restoreTitle}`;
+      }
+
+      if (latestNotificationTimerRef.current) {
+        window.clearTimeout(latestNotificationTimerRef.current);
+      }
+
+      latestNotificationTimerRef.current = window.setTimeout(() => {
+        setLatestSalesNotification(null);
+        document.title = restoreTitle;
+      }, 7000);
+    };
+
     const disconnect = connectSalesNotificationStream({
       onOpen: () => setSalesStreamStatus("connected"),
       onError: () => setSalesStreamStatus("reconnecting"),
       onNotification: (notification) => {
+        const notificationWithStatus = { ...notification, status: notification.status ?? "belum_terbaca" };
+        const notificationKey = getNotificationKey(notificationWithStatus);
+
+        if (knownNotificationKeysRef.current.has(notificationKey)) {
+          return;
+        }
+
+        knownNotificationKeysRef.current.add(notificationKey);
         setUnreadSalesNotifications((count) => count + 1);
-        setNotifications((current) => [{ ...notification, status: notification.status ?? "belum_terbaca" }, ...current]);
-        setLatestSalesNotification(notification);
-        void playNotificationSound();
-        window.dispatchEvent(new CustomEvent("sales-notification", { detail: notification }));
-
-        if (document.hidden) {
-          document.title = `PO baru - ${restoreTitle}`;
-        }
-
-        if (latestNotificationTimerRef.current) {
-          window.clearTimeout(latestNotificationTimerRef.current);
-        }
-
-        latestNotificationTimerRef.current = window.setTimeout(() => {
-          setLatestSalesNotification(null);
-          document.title = restoreTitle;
-        }, 7000);
+        setNotifications((current) => [notificationWithStatus, ...current]);
+        showSalesNotification(notificationWithStatus);
       },
     });
 
+    const pollSalesNotifications = async () => {
+      try {
+        const response = await api.notifications("belum_terbaca");
+        const nextNotifications = Array.isArray(response.notifications) ? response.notifications : [];
+        const newNotifications = nextNotifications.filter((notification) => {
+          const notificationKey = getNotificationKey(notification);
+          return !knownNotificationKeysRef.current.has(notificationKey);
+        });
+
+        nextNotifications.forEach((notification) => {
+          knownNotificationKeysRef.current.add(getNotificationKey(notification));
+        });
+
+        if (!newNotifications.length) {
+          return;
+        }
+
+        setUnreadSalesNotifications((count) => count + newNotifications.length);
+        setNotifications((current) => {
+          const currentKeys = new Set(current.map(getNotificationKey));
+          const merged = [...newNotifications, ...current];
+          return merged.filter((notification) => {
+            const notificationKey = getNotificationKey(notification);
+            if (currentKeys.has(notificationKey) && newNotifications.includes(notification)) {
+              return false;
+            }
+            currentKeys.add(notificationKey);
+            return true;
+          });
+        });
+        showSalesNotification(newNotifications[0]);
+      } catch {
+        setSalesStreamStatus((status) => (status === "connected" ? status : "reconnecting"));
+      }
+    };
+
+    const pollTimer = window.setInterval(() => {
+      void pollSalesNotifications();
+    }, salesNotificationPollIntervalMs);
+
     return () => {
       disconnect();
+      window.clearInterval(pollTimer);
+      document.title = restoreTitle;
+
+      if (latestNotificationTimerRef.current) {
+        window.clearTimeout(latestNotificationTimerRef.current);
+      }
+    };
+  }, [currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "agent") {
+      return;
+    }
+
+    const restoreTitle = document.title;
+
+    const showAgentNotification = (notification: NotificationDto, preorder?: Partial<PreorderDto>) => {
+      setUnreadAgentPreorderUpdates((count) => count + 1);
+      setNotifications((current) => [{ ...notification, status: notification.status ?? "belum_terbaca" }, ...current]);
+      setLatestAgentNotification(notification);
+      void playNotificationSound();
+
+      if (document.hidden) {
+        document.title = `Update PO - ${restoreTitle}`;
+      }
+
+      if (latestNotificationTimerRef.current) {
+        window.clearTimeout(latestNotificationTimerRef.current);
+      }
+
+      latestNotificationTimerRef.current = window.setTimeout(() => {
+        setLatestAgentNotification(null);
+        document.title = restoreTitle;
+      }, 7000);
+    };
+
+    const rememberPreorder = (preorder: Partial<PreorderDto>) => {
+      if (!preorder.id) {
+        return;
+      }
+
+      knownAgentPreorderKeysRef.current.set(preorder.id, getPreorderUpdateKey(preorder));
+    };
+
+    const handlePreorderUpdate = (preorder: Partial<PreorderDto>) => {
+      if (!preorder.id) {
+        return;
+      }
+
+      const nextKey = getPreorderUpdateKey(preorder);
+      const previousKey = knownAgentPreorderKeysRef.current.get(preorder.id);
+      knownAgentPreorderKeysRef.current.set(preorder.id, nextKey);
+
+      if (previousKey === nextKey) {
+        return;
+      }
+
+      window.dispatchEvent(new CustomEvent("agent-preorder-updated", { detail: preorder }));
+
+      const notification = getAgentPreorderNotification(preorder);
+
+      if (notification) {
+        showAgentNotification(notification, preorder);
+      }
+    };
+
+    const seedPreorderSnapshot = async () => {
+      try {
+        const response = await api.agentPreorders();
+        (response.preorders ?? []).forEach(rememberPreorder);
+      } catch {
+        // Initial snapshot is best-effort; SSE/poll retry will keep working.
+      }
+    };
+
+    void seedPreorderSnapshot();
+
+    const disconnect = connectAgentPreorderStream({
+      onOpen: () => setAgentStreamStatus("connected"),
+      onError: () => setAgentStreamStatus("reconnecting"),
+      onPreorderUpdated: handlePreorderUpdate,
+    });
+
+    const pollAgentPreorders = async () => {
+      try {
+        const response = await api.agentPreorders();
+        (response.preorders ?? []).forEach(handlePreorderUpdate);
+      } catch {
+        setAgentStreamStatus((status) => (status === "connected" ? status : "reconnecting"));
+      }
+    };
+
+    const pollTimer = window.setInterval(() => {
+      void pollAgentPreorders();
+    }, agentPreorderPollIntervalMs);
+
+    return () => {
+      disconnect();
+      window.clearInterval(pollTimer);
       document.title = restoreTitle;
 
       if (latestNotificationTimerRef.current) {
@@ -491,6 +727,10 @@ export function Layout() {
                     ? salesStreamStatus === "connected"
                       ? "Realtime sales aktif"
                       : "Realtime sales menyambung ulang"
+                    : currentRole === "agent"
+                      ? agentStreamStatus === "connected"
+                        ? "Realtime agent aktif"
+                        : "Realtime agent menyambung ulang"
                     : "Notifications"
                 }
                 aria-label="Buka notifikasi"
@@ -504,7 +744,10 @@ export function Layout() {
                 ) : (
                   <span
                     className={`absolute right-1.5 top-1.5 h-2 w-2 rounded-full ${
-                      currentRole === "sales" && salesStreamStatus === "connected" ? "bg-emerald-500" : "bg-slate-300"
+                      (currentRole === "sales" && salesStreamStatus === "connected") ||
+                      (currentRole === "agent" && agentStreamStatus === "connected")
+                        ? "bg-emerald-500"
+                        : "bg-slate-300"
                     }`}
                   />
                 )}
@@ -631,7 +874,7 @@ export function Layout() {
         />
       )}
 
-      {currentRole === "sales" && showSalesAudioPrompt && (
+      {(currentRole === "sales" || currentRole === "agent") && showSalesAudioPrompt && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4">
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl ring-1 ring-black/5">
             <div className="flex items-start gap-3">
@@ -641,7 +884,7 @@ export function Layout() {
               <div>
                 <h2 className="text-base font-semibold text-slate-950">Aktifkan suara notifikasi</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Klik aktifkan agar notifikasi PO baru sales bisa memutar suara.
+                  Klik aktifkan agar notifikasi {currentRole === "agent" ? "update PO agent" : "PO baru sales"} bisa memutar suara.
                 </p>
               </div>
             </div>
@@ -686,6 +929,32 @@ export function Layout() {
                 {latestSalesNotification.message ?? "PO baru masuk dan perlu direview sales."}
               </p>
               <p className="mt-2 text-xs font-semibold text-[#0F766E]">Buka review order</p>
+            </div>
+          </div>
+        </button>
+      )}
+
+      {currentRole === "agent" && latestAgentNotification && (
+        <button
+          onClick={() => {
+            setLatestAgentNotification(null);
+            setUnreadAgentPreorderUpdates(0);
+            navigate("/agent-purchase-orders");
+          }}
+          className="fixed right-4 top-20 z-50 w-[calc(100vw-2rem)] max-w-sm rounded-lg border border-teal-200 bg-white p-4 text-left shadow-xl ring-1 ring-black/5 sm:right-6"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-[#0F766E]">
+              <ShoppingCart className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-950">
+                {latestAgentNotification.title ?? "Update Purchase Order"}
+              </p>
+              <p className="mt-1 line-clamp-2 text-sm text-slate-600">
+                {latestAgentNotification.message ?? "Ada update terbaru pada PO Anda."}
+              </p>
+              <p className="mt-2 text-xs font-semibold text-[#0F766E]">Buka purchase order</p>
             </div>
           </div>
         </button>

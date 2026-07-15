@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle, Upload, FileText } from "lucide-react";
+import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle, Upload, FileText, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
 import Swal from "sweetalert2";
@@ -44,6 +44,13 @@ type PurchaseOrder = {
   invalidReason?: string;
 };
 
+type SalesActionLoading =
+  | { type: "approve"; poId: number }
+  | { type: "invalid"; poId: number }
+  | { type: "upload"; poId: number; stage: "full" | "dp" | "remaining" }
+  | { type: "quotation"; poId: number }
+  | null;
+
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",
@@ -57,6 +64,7 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const salesOrdersPollIntervalMs = 10000;
 
 function getItemProductId(item: PreorderItemDto) {
   return item.id_product ?? item.product_id ?? item.product?.id ?? 0;
@@ -246,6 +254,18 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
   );
 }
 
+function openProcessingAlert(title: string, text: string) {
+  void Swal.fire({
+    title,
+    text,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => {
+      Swal.showLoading();
+    },
+  });
+}
+
 export function SalesOrders() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | "all">("in_review");
@@ -256,9 +276,24 @@ export function SalesOrders() {
   const [formError, setFormError] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<SalesActionLoading>(null);
 
-  const loadOrders = useCallback(async () => {
-    setIsLoading(true);
+  const isActionLoading = (poId: number, type?: NonNullable<SalesActionLoading>["type"]) =>
+    actionLoading?.poId === poId && (!type || actionLoading.type === type);
+
+  const refreshPreviewPo = async (poId: number) => {
+    const response = await api.preorders();
+    const updatedPo = response.preorders.map(mapPreorder).find((item) => item.id === poId);
+
+    if (updatedPo) {
+      setPreviewPo(updatedPo);
+    }
+  };
+
+  const loadOrders = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     setErrorMessage("");
 
     try {
@@ -270,7 +305,9 @@ export function SalesOrders() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal memuat data PO sales.");
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, [searchTerm, statusFilter]);
 
@@ -280,13 +317,23 @@ export function SalesOrders() {
 
   useEffect(() => {
     const handleSalesNotification = () => {
-      void loadOrders();
+      void loadOrders(true);
     };
 
     window.addEventListener("sales-notification", handleSalesNotification);
 
     return () => {
       window.removeEventListener("sales-notification", handleSalesNotification);
+    };
+  }, [loadOrders]);
+
+  useEffect(() => {
+    const pollTimer = window.setInterval(() => {
+      void loadOrders(true);
+    }, salesOrdersPollIntervalMs);
+
+    return () => {
+      window.clearInterval(pollTimer);
     };
   }, [loadOrders]);
 
@@ -309,47 +356,65 @@ export function SalesOrders() {
   const invalidCount = purchaseOrders.filter((po) => po.status === "invalid").length;
 
   const approvePo = async (po: PurchaseOrder) => {
-    if (po.status !== "in_review") {
+    if (po.status !== "in_review" || actionLoading) {
       return;
     }
 
+    setActionLoading({ type: "approve", poId: po.id });
+    openProcessingAlert("Memproses approve", "Mohon tunggu sampai status PO benar-benar tersimpan.");
+
     try {
       await api.salesUpdatePreorderStatus(po.id, { status: "approve" });
-      await loadOrders();
-      // Reload preview state
-      const response = await api.preorders({ status: statusFilter === "all" ? undefined : statusFilter });
-      const updatedPo = response.preorders.map(mapPreorder).find(p => p.id === po.id);
-      if (updatedPo) {
-        setPreviewPo(updatedPo);
-      }
+      await loadOrders(true);
+      await refreshPreviewPo(po.id);
+      await Swal.fire({
+        title: "Approve selesai",
+        text: "PO berhasil di-approve dan data sales sudah diperbarui.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
+      Swal.close();
       setErrorMessage(error instanceof Error ? error.message : "Gagal approve PO.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal approve PO.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleUploadProof = async (po: PurchaseOrder, stage: "full" | "dp" | "remaining", file: File) => {
+    if (actionLoading) {
+      return;
+    }
+
+    setActionLoading({ type: "upload", poId: po.id, stage });
+    openProcessingAlert("Mengupload bukti pembayaran", "Mohon tunggu sampai file tersimpan dan data PO diperbarui.");
+
     try {
       await api.salesUploadPaymentProof(po.id, stage, file);
+      await loadOrders(true);
+      await refreshPreviewPo(po.id);
       await Swal.fire({
         title: "Berhasil",
-        text: "Bukti pembayaran berhasil diupload.",
+        text: "Bukti pembayaran berhasil diupload dan data PO sudah diperbarui.",
         icon: "success",
         confirmButtonColor: "#0F766E",
       });
-      await loadOrders();
-      // Refresh preview modal PO details
-      const response = await api.preorders({ status: statusFilter === "all" ? undefined : statusFilter });
-      const updatedPo = response.preorders.map(mapPreorder).find(p => p.id === po.id);
-      if (updatedPo) {
-        setPreviewPo(updatedPo);
-      }
     } catch (error) {
+      Swal.close();
       await Swal.fire({
         title: "Gagal",
         text: error instanceof Error ? error.message : "Gagal mengupload bukti pembayaran.",
         icon: "error",
         confirmButtonColor: "#0F766E",
       });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -366,27 +431,33 @@ export function SalesOrders() {
     });
 
     if (result.isConfirmed) {
+      if (actionLoading) {
+        return;
+      }
+
+      setActionLoading({ type: "quotation", poId: po.id });
+      openProcessingAlert("Mengirim tagihan", "Mohon tunggu sampai tagihan pelunasan terkirim dan data PO diperbarui.");
+
       try {
         await api.salesSendPaymentQuotation(po.id, "remaining");
+        await loadOrders(true);
+        await refreshPreviewPo(po.id);
         await Swal.fire({
           title: "Terkirim",
-          text: "Tagihan pelunasan berhasil dikirim ke customer.",
+          text: "Tagihan pelunasan berhasil dikirim ke customer dan data PO sudah diperbarui.",
           icon: "success",
           confirmButtonColor: "#0F766E",
         });
-        await loadOrders();
-        const response = await api.preorders({ status: statusFilter === "all" ? undefined : statusFilter });
-        const updatedPo = response.preorders.map(mapPreorder).find(p => p.id === po.id);
-        if (updatedPo) {
-          setPreviewPo(updatedPo);
-        }
       } catch (error) {
+        Swal.close();
         await Swal.fire({
           title: "Gagal",
           text: error instanceof Error ? error.message : "Gagal mengirim tagihan pelunasan.",
           icon: "error",
           confirmButtonColor: "#0F766E",
         });
+      } finally {
+        setActionLoading(null);
       }
     }
   };
@@ -394,7 +465,7 @@ export function SalesOrders() {
   const submitInvalid = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!invalidPo) {
+    if (!invalidPo || actionLoading) {
       return;
     }
 
@@ -403,22 +474,45 @@ export function SalesOrders() {
       return;
     }
 
+    setActionLoading({ type: "invalid", poId: invalidPo.id });
+    openProcessingAlert("Menyimpan invalid", "Mohon tunggu sampai status PO benar-benar tersimpan.");
+
     try {
       await api.salesUpdatePreorderStatus(invalidPo.id, { status: "invalid", invalid_reason: invalidReason });
-      await loadOrders();
+      await loadOrders(true);
       setPreviewPo((currentPo) =>
         currentPo?.id === invalidPo.id ? { ...currentPo, status: "invalid", invalidReason } : currentPo,
       );
       setInvalidPo(null);
       setInvalidReason("");
       setFormError("");
+      await Swal.fire({
+        title: "Invalid selesai",
+        text: "PO berhasil ditandai invalid dan data sales sudah diperbarui.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
     } catch (error) {
+      Swal.close();
       setFormError(error instanceof Error ? error.message : "Gagal menyimpan status invalid.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal menyimpan status invalid.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const renderUploadSection = (po: PurchaseOrder) => {
     const isDpMode = po.paymentMode === "split" || po.paymentMode === "50%";
+    const isUploadingDp = actionLoading?.type === "upload" && actionLoading.poId === po.id && actionLoading.stage === "dp";
+    const isUploadingRemaining =
+      actionLoading?.type === "upload" && actionLoading.poId === po.id && actionLoading.stage === "remaining";
+    const isUploadingFull =
+      actionLoading?.type === "upload" && actionLoading.poId === po.id && actionLoading.stage === "full";
 
     if (isDpMode) {
       if (po.paymentStatus === "unpaid" && po.status === "approve") {
@@ -427,13 +521,18 @@ export function SalesOrders() {
             <p className="text-xs font-medium text-amber-600">
               * Silakan upload bukti pembayaran DP 50% untuk melanjutkan transaksi.
             </p>
-            <label className="inline-flex max-w-xs cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100">
-              <Upload className="h-4 w-4" />
-              Upload Bukti DP
+            <label
+              className={`inline-flex max-w-xs items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 ${
+                actionLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+              }`}
+            >
+              {isUploadingDp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {isUploadingDp ? "Mengupload..." : "Upload Bukti DP"}
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 className="hidden"
+                disabled={Boolean(actionLoading)}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -452,13 +551,18 @@ export function SalesOrders() {
             <p className="text-xs font-medium text-sky-600">
               * Silakan upload bukti pelunasan setelah customer membayar sisa 50%.
             </p>
-            <label className="inline-flex max-w-xs cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100">
-              <Upload className="h-4 w-4" />
-              Upload Bukti Pelunasan
+            <label
+              className={`inline-flex max-w-xs items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 ${
+                actionLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+              }`}
+            >
+              {isUploadingRemaining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {isUploadingRemaining ? "Mengupload..." : "Upload Bukti Pelunasan"}
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 className="hidden"
+                disabled={Boolean(actionLoading)}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -478,13 +582,18 @@ export function SalesOrders() {
             <p className="text-xs font-medium text-slate-600">
               * Silakan upload bukti pembayaran penuh (100%) untuk menyelesaikan transaksi.
             </p>
-            <label className="inline-flex max-w-xs cursor-pointer items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100">
-              <Upload className="h-4 w-4" />
-              Upload Bukti Pembayaran
+            <label
+              className={`inline-flex max-w-xs items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 ${
+                actionLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+              }`}
+            >
+              {isUploadingFull ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {isUploadingFull ? "Mengupload..." : "Upload Bukti Pembayaran"}
               <input
                 type="file"
                 accept="image/*,application/pdf"
                 className="hidden"
+                disabled={Boolean(actionLoading)}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -578,7 +687,11 @@ export function SalesOrders() {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((po) => (
+              {filteredOrders.map((po) => {
+                const isApproving = isActionLoading(po.id, "approve");
+                const isInvalidating = isActionLoading(po.id, "invalid");
+
+                return (
                 <tr key={po.id} className="border-b border-slate-100 text-sm last:border-0">
                   <td className="px-4 py-3 font-semibold text-slate-950">{po.poNumber}</td>
                   <td className="px-4 py-3">
@@ -620,28 +733,29 @@ export function SalesOrders() {
                       </button>
                       <button
                         onClick={() => approvePo(po)}
-                        disabled={po.status !== "in_review"}
+                        disabled={po.status !== "in_review" || Boolean(actionLoading)}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Approve
+                        {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        {isApproving ? "Memproses..." : "Approve"}
                       </button>
                       <button
                         onClick={() => {
-                          if (po.status === "in_review") {
+                          if (po.status === "in_review" && !actionLoading) {
                             setInvalidPo(po);
                           }
                         }}
-                        disabled={po.status !== "in_review"}
+                        disabled={po.status !== "in_review" || Boolean(actionLoading)}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                       >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Invalid
+                        {isInvalidating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                        {isInvalidating ? "Memproses..." : "Invalid"}
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {isLoading && <div className="px-4 py-5 text-sm text-slate-500">Memuat order sales...</div>}
@@ -935,17 +1049,27 @@ export function SalesOrders() {
                 <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                   <button
                     onClick={() => setInvalidPo(previewPo)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
+                    disabled={Boolean(actionLoading)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                   >
-                    <XCircle className="h-4 w-4" />
-                    Invalid
+                    {isActionLoading(previewPo.id, "invalid") ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    {isActionLoading(previewPo.id, "invalid") ? "Memproses..." : "Invalid"}
                   </button>
                   <button
                     onClick={() => approvePo(previewPo)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                    disabled={Boolean(actionLoading)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Approve
+                    {isActionLoading(previewPo.id, "approve") ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    {isActionLoading(previewPo.id, "approve") ? "Memproses..." : "Approve"}
                   </button>
                 </div>
               )}
@@ -954,10 +1078,15 @@ export function SalesOrders() {
                 <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                   <button
                     onClick={() => handleSendRemainingQuotation(previewPo)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                    disabled={Boolean(actionLoading)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Kirim Tagihan Pelunasan
+                    {isActionLoading(previewPo.id, "quotation") ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    {isActionLoading(previewPo.id, "quotation") ? "Mengirim..." : "Kirim Tagihan Pelunasan"}
                   </button>
                 </div>
               )}
@@ -1006,20 +1135,23 @@ export function SalesOrders() {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
+                  disabled={Boolean(actionLoading)}
                   onClick={() => {
                     setInvalidPo(null);
                     setInvalidReason("");
                     setFormError("");
                   }}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  Simpan invalid
+                  {isActionLoading(invalidPo.id, "invalid") && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isActionLoading(invalidPo.id, "invalid") ? "Menyimpan..." : "Simpan invalid"}
                 </button>
               </div>
             </form>
