@@ -974,15 +974,17 @@ export function AgentPurchaseOrder() {
                           {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                           {isDeleting ? "Menghapus" : "Hapus"}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadQuotationPdf(po)}
-                          disabled={Boolean(actionLoading) || isPersistingPo || downloadingQuotationId === po.id}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#115E59] disabled:cursor-wait disabled:bg-[#0F766E]/60"
-                        >
-                          {isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                          {isDownloading ? "Loading" : "Send Invoice"}
-                        </button>
+                        {po.status === "draft" && (
+                          <button
+                            type="button"
+                            onClick={() => downloadQuotationPdf(po)}
+                            disabled={Boolean(actionLoading) || isPersistingPo || downloadingQuotationId === po.id}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#115E59] disabled:cursor-wait disabled:bg-[#0F766E]/60"
+                          >
+                            {isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                            {isDownloading ? "Loading" : "Send Invoice"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
