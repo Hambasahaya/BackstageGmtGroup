@@ -12,8 +12,8 @@ const emptySummary: OnboardingSummaryDto = {
 };
 
 const forcedOnboardingVideoUrls = [
-  "https://www.youtube.com/watch?v=iWmqw7PqAgs",
-  "https://www.youtube.com/watch?v=Mjm_g8WKa20",
+  "https://www.youtube.com/watch?v=4UPgUT-bMiU",
+  "https://www.youtube.com/watch?v=IH7kHpxtTp4",
   "https://www.youtube.com/watch?v=aNwhxCN2dyg",
 ];
 
