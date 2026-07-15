@@ -40,6 +40,20 @@ export type PreorderDto = {
   id: number;
   po_number?: string;
   status: PreorderStatus;
+  agent_name?: string | null;
+  agent_email?: string | null;
+  sales_agent_name?: string | null;
+  sales_agent_email?: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  agent?: {
+    name?: string | null;
+    email?: string | null;
+  } | null;
+  user?: {
+    name?: string | null;
+    email?: string | null;
+  } | null;
   nama_customer: string;
   email: string;
   alamat: string;

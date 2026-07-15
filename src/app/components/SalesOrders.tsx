@@ -18,6 +18,8 @@ type PurchaseOrder = {
   id: number;
   poNumber: string;
   status: PurchaseOrderStatus;
+  agentName: string;
+  agentEmail: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -97,13 +99,35 @@ function getItemProductUnit(item: PreorderItemDto) {
   );
 }
 
+function getPreorderAgent(preorder: PreorderDto) {
+  const agentName =
+    preorder.agent?.name?.trim() ||
+    preorder.user?.name?.trim() ||
+    preorder.agent_name?.trim() ||
+    preorder.sales_agent_name?.trim() ||
+    preorder.user_name?.trim() ||
+    "Agent tidak tersedia";
+  const agentEmail =
+    preorder.agent?.email?.trim() ||
+    preorder.user?.email?.trim() ||
+    preorder.agent_email?.trim() ||
+    preorder.sales_agent_email?.trim() ||
+    preorder.user_email?.trim() ||
+    "";
+
+  return { agentName, agentEmail };
+}
+
 function mapPreorder(preorder: PreorderDto): PurchaseOrder {
   const rawItems = preorder.items ?? preorder.preorder_items ?? [];
+  const agent = getPreorderAgent(preorder);
 
   return {
     id: preorder.id,
     poNumber: preorder.po_number ?? `PO-${preorder.id}`,
     status: preorder.status,
+    agentName: agent.agentName,
+    agentEmail: agent.agentEmail,
     customerName: preorder.nama_customer,
     customerEmail: preorder.email,
     customerPhone: preorder.no_hp,
@@ -269,7 +293,7 @@ export function SalesOrders() {
 
     return purchaseOrders.filter((po) => {
       const matchesStatus = statusFilter === "all" || po.status === statusFilter;
-      const matchesSearch = [po.poNumber, po.customerName, po.customerEmail, po.customerPhone]
+      const matchesSearch = [po.poNumber, po.agentName, po.agentEmail, po.customerName, po.customerEmail, po.customerPhone]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearch);
@@ -535,10 +559,11 @@ export function SalesOrders() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] whitespace-nowrap">
+          <table className="w-full min-w-[1080px] whitespace-nowrap">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
                 <th className="px-4 py-3 font-semibold">PO</th>
+                <th className="px-4 py-3 font-semibold">Agent</th>
                 <th className="px-4 py-3 font-semibold">Customer</th>
                 <th className="px-4 py-3 font-semibold">Item</th>
                 <th className="px-4 py-3 font-semibold">Total</th>
@@ -554,6 +579,10 @@ export function SalesOrders() {
               {filteredOrders.map((po) => (
                 <tr key={po.id} className="border-b border-slate-100 text-sm last:border-0">
                   <td className="px-4 py-3 font-semibold text-slate-950">{po.poNumber}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-900">{po.agentName}</p>
+                    {po.agentEmail && <p className="text-xs text-slate-500">{po.agentEmail}</p>}
+                  </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900">{po.customerName}</p>
                     <p className="text-xs text-slate-500">{po.customerPhone}</p>
@@ -635,7 +664,12 @@ export function SalesOrders() {
             </div>
 
             <div className="space-y-5 p-5">
-              <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Agent</p>
+                  <p className="mt-2 font-semibold text-slate-950">{previewPo.agentName}</p>
+                  {previewPo.agentEmail && <p className="mt-1 text-sm text-slate-600">{previewPo.agentEmail}</p>}
+                </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</p>
                   <p className="mt-2 font-semibold text-slate-950">{previewPo.customerName}</p>

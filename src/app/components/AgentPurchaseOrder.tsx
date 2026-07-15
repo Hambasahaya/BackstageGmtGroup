@@ -212,9 +212,9 @@ export function renderFormattedDescription(text: string | null | undefined) {
   return <div className="space-y-0.5">{parsedElements}</div>;
 }
 
-const newItem = (): PurchaseOrderItem => ({
+const newItem = (productId = defaultProducts[0].id): PurchaseOrderItem => ({
   id: `item-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  productId: defaultProducts[0].id,
+  productId,
   qty: 1,
   discountPercent: 0,
   itemStatus: "ready",
@@ -438,6 +438,7 @@ export function AgentPurchaseOrder() {
 
   const submittedCount = purchaseOrders.filter((po) => po.status === "in_review").length;
   const draftCount = purchaseOrders.filter((po) => po.status === "draft").length;
+  const canAddMoreProducts = items.length < products.length;
 
   const resetForm = () => {
     setCustomerName("");
@@ -459,8 +460,15 @@ export function AgentPurchaseOrder() {
   };
 
   const updateItem = (itemId: string, changes: Partial<PurchaseOrderItem>) => {
-    setItems((currentItems) =>
-      currentItems.map((item) => {
+    setItems((currentItems) => {
+      if (
+        changes.productId !== undefined &&
+        currentItems.some((item) => item.id !== itemId && item.productId === changes.productId)
+      ) {
+        return currentItems;
+      }
+
+      return currentItems.map((item) => {
         if (item.id !== itemId) {
           return item;
         }
@@ -487,8 +495,8 @@ export function AgentPurchaseOrder() {
           discountPercent: Math.max(0, newDiscountPercent),
           qty: Math.max(1, changes.qty ?? item.qty),
         };
-      }),
-    );
+      });
+    });
   };
 
   const removeItem = (itemId: string) => {
@@ -500,6 +508,22 @@ export function AgentPurchaseOrder() {
   const openCreateModal = () => {
     resetForm();
     setIsModalOpen(true);
+  };
+
+  const getAvailableProductsForItem = (itemId: string) => {
+    const usedProductIds = new Set(items.filter((item) => item.id !== itemId).map((item) => item.productId));
+    return products.filter((product) => !usedProductIds.has(product.id));
+  };
+
+  const addPurchaseOrderItem = () => {
+    const usedProductIds = new Set(items.map((item) => item.productId));
+    const nextProduct = products.find((product) => !usedProductIds.has(product.id));
+
+    if (!nextProduct) {
+      return;
+    }
+
+    setItems((currentItems) => [...currentItems, newItem(nextProduct.id)]);
   };
 
   const openEditModal = (po: PurchaseOrder) => {
@@ -981,7 +1005,7 @@ export function AgentPurchaseOrder() {
                           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                           aria-label={`Pilih product ${index + 1}`}
                         >
-                          {products.map((product) => (
+                          {getAvailableProductsForItem(item.id).map((product) => (
                             <option key={product.id} value={product.id}>
                               {product.name}
                             </option>
@@ -1145,7 +1169,7 @@ export function AgentPurchaseOrder() {
                               onChange={(event) => updateItem(item.id, { productId: Number(event.target.value) })}
                               className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-medium text-slate-900 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:text-sm"
                             >
-                              {products.map((product) => (
+                              {getAvailableProductsForItem(item.id).map((product) => (
                                 <option key={product.id} value={product.id}>
                                   {product.name}
                                 </option>
@@ -1229,11 +1253,12 @@ export function AgentPurchaseOrder() {
 
               <button
                 type="button"
-                onClick={() => setItems((currentItems) => [...currentItems, newItem()])}
-                className={`${mobilePoStep === "cart" ? "inline-flex" : "hidden"} items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 md:inline-flex`}
+                onClick={addPurchaseOrderItem}
+                disabled={!canAddMoreProducts}
+                className={`${mobilePoStep === "cart" ? "inline-flex" : "hidden"} items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 md:inline-flex`}
               >
                 <Plus className="h-4 w-4" />
-                Tambah product
+                {canAddMoreProducts ? "Tambah product" : "Semua product dipilih"}
               </button>
 
               <label className={`${mobilePoStep === "details" ? "block" : "hidden"} md:block`}>
