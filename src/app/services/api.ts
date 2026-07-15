@@ -364,6 +364,7 @@ export type ArticlePayload = {
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const assetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL ?? "https://is3.cloudhost.id/gmtsuites";
 export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
 const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
 const defaultLogoutRedirectUrl = import.meta.env.VITE_LOGOUT_REDIRECT_URL ?? "/";
@@ -402,7 +403,7 @@ export function resolveApiAssetUrl(value: string | null | undefined) {
     return value;
   }
 
-  const base = apiBaseUrl.replace(/\/$/, "");
+  const base = assetBaseUrl.replace(/\/$/, "");
   const normalizedPath = value.startsWith("/") ? value : `/${value}`;
 
   return `${base}${normalizedPath}`;
