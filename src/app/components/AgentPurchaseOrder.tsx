@@ -38,6 +38,7 @@ type PurchaseOrder = {
   id: number;
   poNumber: string;
   status: "draft" | "in_review" | "approve" | "invalid";
+  companyName: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -100,6 +101,7 @@ const defaultPurchaseOrders: PurchaseOrder[] = [
     id: 1008,
     poNumber: "PO-1008",
     status: "in_review",
+    companyName: "PT Cahaya Eventindo",
     customerName: "PT Cahaya Eventindo",
     customerEmail: "procurement@cahayaevent.id",
     customerPhone: "081234567890",
@@ -120,6 +122,7 @@ const defaultPurchaseOrders: PurchaseOrder[] = [
     id: 1007,
     poNumber: "PO-1007",
     status: "draft",
+    companyName: "Bina Kreatif Production",
     customerName: "Bina Kreatif Production",
     customerEmail: "admin@binakreatif.id",
     customerPhone: "082112345678",
@@ -244,6 +247,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     id: preorder.id,
     poNumber: preorder.po_number ?? `PO-${preorder.id}`,
     status: preorder.status,
+    companyName: preorder.company_name ?? preorder.nama_perusahaan ?? "",
     customerName: preorder.nama_customer,
     customerEmail: preorder.email,
     customerPhone: preorder.no_hp,
@@ -275,6 +279,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
 }
 
 function toPreorderPayload(
+  companyName: string,
   customerName: string,
   customerEmail: string,
   customerPhone: string,
@@ -286,6 +291,8 @@ function toPreorderPayload(
   const normalizedEmail = normalizeEmail(customerEmail);
 
   return {
+    company_name: companyName.trim(),
+    nama_perusahaan: companyName.trim(),
     nama_customer: customerName.trim(),
     email: normalizedEmail,
     alamat: customerAddress.trim(),
@@ -388,6 +395,7 @@ export function AgentPurchaseOrder() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(defaultPurchaseOrders);
   const [products, setProducts] = useState<Product[]>(defaultProducts);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [companyName, setCompanyName] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -441,6 +449,7 @@ export function AgentPurchaseOrder() {
   const canAddMoreProducts = items.length < products.length;
 
   const resetForm = () => {
+    setCompanyName("");
     setCustomerName("");
     setCustomerEmail("");
     setCustomerPhone("");
@@ -532,6 +541,7 @@ export function AgentPurchaseOrder() {
     }
 
     setEditingPoId(po.id);
+    setCompanyName(po.companyName);
     setCustomerName(po.customerName);
     setCustomerEmail(po.customerEmail);
     setCustomerPhone(po.customerPhone);
@@ -558,7 +568,7 @@ export function AgentPurchaseOrder() {
   const validateForm = () => {
     const normalizedEmail = normalizeEmail(customerEmail);
 
-    if (!customerName.trim() || !normalizedEmail || !customerPhone.trim() || !customerAddress.trim()) {
+    if (!companyName.trim() || !customerName.trim() || !normalizedEmail || !customerPhone.trim() || !customerAddress.trim()) {
       setFormError("Lengkapi data customer sebelum menyimpan PO.");
       return false;
     }
@@ -595,7 +605,7 @@ export function AgentPurchaseOrder() {
     const normalizedEmail = normalizeEmail(customerEmail);
     setCustomerEmail(normalizedEmail);
 
-    const payload = toPreorderPayload(customerName, normalizedEmail, customerPhone, customerAddress, notes, paymentMode, items);
+    const payload = toPreorderPayload(companyName, customerName, normalizedEmail, customerPhone, customerAddress, notes, paymentMode, items);
 
     setIsPersistingPo(true);
     try {
@@ -743,6 +753,7 @@ export function AgentPurchaseOrder() {
                       <section className="rounded-lg bg-slate-50 px-3 py-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
+                            {po.companyName && <p className="truncate text-sm font-semibold text-slate-950">{po.companyName}</p>}
                             <p className="truncate text-sm font-semibold text-slate-950">{po.customerName}</p>
                             <p className="mt-1 truncate text-xs text-slate-500">{po.customerEmail}</p>
                             <p className="mt-1 text-xs font-medium text-slate-600">{po.customerPhone}</p>
@@ -867,6 +878,7 @@ export function AgentPurchaseOrder() {
                 <tr key={po.id} className="border-b border-slate-100 text-sm last:border-0">
                   <td className="px-4 py-3 font-semibold text-slate-950">{po.poNumber}</td>
                   <td className="px-4 py-3">
+                    {po.companyName && <p className="font-semibold text-slate-900">{po.companyName}</p>}
                     <p className="font-medium text-slate-900">{po.customerName}</p>
                     <p className="text-xs text-slate-500">{po.customerPhone}</p>
                   </td>
@@ -950,6 +962,15 @@ export function AgentPurchaseOrder() {
 
             <div className="space-y-4 p-4 pb-36 md:space-y-5 md:bg-white md:p-5">
               <div className={`${mobilePoStep === "details" ? "grid" : "hidden"} grid-cols-1 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid md:border-0 md:p-0 md:shadow-none lg:grid-cols-2`}>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Nama perusahaan</span>
+                  <input
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    placeholder="PT Contoh Perusahaan"
+                  />
+                </label>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Nama customer</span>
                   <input
@@ -1456,6 +1477,7 @@ export function AgentPurchaseOrder() {
               <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</p>
+                  {previewPo.companyName && <p className="mt-2 font-semibold text-slate-950">{previewPo.companyName}</p>}
                   <p className="mt-2 font-semibold text-slate-950">{previewPo.customerName}</p>
                   <p className="mt-1 text-sm text-slate-600">{previewPo.customerEmail}</p>
                   <p className="text-sm text-slate-600">{previewPo.customerPhone}</p>

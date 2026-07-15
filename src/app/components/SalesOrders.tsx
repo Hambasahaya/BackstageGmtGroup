@@ -20,6 +20,7 @@ type PurchaseOrder = {
   status: PurchaseOrderStatus;
   agentName: string;
   agentEmail: string;
+  companyName: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -128,6 +129,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     status: preorder.status,
     agentName: agent.agentName,
     agentEmail: agent.agentEmail,
+    companyName: preorder.company_name ?? preorder.nama_perusahaan ?? "",
     customerName: preorder.nama_customer,
     customerEmail: preorder.email,
     customerPhone: preorder.no_hp,
@@ -293,7 +295,7 @@ export function SalesOrders() {
 
     return purchaseOrders.filter((po) => {
       const matchesStatus = statusFilter === "all" || po.status === statusFilter;
-      const matchesSearch = [po.poNumber, po.agentName, po.agentEmail, po.customerName, po.customerEmail, po.customerPhone]
+      const matchesSearch = [po.poNumber, po.agentName, po.agentEmail, po.companyName, po.customerName, po.customerEmail, po.customerPhone]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearch);
@@ -584,6 +586,7 @@ export function SalesOrders() {
                     {po.agentEmail && <p className="text-xs text-slate-500">{po.agentEmail}</p>}
                   </td>
                   <td className="px-4 py-3">
+                    {po.companyName && <p className="font-semibold text-slate-900">{po.companyName}</p>}
                     <p className="font-medium text-slate-900">{po.customerName}</p>
                     <p className="text-xs text-slate-500">{po.customerPhone}</p>
                   </td>
@@ -672,6 +675,7 @@ export function SalesOrders() {
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</p>
+                  {previewPo.companyName && <p className="mt-2 font-semibold text-slate-950">{previewPo.companyName}</p>}
                   <p className="mt-2 font-semibold text-slate-950">{previewPo.customerName}</p>
                   <p className="mt-1 text-sm text-slate-600">{previewPo.customerEmail}</p>
                   <p className="text-sm text-slate-600">{previewPo.customerPhone}</p>
