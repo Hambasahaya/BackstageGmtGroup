@@ -55,8 +55,6 @@ export type PreorderDto = {
     email?: string | null;
   } | null;
   nama_customer: string;
-  company_name?: string | null;
-  nama_perusahaan?: string | null;
   email: string;
   alamat: string;
   no_hp: string;
