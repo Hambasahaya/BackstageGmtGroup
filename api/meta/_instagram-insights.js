@@ -1101,24 +1101,26 @@ export default async function handler(request, response) {
       return;
     }
 
-    const mediaWithReasoning = await enrichMediaReasoning({
-      mediaItems: media.data || [],
-      profile,
-      dateRange,
-      skipAi: false,
-    });
-    const contentBrief = await getContentBrief({
-      profile,
-      dateRange,
-      mediaItems: mediaWithReasoning.data || [],
-      audience: audience.data,
-      igUserId,
-    });
-    const contentReferences = await getReferenceInsights({
-      profile,
-      igUserId,
-      recentPosts: getMediaReasoningPayload(mediaWithReasoning.data || []),
-    });
+    const [mediaWithReasoning, contentBrief, contentReferences] = await Promise.all([
+      enrichMediaReasoning({
+        mediaItems: media.data || [],
+        profile,
+        dateRange,
+        skipAi: false,
+      }),
+      getContentBrief({
+        profile,
+        dateRange,
+        mediaItems: media.data || [],
+        audience: audience.data,
+        igUserId,
+      }),
+      getReferenceInsights({
+        profile,
+        igUserId,
+        recentPosts: getMediaReasoningPayload(media.data || []),
+      }),
+    ]);
 
     json(response, 200, {
       connected: true,
