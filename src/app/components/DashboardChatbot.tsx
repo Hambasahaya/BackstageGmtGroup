@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, MessageSquare, RotateCcw, Send, Sparkles, X, Loader2 } from "lucide-react";
 import { api } from "../services/api";
-import { fetchChatbotContext, streamChatbot } from "../services/chatbot";
 import { fetchWebsiteAnalytics } from "../services/websiteAnalytics";
 import { fetchInstagramInsights } from "../services/metaIntegrations";
 
@@ -33,17 +32,6 @@ export function DashboardChatbot() {
     setIsFetchingContext(true);
     
     try {
-      try {
-        const backendContext = await fetchChatbotContext();
-        if (backendContext.trim()) {
-          setContext(backendContext);
-          setHasLoadedContext(true);
-          return;
-        }
-      } catch {
-        // Fallback to browser-built context while the Go context endpoint is still a placeholder.
-      }
-
       const [prodRes, artRes, webRes, igRes] = await Promise.allSettled([
         api.products(),
         api.articles({ limit: 50 }),
@@ -157,30 +145,89 @@ export function DashboardChatbot() {
     setIsLoading(true);
 
     try {
+      const response = await fetch("/api/chatbot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: query,
+          history: messages,
+          context: context,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.error || "Gagal mendapatkan respon chatbot.");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Pemberi respon stream tidak didukung di browser ini.");
+      }
+
+      const decoder = new TextDecoder();
       let assistantReply = "";
 
       // Add a blank message to compile the stream in real-time
       setMessages([...nextMessages, { role: "assistant", content: "" }]);
       setIsLoading(false); // Hide the loading indicator as streaming starts
 
-      await streamChatbot(
-        {
-          message: query,
-          history: messages,
-          context,
-        },
-        (token) => {
-          assistantReply += token;
-          setMessages((prev) => {
-            const updated = [...prev];
-            const lastMsg = updated[updated.length - 1];
-            if (lastMsg && lastMsg.role === "assistant") {
-              lastMsg.content = assistantReply;
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (!cleanLine) continue;
+          if (cleanLine === "data: [DONE]") continue;
+
+          if (cleanLine.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(cleanLine.substring(6));
+              const delta = data.choices?.[0]?.delta?.content || "";
+              if (delta) {
+                assistantReply += delta;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastMsg = updated[updated.length - 1];
+                  if (lastMsg && lastMsg.role === "assistant") {
+                    lastMsg.content = assistantReply;
+                  }
+                  return updated;
+                });
+              }
+            } catch (e) {
+              // Ignore incomplete chunk parse errors
             }
-            return updated;
-          });
-        },
-      );
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith("data: ")) {
+        try {
+          const data = JSON.parse(buffer.trim().substring(6));
+          const delta = data.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            assistantReply += delta;
+            setMessages((prev) => {
+              const updated = [...prev];
+              const lastMsg = updated[updated.length - 1];
+              if (lastMsg && lastMsg.role === "assistant") {
+                lastMsg.content = assistantReply;
+              }
+              return updated;
+            });
+          }
+        } catch (e) {}
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan koneksi.";
       setMessages((prev) => {

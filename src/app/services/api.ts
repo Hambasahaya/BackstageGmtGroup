@@ -388,7 +388,7 @@ type RequestOptions = RequestInit & {
   query?: Record<string, string | number | undefined>;
 };
 
-export function buildApiUrl(path: string, query?: RequestOptions["query"]) {
+function buildUrl(path: string, query?: RequestOptions["query"]) {
   const base = apiBaseUrl.replace(/\/$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(`${base}${normalizedPath}`, window.location.origin);
@@ -464,7 +464,7 @@ export function connectSalesNotificationStream({
         headers.set("Authorization", `Bearer ${token}`);
       }
 
-      const response = await fetch(buildApiUrl("/api/sales/notifications/stream"), {
+      const response = await fetch(buildUrl("/api/sales/notifications/stream"), {
         headers,
         signal: controller.signal,
       });
@@ -550,7 +550,7 @@ export function connectAgentPreorderStream({
         headers.set("Authorization", `Bearer ${token}`);
       }
 
-      const response = await fetch(buildApiUrl("/api/agent/preorders/stream"), {
+      const response = await fetch(buildUrl("/api/agent/preorders/stream"), {
         headers,
         signal: controller.signal,
       });
@@ -725,7 +725,7 @@ async function refreshAccessToken(): Promise<string> {
       throw new Error("refresh failed");
     }
 
-    const res = await fetch(buildApiUrl("/api/auth/refresh"), {
+    const res = await fetch(buildUrl("/api/auth/refresh"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -766,7 +766,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     requestHeaders.set("Authorization", `Bearer ${token}`);
   }
 
-  let response = await fetch(buildApiUrl(path, query), {
+  let response = await fetch(buildUrl(path, query), {
     ...requestOptions,
     body,
     headers: requestHeaders,
@@ -780,7 +780,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
         retryHeaders.set("Content-Type", "application/json");
       }
       retryHeaders.set("Authorization", `Bearer ${newToken}`);
-      response = await fetch(buildApiUrl(path, query), {
+      response = await fetch(buildUrl(path, query), {
         ...requestOptions,
         body,
         headers: retryHeaders,

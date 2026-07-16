@@ -1,4 +1,4 @@
-import { apiRequest, clientName } from "./api";
+import { apiRequest } from "./api";
 
 export type MetaAccountHealth = {
   connected: boolean;
@@ -21,43 +21,6 @@ export type MetaAccountHealth = {
       username?: string;
     } | null;
   }>;
-};
-
-type ApiEnvelope<T> = {
-  success?: boolean;
-  cached?: boolean;
-  queued?: boolean;
-  message?: string;
-  error?: string;
-  data?: T;
-};
-
-type GoMetaAccount = {
-  id?: number;
-  connection_id?: number;
-  page_id?: string;
-  page_name?: string;
-  ig_user_id?: string;
-  ig_username?: string;
-  profile_picture_url?: string;
-  tasks?: string[];
-};
-
-type GoInstagramInsights = {
-  ig_user_id?: string;
-  since?: string;
-  until?: string;
-  profile?: InstagramInsights["profile"];
-  insights?: InstagramInsights["insights"] | Record<string, unknown>;
-  media?: InstagramInsights["media"];
-  audience?: InstagramInsights["audience"];
-  warnings?: string[];
-  fetched_at?: string;
-  expires_at?: string;
-  contentBrief?: InstagramInsights["contentBrief"];
-  contentReferences?: InstagramInsights["contentReferences"];
-  content_brief?: InstagramInsights["contentBrief"];
-  content_references?: InstagramInsights["contentReferences"];
 };
 
 export type InstagramInsights = {
@@ -219,67 +182,34 @@ export type CompetitorBenchmark = {
   warnings?: string[];
 };
 
-export async function fetchMetaAuthUrl() {
-  const payload = await apiRequest<ApiEnvelope<{ auth_url?: string; url?: string; scopes?: string[] }> & { auth_url?: string; url?: string; scopes?: string[] }>(
-    "/api/meta/auth-url",
-    {
-      method: "GET",
-      auth: false,
-      query: {
-        client_name: clientName,
-        source: "frontend",
-        return_url: `${window.location.origin}/integrations`,
-      },
-    },
-  );
-  const data = payload.data ?? payload;
-  const url = data.auth_url || data.url;
+async function readJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const text = await response.text();
+  let payload: any = {};
 
-  if (!url) {
-    throw new Error(payload.error || payload.message || "Failed to create Meta OAuth URL.");
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      const message = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      throw new Error(message || fallbackMessage);
+    }
   }
 
-  return { url, auth_url: url, scopes: data.scopes || [] };
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || fallbackMessage);
+  }
+
+  return payload as T;
+}
+
+export async function fetchMetaAuthUrl() {
+  const response = await fetch("/api/meta/auth-url");
+  return readJsonResponse<{ url: string; scopes: string[] }>(response, "Failed to create Meta OAuth URL.");
 }
 
 export async function fetchMetaAccounts() {
-  const payload = await apiRequest<ApiEnvelope<GoMetaAccount[]> | MetaAccountHealth>("/api/meta/accounts", {
-    method: "GET",
-  });
-
-  if ("instagramAccounts" in payload) {
-    return payload;
-  }
-
-  const accounts = payload.data || [];
-  const pages = accounts.map((account) => ({
-    id: account.page_id || String(account.id || ""),
-    name: account.page_name || account.ig_username || "",
-    connected: Boolean(account.ig_user_id),
-    instagramBusinessAccount: account.ig_user_id
-      ? {
-          id: account.ig_user_id,
-          username: account.ig_username,
-        }
-      : null,
-  }));
-
-  return {
-    connected: accounts.length > 0,
-    source: "server",
-    error: payload.error || undefined,
-    savedAt: null,
-    expiresAt: null,
-    instagramAccounts: accounts
-      .filter((account) => account.ig_user_id)
-      .map((account) => ({
-        id: account.ig_user_id || "",
-        username: account.ig_username,
-        pageId: account.page_id || String(account.id || ""),
-        pageName: account.page_name || account.ig_username || "",
-      })),
-    pages,
-  };
+  const response = await fetch("/api/meta/accounts");
+  return readJsonResponse<MetaAccountHealth>(response, "Failed to fetch Meta accounts.");
 }
 
 export async function fetchInstagramInsights(
@@ -287,65 +217,30 @@ export async function fetchInstagramInsights(
   dateRange?: { since: string; until: string },
   skipAi?: boolean,
 ) {
-  const payload = await apiRequest<ApiEnvelope<GoInstagramInsights> | InstagramInsights>("/api/meta/instagram-insights", {
-    method: "GET",
-    query: {
-      igUserId,
-      since: dateRange?.since,
-      until: dateRange?.until,
-      skip_ai: skipAi ? "true" : undefined,
-    },
-  });
-
-  if ("connected" in payload && "media" in payload) {
-    return payload;
-  }
-
-  const data = payload.data || {};
-  const insights = Array.isArray(data.insights) ? data.insights : [];
-
-  return {
-    connected: Boolean(data.ig_user_id || data.profile),
-    dateRange: {
-      since: data.since || dateRange?.since || "",
-      until: data.until || dateRange?.until || "",
-    },
-    profile: data.profile,
-    insights,
-    media: data.media || [],
-    audience: data.audience,
-    contentBrief: data.contentBrief ?? data.content_brief ?? null,
-    contentReferences: data.contentReferences ?? data.content_references ?? [],
-    warnings: data.warnings || [],
-  };
+  const params = new URLSearchParams();
+  if (igUserId) params.set("igUserId", igUserId);
+  if (dateRange?.since) params.set("since", dateRange.since);
+  if (dateRange?.until) params.set("until", dateRange.until);
+  if (skipAi) params.set("skip_ai", "true");
+  const query = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/meta/instagram-insights${query}`);
+  return readJsonResponse<InstagramInsights>(response, "Failed to fetch Instagram insights.");
 }
 
 export async function fetchCompetitorBenchmark(
   igUserId?: string,
   dateRange?: { since: string; until: string },
 ) {
-  const payload = await apiRequest<ApiEnvelope<Partial<CompetitorBenchmark>> | CompetitorBenchmark>("/api/meta/competitor-benchmark", {
-    method: "GET",
-    query: {
-      igUserId,
-      since: dateRange?.since,
-      until: dateRange?.until,
-    },
-  });
-
-  if ("competitors" in payload) {
-    return payload;
-  }
-
-  return {
-    connected: false,
-    competitors: [],
-    warnings: payload.data?.warnings || [payload.message || "Competitor benchmark belum tersedia di backend Go."],
-    ...payload.data,
-  };
+  const params = new URLSearchParams();
+  if (igUserId) params.set("igUserId", igUserId);
+  if (dateRange?.since) params.set("since", dateRange.since);
+  if (dateRange?.until) params.set("until", dateRange.until);
+  const query = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/meta/competitor-benchmark${query}`);
+  return readJsonResponse<CompetitorBenchmark>(response, "Failed to fetch competitor benchmark.");
 }
 
-export async function generateReferenceBrief(requestPayload: {
+export async function generateReferenceBrief(payload: {
   account?: {
     username?: string;
     name?: string;
@@ -357,24 +252,15 @@ export async function generateReferenceBrief(requestPayload: {
   selectedBrief?: unknown;
   references: Array<Record<string, unknown>>;
 }) {
-  const result = await apiRequest<ApiEnvelope<{ queued?: boolean; filename?: string; html?: string }>>("/api/meta/reference-brief", {
+  const response = await fetch("/api/meta/reference-brief", {
     method: "POST",
-    body: JSON.stringify(requestPayload),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-  const data = result.data || {};
-
-  if (result.queued || data.queued) {
-    throw new Error(result.message || "Reference brief masuk antrean backend dan akan tersedia setelah diproses.");
-  }
-
-  if (!data.filename || !data.html) {
-    throw new Error(result.message || "Reference brief belum tersedia dari backend.");
-  }
-
-  return { filename: data.filename, html: data.html };
+  return readJsonResponse<{ filename: string; html: string }>(response, "Failed to generate reference brief.");
 }
 
-export async function generateContentFromBrief(requestPayload: {
+export async function generateContentFromBrief(payload: {
   selectedIdea: any;
   contentType: string;
   account?: {
@@ -385,50 +271,12 @@ export async function generateContentFromBrief(requestPayload: {
     website?: string;
   };
 }) {
-  const result = await apiRequest<ApiEnvelope<{
-    queued?: boolean;
-    contentType: string;
-    title: string;
-    caption: {
-      hook: string;
-      body: string;
-      cta: string;
-      hashtags: string[];
-    };
-    content: {
-      script?: Array<{ timecode: string; visual: string; voiceOver: string; onScreenText: string }>;
-      storyFrames?: Array<{ frame: string; visual: string; text: string; stickerOrCta: string }>;
-      carouselSlides?: Array<{ slide: string; headline: string; visual: string; copy: string }>;
-      article?: string;
-    };
-    metadata: {
-      visualDirection?: string;
-      shotList?: string[];
-      publishChecklist?: string[];
-    };
-  }>>("/api/meta/generate-content", {
+  const response = await fetch("/api/meta/generate-content", {
     method: "POST",
-    body: JSON.stringify(requestPayload),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-  const data = result.data || {};
-
-  if (result.queued || data.queued) {
-    return {
-      queued: true,
-      contentType: requestPayload.contentType,
-      title: "Konten masuk antrean",
-      caption: {
-        hook: "Request sudah diterima backend.",
-        body: result.message || "Generate content sedang diproses di backend Go. Cek kembali hasilnya setelah job selesai.",
-        cta: "",
-        hashtags: [],
-      },
-      content: {},
-      metadata: {},
-    };
-  }
-
-  return data as {
+  return readJsonResponse<{
     contentType: string;
     title: string;
     caption: {
@@ -448,8 +296,7 @@ export async function generateContentFromBrief(requestPayload: {
       shotList?: string[];
       publishChecklist?: string[];
     };
-    queued?: boolean;
-  };
+  }>(response, "Failed to generate content.");
 }
 
 export async function autoPostInstagramContent(payload: {
@@ -457,29 +304,12 @@ export async function autoPostInstagramContent(payload: {
   content: any;
   reference?: Record<string, unknown>;
 }) {
-  const result = await apiRequest<{
-    success?: boolean;
-    message?: string;
-    error?: string;
-    data?: {
-      success?: boolean;
-      mediaId?: string;
-      permalink?: string;
-      selectedAsset?: {
-        id: string;
-        name: string;
-        mimeType: string;
-      };
-    };
-  }>("/api/meta/auto-post", {
+  const response = await fetch("/api/meta/auto-post", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-
-  return {
-    ...(result.data || {}),
-    success: result.data?.success ?? result.success ?? false,
-  } as {
+  return readJsonResponse<{
     success: boolean;
     mediaId?: string;
     permalink?: string;
@@ -488,7 +318,7 @@ export async function autoPostInstagramContent(payload: {
       name: string;
       mimeType: string;
     };
-  };
+  }>(response, "Failed to auto post Instagram content.");
 }
 
 export type CachedContentBrief = {
@@ -505,21 +335,10 @@ export type CachedContentBrief = {
 };
 
 export async function fetchContentBriefCache(igUserId: string): Promise<CachedContentBrief> {
-  const result = await apiRequest<
-    CachedContentBrief | (ApiEnvelope<CachedContentBrief["data"]> & { cached?: boolean })
-  >("/api/marketing/content-brief-cache", {
+  return apiRequest<CachedContentBrief>("/api/marketing/content-brief-cache", {
     method: "GET",
     query: { ig_user_id: igUserId },
   });
-
-  if ("cached" in result && ("data" in result)) {
-    return {
-      cached: Boolean(result.cached && result.data),
-      data: result.data ?? null,
-    };
-  }
-
-  return { cached: false, data: null };
 }
 
 export async function saveContentBriefCache(payload: {
@@ -528,14 +347,14 @@ export async function saveContentBriefCache(payload: {
   content_brief: InstagramInsights["contentBrief"];
   content_references: InstagramInsights["contentReferences"];
 }) {
-  return apiRequest<ApiEnvelope<any> & { message?: string }>("/api/marketing/content-brief-cache", {
+  return apiRequest<{ message: string; data: any }>("/api/marketing/content-brief-cache", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function deleteContentBriefCache(igUserId: string) {
-  return apiRequest<ApiEnvelope<null> & { message?: string }>("/api/marketing/content-brief-cache", {
+  return apiRequest<{ message: string }>("/api/marketing/content-brief-cache", {
     method: "DELETE",
     query: { ig_user_id: igUserId },
   });
