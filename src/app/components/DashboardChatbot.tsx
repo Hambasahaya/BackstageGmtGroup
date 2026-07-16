@@ -44,12 +44,24 @@ export function DashboardChatbot() {
       // 1. Parse Products
       if (prodRes.status === "fulfilled" && prodRes.value.products) {
         const prodList = prodRes.value.products
-          .map(
-            (p) =>
-              `- ${p.namaproduct}: Harga Rp${p.price.toLocaleString("id-ID")}, Komisi Rp${(p.komisi || 0).toLocaleString("id-ID")} (${p.unit || "unit"}), Status: ${p.status}`
-          )
-          .join("\n");
-        contextParts.push(`GMT Group Products:\n${prodList}`);
+          .map((p) => {
+            const tiers = p.commission_tiers
+              ? Object.entries(p.commission_tiers)
+                  .map(([tier, val]) => `${tier}: Rp${val.toLocaleString("id-ID")}`)
+                  .join(", ")
+              : "Tidak ada tier khusus";
+            return [
+              `- Nama Produk: ${p.namaproduct}`,
+              `  Harga: Rp${p.price.toLocaleString("id-ID")}`,
+              `  Unit: ${p.unit || "unit"}`,
+              `  Status: ${p.status}`,
+              `  Komisi Utama: Rp${(p.komisi || 0).toLocaleString("id-ID")}`,
+              `  Komisi Tiering: ${tiers}`,
+              `  Deskripsi: ${p.deskripsi || "Tidak ada deskripsi."}`
+            ].join("\n");
+          })
+          .join("\n\n");
+        contextParts.push(`GMT Group Products (Daftar Lengkap Detail):\n${prodList}`);
       }
 
       // 2. Parse Articles
@@ -78,18 +90,28 @@ export function DashboardChatbot() {
       if (igRes.status === "fulfilled" && igRes.value.connected && igRes.value.profile) {
         const profile = igRes.value.profile;
         const mediaList = (igRes.value.media || [])
-          .slice(0, 5)
-          .map(
-            (m) =>
-              `- [${m.media_type}] ${m.caption?.slice(0, 60).replace(/\n/g, " ")}... (Likes: ${m.like_count || 0}, Komentar: ${m.comments_count || 0})`
-          )
-          .join("\n");
+          .slice(0, 10)
+          .map((m) => {
+            const metrics = `Likes: ${m.like_count || 0}, Comments: ${m.comments_count || 0}`;
+            const aiStrategy = [
+              m.ai_angle ? `Angle/Pillar: ${m.ai_angle}` : "",
+              m.ai_reasoning ? `Analisis AI: ${m.ai_reasoning}` : "",
+              m.ai_action ? `Saran Aksi: ${m.ai_action}` : ""
+            ].filter(Boolean).join("\n    ");
+            return [
+              `- Post [ID: ${m.id}, Tipe: ${m.media_type}, Tanggal: ${m.timestamp ? new Date(m.timestamp).toLocaleDateString("id-ID") : "N/A"}]`,
+              `  Metrik: ${metrics}`,
+              `  Caption: ${m.caption || "Tidak ada caption."}`,
+              aiStrategy ? `  Strategi Konten:\n    ${aiStrategy}` : ""
+            ].filter(Boolean).join("\n");
+          })
+          .join("\n\n");
         const igData = [
           `Instagram Account: @${profile.username} (${profile.name})`,
-          `Followers: ${profile.followers_count}, Total Media: ${profile.media_count}`,
-          `Postingan Terbaru:\n${mediaList}`,
+          `Followers: ${profile.followers_count}, Total Media: ${profile.media_count}, Mengikuti: ${profile.follows_count || 0}`,
+          `Daftar Postingan & Performa Detail:\n${mediaList}`,
         ].join("\n");
-        contextParts.push(`Social Media (Instagram Insights):\n${igData}`);
+        contextParts.push(`Social Media (Instagram Insights & Post Analytics):\n${igData}`);
       }
 
       setContext(contextParts.join("\n\n"));
@@ -202,10 +224,10 @@ export function DashboardChatbot() {
 
   return (
     <>
-      {/* Floating Toggle Button (Bottom Left) */}
+      {/* Floating Toggle Button (Bottom Right) */}
       <button
         onClick={handleToggleChat}
-        className="fixed bottom-6 left-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-teal-600 to-emerald-500 text-white shadow-[0_8px_30px_rgba(15,118,110,0.4)] hover:shadow-[0_8px_30px_rgba(16,185,129,0.6)] border border-teal-400/20 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group focus:outline-none"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-teal-600 to-emerald-500 text-white shadow-[0_8px_30px_rgba(15,118,110,0.4)] hover:shadow-[0_8px_30px_rgba(16,185,129,0.6)] border border-teal-400/20 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group focus:outline-none"
         title="Hubungi Asisten AI"
         aria-label="Toggle Chatbot"
       >
@@ -214,7 +236,7 @@ export function DashboardChatbot() {
 
       {/* Chat Window Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 left-6 w-[420px] max-w-[calc(100vw-3rem)] h-[560px] max-h-[calc(100vh-8rem)] z-50 rounded-2xl shadow-2xl flex flex-col bg-slate-950/95 border border-slate-800 backdrop-blur-xl overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-24 right-6 w-[420px] max-w-[calc(100vw-3rem)] h-[560px] max-h-[calc(100vh-8rem)] z-50 rounded-2xl shadow-2xl flex flex-col bg-slate-950/95 border border-slate-800 backdrop-blur-xl overflow-hidden transition-all duration-300 origin-bottom-right animate-in fade-in slide-in-from-bottom-5">
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-950 to-teal-950/80 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
