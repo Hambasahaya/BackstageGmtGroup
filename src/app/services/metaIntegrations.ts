@@ -180,26 +180,34 @@ export type CompetitorBenchmark = {
   warnings?: string[];
 };
 
-export async function fetchMetaAuthUrl() {
-  const response = await fetch("/api/meta/auth-url");
-  const payload = await response.json();
+async function readJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const text = await response.text();
+  let payload: any = {};
 
-  if (!response.ok) {
-    throw new Error(payload.error || "Failed to create Meta OAuth URL.");
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      const message = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      throw new Error(message || fallbackMessage);
+    }
   }
 
-  return payload as { url: string; scopes: string[] };
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || fallbackMessage);
+  }
+
+  return payload as T;
+}
+
+export async function fetchMetaAuthUrl() {
+  const response = await fetch("/api/meta/auth-url");
+  return readJsonResponse<{ url: string; scopes: string[] }>(response, "Failed to create Meta OAuth URL.");
 }
 
 export async function fetchMetaAccounts() {
   const response = await fetch("/api/meta/accounts");
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error || "Failed to fetch Meta accounts.");
-  }
-
-  return payload as MetaAccountHealth;
+  return readJsonResponse<MetaAccountHealth>(response, "Failed to fetch Meta accounts.");
 }
 
 import { apiRequest } from "./api";
@@ -216,13 +224,7 @@ export async function fetchInstagramInsights(
   if (skipAi) params.set("skip_ai", "true");
   const query = params.size ? `?${params.toString()}` : "";
   const response = await fetch(`/api/meta/instagram-insights${query}`);
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error || "Failed to fetch Instagram insights.");
-  }
-
-  return payload as InstagramInsights;
+  return readJsonResponse<InstagramInsights>(response, "Failed to fetch Instagram insights.");
 }
 
 export async function fetchCompetitorBenchmark(
@@ -235,13 +237,7 @@ export async function fetchCompetitorBenchmark(
   if (dateRange?.until) params.set("until", dateRange.until);
   const query = params.size ? `?${params.toString()}` : "";
   const response = await fetch(`/api/meta/competitor-benchmark${query}`);
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error || "Failed to fetch competitor benchmark.");
-  }
-
-  return payload as CompetitorBenchmark;
+  return readJsonResponse<CompetitorBenchmark>(response, "Failed to fetch competitor benchmark.");
 }
 
 export async function generateReferenceBrief(payload: {
@@ -261,13 +257,7 @@ export async function generateReferenceBrief(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.error || "Failed to generate reference brief.");
-  }
-
-  return result as { filename: string; html: string };
+  return readJsonResponse<{ filename: string; html: string }>(response, "Failed to generate reference brief.");
 }
 
 export async function generateContentFromBrief(payload: {
@@ -286,13 +276,7 @@ export async function generateContentFromBrief(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.error || "Failed to generate content.");
-  }
-
-  return result as {
+  return readJsonResponse<{
     contentType: string;
     title: string;
     caption: {
@@ -312,7 +296,7 @@ export async function generateContentFromBrief(payload: {
       shotList?: string[];
       publishChecklist?: string[];
     };
-  };
+  }>(response, "Failed to generate content.");
 }
 
 export async function autoPostInstagramContent(payload: {
@@ -325,13 +309,7 @@ export async function autoPostInstagramContent(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.error || "Failed to auto post Instagram content.");
-  }
-
-  return result as {
+  return readJsonResponse<{
     success: boolean;
     mediaId?: string;
     permalink?: string;
@@ -340,7 +318,7 @@ export async function autoPostInstagramContent(payload: {
       name: string;
       mimeType: string;
     };
-  };
+  }>(response, "Failed to auto post Instagram content.");
 }
 
 export type CachedContentBrief = {

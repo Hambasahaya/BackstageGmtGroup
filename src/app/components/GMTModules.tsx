@@ -1320,23 +1320,39 @@ export function MarketingIntegrations() {
 
       // 2. Cache miss or force refresh or cache check failed
       if (!insightsData) {
-        // Fetch full data including AI calls
-        insightsData = await fetchInstagramInsights(igUserId, dateRange, false);
+        // Load the dashboard-critical Instagram data first. AI brief generation can be
+        // slower for accounts with heavier data, so a failed AI request should not
+        // prevent the integrations page from showing the account metrics.
+        const baseInsightsData = await fetchInstagramInsights(igUserId, dateRange, true);
+        insightsData = baseInsightsData;
 
-        // Save generated data to cache
-        if (insightsData.contentBrief || (insightsData.contentReferences && insightsData.contentReferences.length > 0)) {
-          try {
-            await saveContentBriefCache({
-              ig_user_id: igUserId,
-              ig_username: insightsData.profile?.username || "",
-              content_brief: insightsData.contentBrief,
-              content_references: insightsData.contentReferences || [],
-            });
-            console.log("Saved new AI Content Brief to database cache.");
-          } catch (saveError) {
-            console.warn("Failed to write to content brief cache (expected if DB/endpoint not ready yet):", saveError);
+        try {
+          const aiInsightsData = await fetchInstagramInsights(igUserId, dateRange, false);
+          insightsData = aiInsightsData;
+
+          // Save generated data to cache
+          if (aiInsightsData.contentBrief || (aiInsightsData.contentReferences && aiInsightsData.contentReferences.length > 0)) {
+            try {
+              await saveContentBriefCache({
+                ig_user_id: igUserId,
+                ig_username: aiInsightsData.profile?.username || "",
+                content_brief: aiInsightsData.contentBrief,
+                content_references: aiInsightsData.contentReferences || [],
+              });
+              console.log("Saved new AI Content Brief to database cache.");
+            } catch (saveError) {
+              console.warn("Failed to write to content brief cache (expected if DB/endpoint not ready yet):", saveError);
+            }
           }
+        } catch (aiError) {
+          const message = aiError instanceof Error ? aiError.message : "AI content brief gagal dibuat.";
+          insightsData = {
+            ...baseInsightsData,
+            warnings: [...(baseInsightsData.warnings || []), `AI content brief: ${message}`],
+          };
+          setMetaError(`Data Instagram berhasil dimuat, tetapi AI content brief gagal dibuat: ${message}`);
         }
+
       }
 
       setInstagramInsights(insightsData);
