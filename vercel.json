@@ -5,6 +5,22 @@
       "destination": "/api/meta/index.js"
     },
     {
+      "source": "/api/super-admin/onboarding/videos/:id",
+      "destination": "/api/super-admin/onboarding/videos.js?id=:id"
+    },
+    {
+      "source": "/api/super-admin/onboarding/videos",
+      "destination": "/api/super-admin/onboarding/videos.js"
+    },
+    {
+      "source": "/api/agent/onboarding/videos",
+      "destination": "/api/agent/onboarding/videos.js"
+    },
+    {
+      "source": "/api/agent/onboarding/progress",
+      "destination": "/api/agent/onboarding/progress.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

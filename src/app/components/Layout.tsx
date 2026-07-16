@@ -65,6 +65,7 @@ const menuItems: MenuItem[] = [
   { icon: UserCheck, label: "Participants", path: "/participants", roles: ["super_admin"] },
   { icon: UserPlus, label: "Agent Applications", path: "/agent-applications", roles: ["super_admin"] },
   { icon: Wallet, label: "Withdraw Approval", path: "/withdraw-approvals", roles: ["super_admin"] },
+  { icon: GraduationCap, label: "Onboarding Videos", path: "/admin-onboarding-videos", roles: ["super_admin"] },
   { icon: UserPlus, label: "Apply Agent", path: "/apply-agent", roles: ["user"], statuses: ["not_verif", "verif", "stopped_agent"] },
   { icon: Trophy, label: "Achievement", path: "/agent-achievement", roles: ["agent"], statuses: ["official_agent"] },
   { icon: GraduationCap, label: "Agent Onboarding", path: "/agent-onboarding", roles: ["agent"], statuses: ["official_agent"] },

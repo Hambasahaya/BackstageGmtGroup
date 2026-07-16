@@ -19,6 +19,7 @@ import { Register } from "./components/Register";
 import { SalesOrders } from "./components/SalesOrders";
 import { SsoCallback } from "./components/SsoCallback";
 import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
+import { SuperAdminOnboardingVideos } from "./components/SuperAdminOnboardingVideos";
 import { ProductManagement } from "./components/ProductManagement";
 import { ArticleManagement } from "./components/ArticleManagement";
 import {
@@ -197,6 +198,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={superAdminOnly}>
             <SuperAdminWithdraws />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "admin-onboarding-videos",
+        element: (
+          <RoleGate allowedRoles={superAdminOnly}>
+            <SuperAdminOnboardingVideos />
           </RoleGate>
         ),
       },

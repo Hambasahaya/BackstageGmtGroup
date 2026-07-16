@@ -14,6 +14,17 @@ const isLouderTechnologiesAccount = (account = {}) => {
   return /louder\s*technologies|loudertechnologies|louder-technologies/.test(accountText);
 };
 
+const getLouderTechnologiesInstructions = () => [
+  "Special rule for LouderTechnologies only:",
+  "Write all generated content in English with simple, easy-to-understand grammar.",
+  "Use a Human Experience First approach: start from real user needs, daily problems, project situations, or product challenges.",
+  "Include Technical Experience, but explain it in a clear and light way. Avoid heavy technical language unless it is needed.",
+  "Connect the story to a specific LouderTechnologies product, system, feature, project, or solution. Avoid generic content.",
+  "Make the content relatable by using realistic work, customer, project, or industry situations.",
+  "Use storytelling based on the project or product: problem, situation, solution, and result.",
+  "Keep the tone professional, helpful, practical, and easy to follow.",
+];
+
 const getDefaultDateRange = () => {
   const insightDays = Math.max(1, Math.min(Number(process.env.META_INSIGHT_DAYS || 30), 90));
   const untilDate = new Date();

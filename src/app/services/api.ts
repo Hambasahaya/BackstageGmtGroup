@@ -117,6 +117,16 @@ export type OnboardingVideoDto = {
   is_required: boolean;
 };
 
+export type OnboardingVideoPayload = {
+  title: string;
+  description?: string;
+  video_url: string;
+  duration_seconds: number;
+  sort_order?: number;
+  is_required?: boolean;
+  slug?: string;
+};
+
 export type OnboardingProgressDto = {
   video_id: number;
   slug: string;
@@ -991,6 +1001,19 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   resetOnboardingProgress: () => apiRequest<{ message: string }>("/api/agent/onboarding/progress", { method: "DELETE" }),
+  adminOnboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/super-admin/onboarding/videos"),
+  adminOnboardingVideoDetail: (id: number) => apiRequest<{ video: OnboardingVideoDto }>(`/api/super-admin/onboarding/videos/${id}`),
+  adminCreateOnboardingVideo: (payload: OnboardingVideoPayload) =>
+    apiRequest<{ message: string; video: OnboardingVideoDto }>("/api/super-admin/onboarding/videos", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  adminUpdateOnboardingVideo: (id: number, payload: OnboardingVideoPayload) =>
+    apiRequest<{ message: string; video: OnboardingVideoDto }>(`/api/super-admin/onboarding/videos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  adminDeleteOnboardingVideo: (id: number) => apiRequest<{ message: string }>(`/api/super-admin/onboarding/videos/${id}`, { method: "DELETE" }),
   educations: (query?: { month?: string; type?: string; status?: string; page?: number; limit?: number }) =>
     apiRequest<EducationListResponse>("/api/educations", {
       auth: false,
