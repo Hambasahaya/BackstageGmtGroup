@@ -110,7 +110,13 @@ export default async function handler(request, response) {
       }),
     });
 
-    const payload = await aiResponse.json();
+    const text = await aiResponse.text();
+    let payload;
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = { error: { message: text } };
+    }
 
     if (!aiResponse.ok) {
       const errorMsg = payload.error?.message || payload.message || "Failed to call AI model.";

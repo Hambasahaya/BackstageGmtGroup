@@ -45,10 +45,16 @@ export const metaFetch = async (endpoint, params = {}, token) => {
   }
 
   const response = await fetch(url);
-  const payload = await response.json();
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { error: { message: text } };
+  }
 
   if (!response.ok) {
-    throw new Error(payload.error?.message || "Meta Graph API request failed.");
+    throw new Error(payload.error?.message || payload.message || "Meta Graph API request failed.");
   }
 
   return payload;

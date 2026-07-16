@@ -106,7 +106,14 @@ const getProperties = async (accessToken) => {
   const response = await fetch("https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const payload = await response.json();
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { error: { message: text } };
+  }
+
   if (!response.ok) {
     const detail = payload.error?.message || "Could not discover GA4 properties.";
     throw new Error(`GA4 property auto-discovery failed. Enable Google Analytics Admin API or set GA4_PROPERTIES/GA4_PROPERTY_IDS. ${detail}`);
