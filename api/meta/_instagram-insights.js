@@ -437,9 +437,20 @@ const getReferenceInsights = async ({ profile, igUserId, recentPosts }) => {
   }
 };
 
-const enrichMediaReasoning = async ({ mediaItems, profile, dateRange }) => {
+const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi }) => {
   const mediaPayload = getMediaReasoningPayload(mediaItems);
   const fallbackById = new Map(mediaPayload.map((item) => [item.id, item.fallbackReasoning]));
+
+  if (skipAi) {
+    return {
+      data: mediaItems.map((media) => ({
+        ...media,
+        ai_reasoning: fallbackById.get(media.id),
+        ai_reasoning_source: "local",
+      })),
+      warning: null,
+    };
+  }
 
   try {
     const ai = await callAlibabaForContentReasoning({ profile, dateRange, mediaPayload });
@@ -1068,6 +1079,7 @@ export default async function handler(request, response) {
         mediaItems: media.data || [],
         profile,
         dateRange,
+        skipAi: true,
       });
 
       json(response, 200, {
@@ -1093,6 +1105,7 @@ export default async function handler(request, response) {
       mediaItems: media.data || [],
       profile,
       dateRange,
+      skipAi: false,
     });
     const contentBrief = await getContentBrief({
       profile,
