@@ -202,11 +202,11 @@ const getModelKnowledgeBase = () => {
 };
 
 const getDefaultModelRouting = () => ({
-  defaultModel: process.env.ALIBABA_MODEL || "qwen-plus",
-  growthStrategist: process.env.ALIBABA_GROWTH_MODEL || process.env.ALIBABA_STRATEGY_MODEL || process.env.ALIBABA_MODEL || "qwen-plus",
-  marketingSpecialist: process.env.ALIBABA_MARKETING_MODEL || process.env.ALIBABA_SOCIAL_MODEL || process.env.ALIBABA_CREATIVE_MODEL || process.env.ALIBABA_MODEL || "qwen-plus",
-  socialMediaSpecialist: process.env.ALIBABA_MARKETING_MODEL || process.env.ALIBABA_SOCIAL_MODEL || process.env.ALIBABA_CREATIVE_MODEL || process.env.ALIBABA_MODEL || "qwen-plus",
-  conversionCommunityLead: process.env.ALIBABA_CONVERSION_MODEL || process.env.ALIBABA_COMMUNITY_MODEL || process.env.ALIBABA_MODEL || "qwen-plus",
+  defaultModel: process.env.ALIBABA_MODEL || "qwen3.7-plus",
+  growthStrategist: process.env.ALIBABA_GROWTH_MODEL || process.env.ALIBABA_STRATEGY_MODEL || process.env.ALIBABA_MODEL || "qwen3.7-plus",
+  marketingSpecialist: process.env.ALIBABA_MARKETING_MODEL || process.env.ALIBABA_SOCIAL_MODEL || process.env.ALIBABA_CREATIVE_MODEL || process.env.ALIBABA_MODEL || "qwen3.7-plus",
+  socialMediaSpecialist: process.env.ALIBABA_MARKETING_MODEL || process.env.ALIBABA_SOCIAL_MODEL || process.env.ALIBABA_CREATIVE_MODEL || process.env.ALIBABA_MODEL || "qwen3.7-plus",
+  conversionCommunityLead: process.env.ALIBABA_CONVERSION_MODEL || process.env.ALIBABA_COMMUNITY_MODEL || process.env.ALIBABA_MODEL || "qwen3.7-plus",
 });
 
 const fetchKnowledgeBaseFromBackend = async () => {

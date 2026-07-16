@@ -199,8 +199,8 @@ const getAiProviderConfig = () => {
   return {
     apiKey,
     baseUrl: (process.env.ALIBABA_MODEL_STUDIO_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/$/, ""),
-    model: process.env.ALIBABA_MODEL || "qwen-plus",
-    multimodalModel: process.env.ALIBABA_MULTIMODAL_MODEL || "qwen-plus",
+    model: process.env.ALIBABA_MODEL || "qwen3.7-plus",
+    multimodalModel: process.env.ALIBABA_MULTIMODAL_MODEL || "qwen3.5-omni-plus-2026-03-15",
     source: "alibaba",
   };
 };

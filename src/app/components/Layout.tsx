@@ -44,6 +44,7 @@ import {
   type NotificationDto,
   type UserSession,
 } from "../services/api";
+import { DashboardChatbot } from "./DashboardChatbot";
 
 type MenuItem = {
   icon: ElementType;
@@ -960,6 +961,8 @@ export function Layout() {
           </div>
         </button>
       )}
+
+      <DashboardChatbot />
     </div>
   );
 }
