@@ -155,15 +155,90 @@ export function DashboardChatbot() {
         }),
       });
 
-      const payload = await response.json();
       if (!response.ok) {
+        const payload = await response.json();
         throw new Error(payload.error || "Gagal mendapatkan respon chatbot.");
       }
 
-      setMessages([...nextMessages, { role: "assistant", content: payload.reply || "Maaf, saya tidak dapat memahami permintaan Anda." }]);
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Pemberi respon stream tidak didukung di browser ini.");
+      }
+
+      const decoder = new TextDecoder();
+      let assistantReply = "";
+
+      // Add a blank message to compile the stream in real-time
+      setMessages([...nextMessages, { role: "assistant", content: "" }]);
+      setIsLoading(false); // Hide the loading indicator as streaming starts
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (!cleanLine) continue;
+          if (cleanLine === "data: [DONE]") continue;
+
+          if (cleanLine.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(cleanLine.substring(6));
+              const delta = data.choices?.[0]?.delta?.content || "";
+              if (delta) {
+                assistantReply += delta;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const lastMsg = updated[updated.length - 1];
+                  if (lastMsg && lastMsg.role === "assistant") {
+                    lastMsg.content = assistantReply;
+                  }
+                  return updated;
+                });
+              }
+            } catch (e) {
+              // Ignore incomplete chunk parse errors
+            }
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith("data: ")) {
+        try {
+          const data = JSON.parse(buffer.trim().substring(6));
+          const delta = data.choices?.[0]?.delta?.content || "";
+          if (delta) {
+            assistantReply += delta;
+            setMessages((prev) => {
+              const updated = [...prev];
+              const lastMsg = updated[updated.length - 1];
+              if (lastMsg && lastMsg.role === "assistant") {
+                lastMsg.content = assistantReply;
+              }
+              return updated;
+            });
+          }
+        } catch (e) {}
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Terjadi kesalahan koneksi.";
-      setMessages([...nextMessages, { role: "assistant", content: `Maaf, terjadi kesalahan: ${errMsg}` }]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        if (lastMsg && lastMsg.role === "assistant" && !lastMsg.content) {
+          lastMsg.content = `Maaf, terjadi kesalahan: ${errMsg}`;
+          return updated;
+        }
+        return [...nextMessages, { role: "assistant", content: `Maaf, terjadi kesalahan: ${errMsg}` }];
+      });
     } finally {
       setIsLoading(false);
     }

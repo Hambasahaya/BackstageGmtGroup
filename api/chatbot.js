@@ -107,24 +107,42 @@ export default async function handler(request, response) {
         messages: apiMessages,
         temperature: 0.7,
         max_tokens: 1500,
+        stream: true, // Enable streaming
       }),
     });
 
-    const text = await aiResponse.text();
-    let payload;
-    try {
-      payload = text ? JSON.parse(text) : {};
-    } catch {
-      payload = { error: { message: text } };
-    }
-
     if (!aiResponse.ok) {
+      const text = await aiResponse.text();
+      let payload;
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch {
+        payload = { error: { message: text } };
+      }
       const errorMsg = payload.error?.message || payload.message || "Failed to call AI model.";
-      throw new Error(errorMsg);
+      json(response, 500, { error: errorMsg });
+      return;
     }
 
-    const reply = payload.choices?.[0]?.message?.content || "";
-    json(response, 200, { reply });
+    // Set headers for streaming response
+    response.setHeader("Content-Type", "text/event-stream");
+    response.setHeader("Cache-Control", "no-cache, no-transform");
+    response.setHeader("Connection", "keep-alive");
+    response.setHeader("X-Accel-Buffering", "no");
+
+    if (typeof aiResponse.body.getReader === "function") {
+      const reader = aiResponse.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        response.write(value);
+      }
+    } else {
+      for await (const chunk of aiResponse.body) {
+        response.write(chunk);
+      }
+    }
+    response.end();
   } catch (error) {
     console.error("Chatbot API error:", error);
     json(response, 500, { error: error.message || "Internal server error" });
