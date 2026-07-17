@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock3, Lock, PlayCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactPlayer from "react-player";
-import { api, resolveApiAssetUrl, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
+import { api, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
 
 const emptySummary: OnboardingSummaryDto = {
   completed_count: 0,
@@ -11,26 +11,6 @@ const emptySummary: OnboardingSummaryDto = {
   progress: [],
 };
 
-const forcedOnboardingVideoUrls = [
-  "https://www.youtube.com/watch?v=4UPgUT-bMiU",
-  "https://www.youtube.com/watch?v=IH7kHpxtTp4",
-  "https://www.youtube.com/watch?v=aNwhxCN2dyg",
-];
-
-function getYoutubeEmbedUrl(value: string) {
-  try {
-    const url = new URL(value);
-    const videoId = url.hostname.includes("youtu.be") ? url.pathname.slice(1) : url.searchParams.get("v");
-
-    if (!videoId) {
-      return "";
-    }
-
-    return `https://www.youtube.com/embed/${videoId}`;
-  } catch {
-    return "";
-  }
-}
 
 const formatDuration = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
@@ -133,8 +113,6 @@ export function AgentOnboarding() {
         return {
           ...video,
           index,
-          forcedYoutubeUrl: getYoutubeEmbedUrl(forcedOnboardingVideoUrls[index] ?? ""),
-          resolvedVideoUrl: resolveApiAssetUrl(video.video_url),
           isWatched,
           isUnlocked,
           watchedAt: progress?.completed_at,
@@ -296,10 +274,10 @@ export function AgentOnboarding() {
             >
               <div className="relative aspect-video bg-slate-950">
                 {video.isUnlocked ? (
-                  (video.forcedYoutubeUrl || video.resolvedVideoUrl) ? (
+                  video.video_url ? (
                     <>
                       <ReactPlayer
-                        url={video.forcedYoutubeUrl ? forcedOnboardingVideoUrls[video.index] : video.resolvedVideoUrl}
+                        url={video.video_url}
                         width="100%"
                         height="100%"
                         controls
@@ -311,7 +289,7 @@ export function AgentOnboarding() {
                         onError={() =>
                           setVideoErrors((current) => ({
                             ...current,
-                            [video.id]: "Video gagal dimuat. Periksa file, URL asset, atau koneksi.",
+                            [video.id]: "Video gagal dimuat. Periksa URL atau koneksi internet.",
                           }))
                         }
                       />
@@ -324,7 +302,7 @@ export function AgentOnboarding() {
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-slate-900 text-white">
                       <PlayCircle className="h-8 w-8" />
-                      <span className="text-sm font-semibold">URL video kosong</span>
+                      <span className="text-sm font-semibold">URL video belum diisi</span>
                     </div>
                   )
                 ) : (

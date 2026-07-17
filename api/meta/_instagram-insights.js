@@ -998,9 +998,10 @@ export default async function handler(request, response) {
       getAudienceInsights({ igUserId, accessToken: page.access_token }),
     ]);
 
-    // When skip_ai=true, we still run the real-time content reasoning (enrichMediaReasoning)
-    // but skip contentBrief generation. We store the basic metrics so the dashboard cache
-    // is populated even on fast-load requests.
+    // When skip_ai=true:
+    // 1. Respond to FE immediately with Graph API data (fast load)
+    // 2. Run the full AI pipeline in the background (fire-and-forget)
+    // 3. When AI finishes, store the COMPLETE data (including AI reasoning + brief) to DB
     if (skipAi) {
       const mediaWithReasoning = await enrichMediaReasoning({
         mediaItems: media.data || [],
@@ -1010,9 +1011,7 @@ export default async function handler(request, response) {
         authHeader,
       });
 
-      // Store basic metrics to DB (fire-and-forget, no AI brief)
-      storeDashboardData({ profile, insights, mediaWithReasoning, audience, contentBrief: null, contentReferences: null, dateRange, authHeader });
-
+      // Respond to FE immediately — do NOT wait for AI
       json(response, 200, {
         connected: true,
         skippedAi: true,
@@ -1029,8 +1028,62 @@ export default async function handler(request, response) {
         contentReferences: [],
         warnings: [insights.warning, media.warning, mediaWithReasoning.warning, audience.warning].filter(Boolean),
       });
+
+      // Background: run the full AI pipeline then store the complete result to DB.
+      // This does NOT block or affect the response already sent above.
+      Promise.all([
+        enrichMediaReasoning({
+          mediaItems: media.data || [],
+          profile,
+          dateRange,
+          skipAi: false,   // ← full AI reasoning per post
+          authHeader,
+        }),
+        getContentBrief({
+          profile,
+          dateRange,
+          mediaItems: media.data || [],
+          audience: audience.data,
+          igUserId,
+          authHeader,
+        }),
+        getReferenceInsights({
+          profile,
+          igUserId,
+          recentPosts: getMediaReasoningPayload(media.data || []),
+          authHeader,
+        }),
+      ])
+        .then(([aiMedia, aiContentBrief, aiContentReferences]) => {
+          storeDashboardData({
+            profile,
+            insights,
+            mediaWithReasoning: aiMedia,
+            audience,
+            contentBrief: aiContentBrief,
+            contentReferences: aiContentReferences,
+            dateRange,
+            authHeader,
+          });
+        })
+        .catch((err) => {
+          // If AI pipeline fails entirely, fall back to storing basic metrics
+          console.error("[bg-ai] AI pipeline failed, storing basic metrics:", err.message);
+          storeDashboardData({
+            profile,
+            insights,
+            mediaWithReasoning,
+            audience,
+            contentBrief: null,
+            contentReferences: null,
+            dateRange,
+            authHeader,
+          });
+        });
+
       return;
     }
+
 
     const [mediaWithReasoning, contentBrief, contentReferences] = await Promise.all([
       enrichMediaReasoning({
