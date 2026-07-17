@@ -615,6 +615,47 @@ const getRecentMedia = async ({ igUserId, accessToken, since, until }) => {
 
 const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
 
+/**
+ * Returns the configured content references for a given IG account.
+ * References are read from the META_CONTENT_REFERENCES env variable (JSON array).
+ * Each entry can match by igUserId or username.
+ */
+const getConfiguredReferences = ({ igUserId, username } = {}) => {
+  const raw = process.env.META_CONTENT_REFERENCES || "";
+  if (!raw.trim()) return [];
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  // Find the entry that matches this account
+  const entry = parsed.find((item) => {
+    if (igUserId && item.igUserId === igUserId) return true;
+    if (username && item.username === username) return true;
+    return false;
+  });
+
+  if (!entry) return [];
+
+  const refs = entry.references || [];
+  return refs.map((ref, index) => {
+    if (typeof ref === "string") {
+      return { id: `ref-${index + 1}`, url: ref, contentType: "Post", note: "" };
+    }
+    return {
+      id: ref.id || `ref-${index + 1}`,
+      url: ref.url || ref.accountUrl || "",
+      contentType: ref.contentType || "Post",
+      note: ref.note || "",
+    };
+  }).filter((ref) => ref.url);
+};
+
 const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audience, contentBrief, contentReferences, dateRange) => {
   const mediaItems = mediaWithReasoning.data || [];
   const insightsItems = insights.data || [];
@@ -850,6 +891,33 @@ const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
   };
 };
 
+/**
+ * Fire-and-forget: build the DB payload and POST it to the backend store endpoint.
+ * This does not block the API response — failures are logged but not surfaced to the caller.
+ */
+const storeDashboardData = ({ profile, insights, mediaWithReasoning, audience, contentBrief, contentReferences, dateRange, authHeader }) => {
+  if (!authHeader) return;
+  try {
+    const payload = mapInsightsToDashboardDb(
+      profile,
+      insights,
+      mediaWithReasoning,
+      audience,
+      contentBrief || { contentBrief: null },
+      contentReferences || { data: [] },
+      dateRange,
+    );
+    const storeUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/instagram-dashboard/store`;
+    fetch(storeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify(payload),
+    }).catch((err) => console.error("[store] Failed to persist dashboard data:", err.message));
+  } catch (err) {
+    console.error("[store] Failed to build dashboard payload:", err.message);
+  }
+};
+
 export default async function handler(request, response) {
   response.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
@@ -931,7 +999,8 @@ export default async function handler(request, response) {
     ]);
 
     // When skip_ai=true, we still run the real-time content reasoning (enrichMediaReasoning)
-    // but skip contentBrief generation, and we do NOT write incomplete data to the database cache.
+    // but skip contentBrief generation. We store the basic metrics so the dashboard cache
+    // is populated even on fast-load requests.
     if (skipAi) {
       const mediaWithReasoning = await enrichMediaReasoning({
         mediaItems: media.data || [],
@@ -940,6 +1009,9 @@ export default async function handler(request, response) {
         skipAi: true,
         authHeader,
       });
+
+      // Store basic metrics to DB (fire-and-forget, no AI brief)
+      storeDashboardData({ profile, insights, mediaWithReasoning, audience, contentBrief: null, contentReferences: null, dateRange, authHeader });
 
       json(response, 200, {
         connected: true,
@@ -1002,31 +1074,7 @@ export default async function handler(request, response) {
     };
 
     // 3. Map the calculated insights to the DB schema and store them in the backend database
-    if (authHeader) {
-      try {
-        const dashboardStorePayload = mapInsightsToDashboardDb(
-          profile,
-          insights,
-          mediaWithReasoning,
-          audience,
-          contentBrief,
-          contentReferences,
-          dateRange
-        );
-
-        const storeUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/instagram-dashboard/store`;
-        await fetch(storeUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: authHeader
-          },
-          body: JSON.stringify(dashboardStorePayload)
-        });
-      } catch (storeError) {
-        console.error("Failed to store calculated insights to database:", storeError);
-      }
-    }
+    storeDashboardData({ profile, insights, mediaWithReasoning, audience, contentBrief, contentReferences, dateRange, authHeader });
 
     json(response, 200, finalResponse);
   } catch (error) {

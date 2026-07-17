@@ -11,6 +11,10 @@ import referenceBriefHandler from "./_reference-brief.js";
 import integrationsHandler from "./_integrations.js";
 import integrationsStatusHandler from "./_integrations-status.js";
 import instagramDashboardStoreHandler from "./_instagram-dashboard-store.js";
+import insightsReasoningHandler from "./_insights-reasoning.js";
+import insightsContentBriefHandler from "./_insights-content-brief.js";
+import insightsReferencesAnalysisHandler from "./_insights-references-analysis.js";
+import roleChatbotHandler from "./_role-chatbot.js";
 
 const handlers = {
   "/api/meta/accounts": accountsHandler,
@@ -25,6 +29,10 @@ const handlers = {
   "/api/meta/integrations": integrationsHandler,
   "/api/meta/integrations/status": integrationsStatusHandler,
   "/api/meta/instagram-dashboard/store": instagramDashboardStoreHandler,
+  "/api/meta/insights/reasoning": insightsReasoningHandler,
+  "/api/meta/insights/content-brief": insightsContentBriefHandler,
+  "/api/meta/insights/references-analysis": insightsReferencesAnalysisHandler,
+  "/api/meta/role-chatbot": roleChatbotHandler,
 };
 
 export default async function handler(request, response) {
