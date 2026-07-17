@@ -145,9 +145,15 @@ export function DashboardChatbot() {
     setIsLoading(true);
 
     try {
+      const token = localStorage.getItem("token") || "";
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/chatbot", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           message: query,
           history: messages,

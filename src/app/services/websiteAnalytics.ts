@@ -1,3 +1,5 @@
+import { getAuthToken } from "./api";
+
 export type WebsiteAnalyticsProperty = {
   id: string;
   name: string;
@@ -28,7 +30,13 @@ export type WebsiteAnalyticsResponse = {
 };
 
 export async function fetchWebsiteAnalytics(days = 30) {
-  const response = await fetch(`/api/analytics/websites?days=${days}`);
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`/api/analytics/websites?days=${days}`, { headers });
   const payload = await response.json();
 
   if (!response.ok) {

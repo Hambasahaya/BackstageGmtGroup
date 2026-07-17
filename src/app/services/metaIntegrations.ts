@@ -1,4 +1,4 @@
-import { apiRequest } from "./api";
+import { apiRequest, getAuthToken } from "./api";
 
 export type MetaAccountHealth = {
   connected: boolean;
@@ -202,13 +202,38 @@ async function readJsonResponse<T>(response: Response, fallbackMessage: string):
   return payload as T;
 }
 
+function getHeaders(contentType: string = "application/json") {
+  const headers: Record<string, string> = {};
+  if (contentType) {
+    headers["Content-Type"] = contentType;
+  }
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function getGetHeaders() {
+  const headers: Record<string, string> = {};
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export async function fetchMetaAuthUrl() {
-  const response = await fetch("/api/meta/auth-url");
+  const response = await fetch("/api/meta/auth-url", {
+    headers: getGetHeaders(),
+  });
   return readJsonResponse<{ url: string; scopes: string[] }>(response, "Failed to create Meta OAuth URL.");
 }
 
 export async function fetchMetaAccounts() {
-  const response = await fetch("/api/meta/accounts");
+  const response = await fetch("/api/meta/accounts", {
+    headers: getGetHeaders(),
+  });
   return readJsonResponse<MetaAccountHealth>(response, "Failed to fetch Meta accounts.");
 }
 
@@ -223,7 +248,9 @@ export async function fetchInstagramInsights(
   if (dateRange?.until) params.set("until", dateRange.until);
   if (skipAi) params.set("skip_ai", "true");
   const query = params.size ? `?${params.toString()}` : "";
-  const response = await fetch(`/api/meta/instagram-insights${query}`);
+  const response = await fetch(`/api/meta/instagram-insights${query}`, {
+    headers: getGetHeaders(),
+  });
   return readJsonResponse<InstagramInsights>(response, "Failed to fetch Instagram insights.");
 }
 
@@ -236,7 +263,9 @@ export async function fetchCompetitorBenchmark(
   if (dateRange?.since) params.set("since", dateRange.since);
   if (dateRange?.until) params.set("until", dateRange.until);
   const query = params.size ? `?${params.toString()}` : "";
-  const response = await fetch(`/api/meta/competitor-benchmark${query}`);
+  const response = await fetch(`/api/meta/competitor-benchmark${query}`, {
+    headers: getGetHeaders(),
+  });
   return readJsonResponse<CompetitorBenchmark>(response, "Failed to fetch competitor benchmark.");
 }
 
@@ -254,7 +283,7 @@ export async function generateReferenceBrief(payload: {
 }) {
   const response = await fetch("/api/meta/reference-brief", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(payload),
   });
   return readJsonResponse<{ filename: string; html: string }>(response, "Failed to generate reference brief.");
@@ -273,7 +302,7 @@ export async function generateContentFromBrief(payload: {
 }) {
   const response = await fetch("/api/meta/generate-content", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(payload),
   });
   return readJsonResponse<{
@@ -306,7 +335,7 @@ export async function autoPostInstagramContent(payload: {
 }) {
   const response = await fetch("/api/meta/auto-post", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getHeaders(),
     body: JSON.stringify(payload),
   });
   return readJsonResponse<{

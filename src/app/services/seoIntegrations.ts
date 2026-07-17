@@ -1,3 +1,5 @@
+import { getAuthToken } from "./api";
+
 export type SeoKeywordResult = {
   keyword: string;
   searchVolume: number | null;
@@ -32,9 +34,15 @@ export async function fetchKeywordResearch(input: {
   startDate?: string;
   endDate?: string;
 }) {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch("/api/seo/keyword-research", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(input),
   });
   const payload = await response.json();
