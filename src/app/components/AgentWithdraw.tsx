@@ -122,12 +122,8 @@ type MobileTransaction = {
   subtitle: string;
   amount: number;
   status: "Success" | "On progress";
-  details?: Array<{
-    id: string;
-    poNumber: string;
-    amount: number;
-    createdAt: string;
-  }>;
+  poNumber?: string;
+  createdAt?: string;
 };
 
 function MobileTransactionItem({
@@ -141,7 +137,7 @@ function MobileTransactionItem({
 }) {
   const isIncoming = transaction.type === "in";
   const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
-  const hasDetails = isIncoming && !!transaction.details?.length;
+  const hasDetails = isIncoming && !!transaction.poNumber && !!transaction.createdAt;
 
   return (
     <div className="border-b border-slate-100 py-4 last:border-0">
@@ -174,21 +170,15 @@ function MobileTransactionItem({
       </button>
 
       {isExpanded && hasDetails && (
-        <div className="mt-4 space-y-3 rounded-lg bg-slate-50 px-4 py-3">
-          {transaction.details?.map((detail) => {
-            const date = new Date(detail.createdAt);
-
-            return (
-              <div key={detail.id} className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 last:border-0 last:pb-0">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-950">{detail.poNumber}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">{dayDateFormatter.format(date)}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">Jam {timeFormatter.format(date)}</p>
-                </div>
-                <p className="shrink-0 text-sm font-bold text-emerald-600">+{currencyFormatter.format(detail.amount)}</p>
-              </div>
-            );
-          })}
+        <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-950">{transaction.poNumber}</p>
+              <p className="mt-1 text-xs font-medium text-slate-500">{dayDateFormatter.format(new Date(transaction.createdAt!))}</p>
+              <p className="mt-0.5 text-xs text-slate-400">Jam {timeFormatter.format(new Date(transaction.createdAt!))}</p>
+            </div>
+            <p className="shrink-0 text-sm font-bold text-emerald-600">+{currencyFormatter.format(transaction.amount)}</p>
+          </div>
         </div>
       )}
     </div>
@@ -237,24 +227,16 @@ export function AgentWithdraw() {
   const parsedAmount = useMemo(() => Number(amount), [amount]);
   const formattedAmount = amount ? currencyFormatter.format(parsedAmount) : "";
   const mobileTransactions = useMemo<MobileTransaction[]>(() => {
-    const transactions: MobileTransaction[] = [];
-
-    if (wallet.total_commission > 0) {
-      transactions.push({
-        id: "total-commission",
+    const transactions: MobileTransaction[] = commissionPreorders.map((preorder) => ({
+        id: `commission-${preorder.id}`,
         type: "in",
         title: "Komisi masuk",
-        subtitle: commissionPreorders.length ? `${commissionPreorders.length} PO approved` : "Dari PO approved",
-        amount: wallet.total_commission,
+        subtitle: preorder.po_number ?? `PO-${preorder.id}`,
+        amount: preorder.total_komisi,
         status: "Success",
-        details: commissionPreorders.map((preorder) => ({
-          id: String(preorder.id),
-          poNumber: preorder.po_number ?? `PO-${preorder.id}`,
-          amount: preorder.total_komisi,
-          createdAt: preorder.created_at ?? new Date().toISOString(),
-        })),
-      });
-    }
+        poNumber: preorder.po_number ?? `PO-${preorder.id}`,
+        createdAt: preorder.created_at ?? new Date().toISOString(),
+      }));
 
     withdraws.forEach((withdraw) => {
       transactions.push({
@@ -267,8 +249,13 @@ export function AgentWithdraw() {
       });
     });
 
-    return transactions;
-  }, [commissionPreorders, wallet.total_commission, withdraws]);
+    return transactions.sort((first, second) => {
+      const firstDate = first.createdAt ?? withdraws.find((withdraw) => `withdraw-${withdraw.id}` === first.id)?.created_at ?? "";
+      const secondDate = second.createdAt ?? withdraws.find((withdraw) => `withdraw-${withdraw.id}` === second.id)?.created_at ?? "";
+
+      return new Date(secondDate).getTime() - new Date(firstDate).getTime();
+    });
+  }, [commissionPreorders, withdraws]);
 
   const openWithdrawModal = () => {
     setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
