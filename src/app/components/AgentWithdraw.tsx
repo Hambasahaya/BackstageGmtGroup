@@ -1,4 +1,4 @@
-import { Banknote, CheckCircle2, Clock3, Plus, Wallet, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, Plus, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type WalletDto, type WithdrawDto } from "../services/api";
 
@@ -65,12 +65,80 @@ function StatusBadge({ status }: { status: WithdrawDto["status"] }) {
   );
 }
 
-function StatCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+function StatCard({
+  label,
+  value,
+  detail,
+  featuredMobile = false,
+  pendingValue,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  featuredMobile?: boolean;
+  pendingValue?: string;
+}) {
+  if (featuredMobile) {
+    return (
+      <div className="col-span-2 rounded-lg border border-transparent bg-slate-50 px-4 py-8 text-center shadow-none sm:col-span-1 sm:border-slate-200 sm:bg-white sm:p-5 sm:text-left sm:shadow-sm">
+        <p className="text-base font-medium text-slate-400 sm:text-sm sm:text-slate-500">{label}</p>
+        <p className="mt-3 truncate text-3xl font-bold leading-none text-slate-950 sm:mt-2 sm:text-2xl">
+          {value}
+        </p>
+        <div className="mx-auto mt-4 flex w-full max-w-[240px] items-center justify-between gap-3 text-xs font-semibold text-slate-500 sm:hidden">
+          <span>Pending balance</span>
+          <span className="truncate text-slate-900">{pendingValue}</span>
+        </div>
+        <p className="mt-2 hidden text-sm text-slate-500 sm:block sm:line-clamp-1">{detail}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-5 shadow-sm">
       <p className="text-xs sm:text-sm text-slate-500 line-clamp-1">{label}</p>
       <p className="mt-2 text-base sm:text-2xl font-bold text-slate-950 truncate">{value}</p>
       <p className="mt-2 text-[10px] sm:text-sm text-slate-500 line-clamp-2 sm:line-clamp-1">{detail}</p>
+    </div>
+  );
+}
+
+type MobileTransaction = {
+  id: string;
+  type: "in" | "out";
+  title: string;
+  subtitle: string;
+  amount: number;
+  status: "Success" | "On progress";
+};
+
+function MobileTransactionItem({ transaction }: { transaction: MobileTransaction }) {
+  const isIncoming = transaction.type === "in";
+  const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
+
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-100 py-4 last:border-0">
+      <div
+        className={[
+          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
+          isIncoming ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-700",
+        ].join(" ")}
+      >
+        <Icon className="h-6 w-6" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-bold text-slate-950">{transaction.title}</p>
+        <p className="mt-1 truncate text-sm text-slate-400">{transaction.subtitle}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className={["text-lg font-bold", isIncoming ? "text-emerald-600" : "text-slate-950"].join(" ")}>
+          {isIncoming ? "+" : "-"}
+          {currencyFormatter.format(transaction.amount)}
+        </p>
+        <p className={["mt-1 text-sm font-semibold", transaction.status === "Success" ? "text-emerald-500" : "text-amber-500"].join(" ")}>
+          {transaction.status}
+        </p>
+      </div>
     </div>
   );
 }
@@ -105,6 +173,33 @@ export function AgentWithdraw() {
 
   const parsedAmount = useMemo(() => Number(amount), [amount]);
   const formattedAmount = amount ? currencyFormatter.format(parsedAmount) : "";
+  const mobileTransactions = useMemo<MobileTransaction[]>(() => {
+    const transactions: MobileTransaction[] = [];
+
+    if (wallet.total_commission > 0) {
+      transactions.push({
+        id: "total-commission",
+        type: "in",
+        title: "Komisi masuk",
+        subtitle: "Dari PO approved",
+        amount: wallet.total_commission,
+        status: "Success",
+      });
+    }
+
+    withdraws.forEach((withdraw) => {
+      transactions.push({
+        id: `withdraw-${withdraw.id}`,
+        type: "out",
+        title: "Withdraw",
+        subtitle: `${withdraw.withdraw_number ?? `WD-${withdraw.id}`} - ${dateFormatter.format(new Date(withdraw.created_at))}`,
+        amount: withdraw.amount,
+        status: withdraw.status === "approval" ? "Success" : "On progress",
+      });
+    });
+
+    return transactions;
+  }, [wallet.total_commission, withdraws]);
 
   const openWithdrawModal = () => {
     setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
@@ -160,7 +255,13 @@ export function AgentWithdraw() {
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Total komisi" value={currencyFormatter.format(wallet.total_commission)} detail="Akumulasi komisi approve" />
+        <StatCard
+          label="Total komisi"
+          value={currencyFormatter.format(wallet.total_commission)}
+          detail="Akumulasi komisi approve"
+          featuredMobile
+          pendingValue={currencyFormatter.format(wallet.pending_withdraw)}
+        />
         <StatCard label="Available balance" value={currencyFormatter.format(wallet.available_balance)} detail="Saldo yang bisa di-withdraw" />
         <StatCard label="Pending withdraw" value={currencyFormatter.format(wallet.pending_withdraw)} detail="Menunggu proses admin" />
         <StatCard label="Withdrawn balance" value={currencyFormatter.format(wallet.withdrawn_balance)} detail="Sudah disetujui admin" />
@@ -172,8 +273,25 @@ export function AgentWithdraw() {
         </div>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-2 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-lg bg-white sm:border sm:border-slate-200 sm:shadow-sm">
+        <div className="flex items-center justify-between gap-3 px-1 py-2 sm:hidden">
+          <h2 className="text-xl font-bold text-slate-950">Recent Transaction</h2>
+          <button type="button" className="text-base font-bold text-blue-500">
+            See all
+          </button>
+        </div>
+
+        <div className="mt-2 overflow-hidden rounded-lg bg-white px-1 sm:hidden">
+          {mobileTransactions.length > 0 ? (
+            mobileTransactions.map((transaction) => (
+              <MobileTransactionItem key={transaction.id} transaction={transaction} />
+            ))
+          ) : (
+            <div className="py-6 text-sm font-medium text-slate-500">Belum ada transaksi.</div>
+          )}
+        </div>
+
+        <div className="hidden flex-col gap-2 border-b border-slate-200 p-5 sm:flex sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">List pengajuan withdraw</h2>
             <p className="mt-1 text-sm text-slate-500">Riwayat pengajuan withdraw agent yang sedang diproses atau sudah approval.</p>
@@ -184,7 +302,7 @@ export function AgentWithdraw() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
