@@ -60,7 +60,44 @@ export const metaFetch = async (endpoint, params = {}, token) => {
   return payload;
 };
 
-export const getStoredTokenBundle = async () => {
+export const getStoredTokenBundle = async (request) => {
+  if (request) {
+    const authHeader = request.headers?.authorization || request.headers?.Authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      try {
+        const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
+        const res = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/meta/integrations/credentials`, {
+          headers: { Authorization: authHeader },
+        });
+        if (res.ok) {
+          const payload = await res.json();
+          if (payload?.success && payload?.data) {
+            const dbData = payload.data;
+            const pages = (dbData.instagram_accounts || []).map((acc) => ({
+              id: acc.facebook_page_id,
+              name: acc.facebook_page_name,
+              access_token: acc.page_access_token,
+              instagram_business_account: {
+                id: acc.ig_user_id,
+                username: acc.username,
+                profile_picture_url: acc.profile_picture_url,
+              },
+            }));
+            return {
+              userAccessToken: dbData.user_access_token,
+              pages,
+              source: "database",
+              savedAt: dbData.updated_at || dbData.created_at || new Date().toISOString(),
+              expiresAt: dbData.token_expires_at || null,
+            };
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch token from backend database, falling back to local store:", error);
+      }
+    }
+  }
+
   const bundle = await readTokenBundle();
 
   if (!bundle) {

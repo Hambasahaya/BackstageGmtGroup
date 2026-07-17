@@ -56,114 +56,9 @@ const getLouderTechnologiesInstructions = () => [
   "Keep the tone professional, helpful, practical, and easy to understand.",
 ];
 
-const callAiJson = async (prompt) => {
-  const config = getAiProviderConfig();
-  if (!config) throw new Error("Missing Alibaba Model Studio API key.");
-
-  const requestAi = async (useResponseFormat) => fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        {
-          role: "system",
-          content: "You are a senior social media strategist. Return only valid JSON.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      ...(useResponseFormat ? { response_format: { type: "json_object" } } : {}),
-      temperature: 0.4,
-      max_tokens: 6000,
-    }),
-  });
-
-  const readPayload = async (response) => {
-    const text = await response.text();
-    try {
-      return text ? JSON.parse(text) : {};
-    } catch {
-      return { message: text };
-    }
-  };
-
-  let response = await requestAi(true);
-  let payload = await readPayload(response);
-
-  if (!response.ok) {
-    const message = payload.error?.message || payload.message || "";
-    if (/response_format|json_object|unsupported|invalid parameter/i.test(message)) {
-      response = await requestAi(false);
-      payload = await readPayload(response);
-    }
-  }
-
-  if (!response.ok) {
-    throw new Error(payload.error?.message || payload.message || "Alibaba Model Studio request failed.");
-  }
-
-  const text = payload.choices?.[0]?.message?.content || "";
-  const parsed = extractJsonObject(text);
-  if (!parsed) throw new Error("Alibaba Model Studio returned invalid JSON.");
-  return parsed;
-};
-
-const renderList = (items = []) =>
-  items.length
-    ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-    : "<p>-</p>";
-
-const renderBriefHtml = ({ account, brief, isLouderTechnologies = false }) => `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(brief.title || "Reference Brief")}</title>
-  <style>
-    body { font-family: Arial, sans-serif; color: #111827; line-height: 1.5; }
-    h1 { font-size: 24px; margin-bottom: 4px; }
-    h2 { font-size: 18px; margin-top: 24px; border-bottom: 1px solid #d1d5db; padding-bottom: 6px; }
-    h3 { font-size: 15px; margin-bottom: 4px; }
-    p, li { font-size: 12px; }
-    .muted { color: #6b7280; }
-    .box { border: 1px solid #d1d5db; padding: 10px; margin: 10px 0; }
-  </style>
-</head>
-<body>
-  <h1>${escapeHtml(brief.title || "Reference Brief")}</h1>
-  <p class="muted">${isLouderTechnologies ? "Account" : "Akun"}: ${escapeHtml(account?.username || "-")} | ${isLouderTechnologies ? "Generated with Alibaba Model Studio" : "Dibuat dengan Alibaba Model Studio"}</p>
-  <h2>${isLouderTechnologies ? "Strategy Summary" : "Ringkasan Strategi"}</h2>
-  <p>${escapeHtml(brief.summary || "-")}</p>
-  <h2>${isLouderTechnologies ? "Reference Patterns Used" : "Pola Referensi Yang Dipakai"}</h2>
-  ${renderList(brief.referencePatterns || [])}
-  <h2>Content Pillars</h2>
-  ${renderList(brief.contentPillars || [])}
-  <h2>${isLouderTechnologies ? "Brief Recommendations" : "Rekomendasi Brief"}</h2>
-  ${(brief.briefs || []).map((item, index) => `
-    <div class="box">
-      <h3>${index + 1}. ${escapeHtml(item.title || item.format || "Brief")}</h3>
-      <p><strong>Format:</strong> ${escapeHtml(item.format || "-")}</p>
-      <p><strong>Hook:</strong> ${escapeHtml(item.hook || "-")}</p>
-      <p><strong>Angle:</strong> ${escapeHtml(item.angle || "-")}</p>
-      <p><strong>${isLouderTechnologies ? "Execution" : "Eksekusi"}:</strong> ${escapeHtml(item.execution || "-")}</p>
-      <p><strong>CTA:</strong> ${escapeHtml(item.cta || "-")}</p>
-    </div>
-  `).join("")}
-  <h2>${isLouderTechnologies ? "Production Checklist" : "Checklist Produksi"}</h2>
-  ${renderList(brief.productionChecklist || [])}
-  <h2>${isLouderTechnologies ? "Publish Checklist" : "Checklist Publish"}</h2>
-  ${renderList(brief.publishChecklist || [])}
-</body>
-</html>`;
-
 export default async function handler(request, response) {
   response.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
 
   if (request.method === "OPTIONS") {
     response.statusCode = 204;
@@ -192,33 +87,27 @@ export default async function handler(request, response) {
       request.on("error", reject);
     });
 
-    const isLouderTechnologies = isLouderTechnologiesAccount(body.account);
-    const prompt = [
-      isLouderTechnologies
-        ? "You are applying the Social Media Manager skill for the LouderTechnologies Instagram account."
-        : "You are applying the Social Media Manager skill for an Indonesian Instagram account.",
-      "Skill reference: https://claudemarketplaces.com/skills/alirezarezvani/claude-skills/social-media-manager",
-      "Create a Word-ready strategic brief from the provided reference cards.",
-      "References are inspiration only. Do not copy them, do not treat them as performance data, and adapt all ideas to the selected account.",
-      ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
-      "Return only valid JSON. No markdown. No commentary.",
-      "Schema: {\"title\":\"\",\"summary\":\"\",\"referencePatterns\":[\"\"],\"contentPillars\":[\"\"],\"briefs\":[{\"title\":\"\",\"format\":\"\",\"hook\":\"\",\"angle\":\"\",\"execution\":\"\",\"cta\":\"\"}],\"productionChecklist\":[\"\"],\"publishChecklist\":[\"\"]}",
-      isLouderTechnologies ? "For every field, use English only with simple grammar and clear structure." : "For every field, use Bahasa Indonesia.",
-      JSON.stringify({
-        account: body.account,
-        mainRecommendation: body.mainRecommendation,
-        selectedBrief: body.selectedBrief,
-        references: body.references,
-      }),
-    ].join("\n");
+    const authHeader = request.headers.authorization || request.headers.Authorization;
 
-    const brief = await callAiJson(prompt);
-    const filenameBase = (body.account?.username || "instagram-reference-brief").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-|-$/g, "");
+    const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
+    const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/reference-brief`;
 
-    json(response, 200, {
-      filename: `${filenameBase}-reference-brief.doc`,
-      html: renderBriefHtml({ account: body.account, brief, isLouderTechnologies }),
+    const backendResponse = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authHeader ? { Authorization: authHeader } : {})
+      },
+      body: JSON.stringify(body)
     });
+
+    if (!backendResponse.ok) {
+      const errorText = await backendResponse.text();
+      throw new Error(errorText || `Backend returned status ${backendResponse.status}`);
+    }
+
+    const result = await backendResponse.json();
+    json(response, 200, result);
   } catch (error) {
     json(response, 500, { error: error.message || "Reference brief generation failed." });
   }

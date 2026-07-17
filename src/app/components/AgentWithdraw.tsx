@@ -326,15 +326,15 @@ export function AgentWithdraw() {
         </div>
       )}
 
-      <section className="rounded-lg bg-white sm:border sm:border-slate-200 sm:shadow-sm">
-        <div className="flex items-center justify-between gap-3 px-1 py-2 sm:hidden">
+      <section className="rounded-lg bg-white px-4 py-3 sm:border sm:border-slate-200 sm:p-0 sm:shadow-sm">
+        <div className="flex items-center justify-between gap-3 py-2 sm:hidden">
           <h2 className="text-xl font-bold text-slate-950">Recent Transaction</h2>
           <button type="button" className="text-base font-bold text-blue-500">
             See all
           </button>
         </div>
 
-        <div className="mt-2 overflow-hidden rounded-lg bg-white px-1 sm:hidden">
+        <div className="mt-2 overflow-hidden rounded-lg bg-white sm:hidden">
           {mobileTransactions.length > 0 ? (
             mobileTransactions.map((transaction) => (
               <MobileTransactionItem

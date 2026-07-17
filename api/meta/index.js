@@ -8,6 +8,9 @@ import generateContentHandler from "./_generate-content.js";
 import instagramInsightsHandler from "./_instagram-insights.js";
 import knowledgeBaseHandler from "./_knowledge-base.js";
 import referenceBriefHandler from "./_reference-brief.js";
+import integrationsHandler from "./_integrations.js";
+import integrationsStatusHandler from "./_integrations-status.js";
+import instagramDashboardStoreHandler from "./_instagram-dashboard-store.js";
 
 const handlers = {
   "/api/meta/accounts": accountsHandler,
@@ -19,6 +22,9 @@ const handlers = {
   "/api/meta/instagram-insights": instagramInsightsHandler,
   "/api/meta/knowledge-base": knowledgeBaseHandler,
   "/api/meta/reference-brief": referenceBriefHandler,
+  "/api/meta/integrations": integrationsHandler,
+  "/api/meta/integrations/status": integrationsStatusHandler,
+  "/api/meta/instagram-dashboard/store": instagramDashboardStoreHandler,
 };
 
 export default async function handler(request, response) {

@@ -308,7 +308,7 @@ export default async function handler(request, response) {
       return;
     }
 
-    const bundle = await getStoredTokenBundle();
+    const bundle = await getStoredTokenBundle(request);
     const page = findInstagramPage(bundle, undefined, body.igUserId);
     const igUserId = body.igUserId || page?.instagram_business_account?.id;
     const pageAccessToken = page?.access_token || process.env.META_PAGE_ACCESS_TOKEN;

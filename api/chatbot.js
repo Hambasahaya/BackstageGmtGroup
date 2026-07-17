@@ -1,20 +1,5 @@
 import url from "node:url";
 
-const getAiProviderConfig = () => {
-  const apiKey =
-    process.env.ALIBABA_MODEL_STUDIO_API_KEY ||
-    process.env.ALIBABA_API_KEY ||
-    process.env.DASHSCOPE_API_KEY;
-
-  if (!apiKey) return null;
-
-  return {
-    apiKey,
-    baseUrl: (process.env.ALIBABA_MODEL_STUDIO_BASE_URL || "https://dashscope-intl.aliyuncs.com/compatible-mode/v1").replace(/\/$/, ""),
-    model: process.env.ALIBABA_MODEL || "qwen3.7-plus",
-  };
-};
-
 const json = (res, status, data) => {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -54,61 +39,28 @@ export default async function handler(request, response) {
       request.on("error", reject);
     });
 
-    const { message, history = [], context = "" } = body;
+    const { message } = body;
 
     if (!message) {
       json(response, 400, { error: "Message is required" });
       return;
     }
 
-    const config = getAiProviderConfig();
-    if (!config) {
-      json(response, 500, { error: "Missing Alibaba Model Studio API key configuration." });
-      return;
+    const authHeader = request.headers.authorization || request.headers.Authorization;
+    const fetchHeaders = {
+      "Content-Type": "application/json",
+    };
+    if (authHeader) {
+      fetchHeaders["Authorization"] = authHeader;
     }
 
-    // Build the messages array
-    const systemPrompt = [
-      "You are 'GMT Group Assistant', a helpful, professional, and friendly chatbot. You answer questions about GMT Group products, articles, websites, and social media analytics using the live context provided below.",
-      "Always reply in Indonesian. Be concise, informative, and format your answers with nice Markdown (such as bullet points, bold text, or lists).",
-      "If the answer cannot be found in the provided context, answer politely based on general knowledge but notify the user that it is outside the current dashboard data.",
-      "",
-      "--- LIVE DASHBOARD CONTEXT ---",
-      context || "No context data is currently loaded.",
-      "------------------------------"
-    ].join("\n");
+    const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
+    const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/role-chatbot`;
 
-    const apiMessages = [
-      { role: "system", content: systemPrompt }
-    ];
-
-    // Append history (limit to last 10 messages to save context space)
-    const recentHistory = history.slice(-10);
-    for (const msg of recentHistory) {
-      if (msg.role && msg.content) {
-        apiMessages.push({
-          role: msg.role === "user" ? "user" : "assistant",
-          content: msg.content
-        });
-      }
-    }
-
-    // Append the current message
-    apiMessages.push({ role: "user", content: message });
-
-    const aiResponse = await fetch(`${config.baseUrl}/chat/completions`, {
+    const aiResponse = await fetch(targetUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: apiMessages,
-        temperature: 0.7,
-        max_tokens: 1500,
-        stream: true, // Enable streaming
-      }),
+      headers: fetchHeaders,
+      body: JSON.stringify(body),
     });
 
     if (!aiResponse.ok) {
@@ -119,13 +71,20 @@ export default async function handler(request, response) {
       } catch {
         payload = { error: { message: text } };
       }
-      const errorMsg = payload.error?.message || payload.message || "Failed to call AI model.";
-      json(response, 500, { error: errorMsg });
+      const errorMsg = payload.error?.message || payload.message || "Failed to call backend chatbot API.";
+      json(response, aiResponse.status, { error: errorMsg });
       return;
     }
 
-    // Set headers for streaming response
-    response.setHeader("Content-Type", "text/event-stream");
+    // Forward status and headers
+    response.statusCode = aiResponse.status;
+    for (const [key, value] of aiResponse.headers.entries()) {
+      if (key.toLowerCase() !== "content-length") {
+        response.setHeader(key, value);
+      }
+    }
+
+    // Set standard streaming headers just in case
     response.setHeader("Cache-Control", "no-cache, no-transform");
     response.setHeader("Connection", "keep-alive");
     response.setHeader("X-Accel-Buffering", "no");

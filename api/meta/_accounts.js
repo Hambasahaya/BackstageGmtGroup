@@ -17,16 +17,8 @@ export default async function handler(request, response) {
   }
 
   try {
-    const bundle = await getStoredTokenBundle();
-    const allPages = (bundle.pages || []).map(sanitizePage);
-    
-    // Filter out 'louder' and 'antari' accounts from display
-    const pages = allPages.filter((page) => {
-      const name = (page.name || "").toLowerCase();
-      const username = (page.instagramBusinessAccount?.username || "").toLowerCase();
-      return !name.includes("louder") && !name.includes("antari") &&
-             !username.includes("louder") && !username.includes("antari");
-    });
+    const bundle = await getStoredTokenBundle(request);
+    const pages = (bundle.pages || []).map(sanitizePage);
 
     const instagramAccounts = pages
       .filter((page) => page.instagramBusinessAccount?.id)

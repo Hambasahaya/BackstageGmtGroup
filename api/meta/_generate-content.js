@@ -184,67 +184,9 @@ const getLouderTechnologiesInstructions = () => [
   "Keep the tone professional, helpful, practical, and easy to follow.",
 ];
 
-const callAiJson = async (prompt) => {
-  const config = getAiProviderConfig();
-  if (!config) throw new Error("Missing Alibaba Model Studio API key.");
-
-  const requestAi = async (useResponseFormat) => fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        {
-          role: "system",
-          content: "You are a professional social media manager and content creator for GMT Group. Return only valid JSON.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      ...(useResponseFormat ? { response_format: { type: "json_object" } } : {}),
-      temperature: 0.55,
-      max_tokens: 6000,
-    }),
-  });
-
-  const readPayload = async (response) => {
-    const text = await response.text();
-    try {
-      return text ? JSON.parse(text) : {};
-    } catch {
-      return { message: text };
-    }
-  };
-
-  let response = await requestAi(true);
-  let payload = await readPayload(response);
-
-  if (!response.ok) {
-    const message = payload.error?.message || payload.message || "";
-    if (/response_format|json_object|unsupported|invalid parameter/i.test(message)) {
-      response = await requestAi(false);
-      payload = await readPayload(response);
-    }
-  }
-
-  if (!response.ok) {
-    throw new Error(payload.error?.message || payload.message || "Alibaba Model Studio request failed.");
-  }
-
-  const text = payload.choices?.[0]?.message?.content || "";
-  const parsed = extractJsonObject(text);
-  if (!parsed) throw new Error("Alibaba Model Studio returned invalid JSON format.");
-  return parsed;
-};
-
 export default async function handler(request, response) {
   response.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
 
   if (request.method === "OPTIONS") {
     response.statusCode = 204;
@@ -280,94 +222,27 @@ export default async function handler(request, response) {
     }
 
     const isLouderTechnologies = isLouderTechnologiesAccount(account);
-    const languageInstruction = isLouderTechnologies
-      ? "Always generate content in ENGLISH with simple grammar and clear wording."
-      : "Always generate content in BAHASA INDONESIA, with engaging and highly professional copywriting.";
-    const schemaLanguage = isLouderTechnologies ? {
-      hook: "Simple English hook for the first caption line",
-      body: "Main caption body in clear and practical English",
-      cta: "Clear call to action in English",
-      visual: "visual scene description",
-      voiceOver: "voice over / spoken line in simple English",
-      onScreenText: "short on-screen text in English",
-      article: "Full English markdown article with heading tags (#, ##, ###), intro, body sections, conclusion, and FAQs. ONLY include this string if target contentType is \"artikel\"",
-    } : {
-      hook: "Copywriting hook untuk baris pertama caption",
-      body: "Isi caption utama yang persuasif dan lengkap",
-      cta: "Call to action yang jelas",
-      visual: "deskripsi visual adegan",
-      voiceOver: "dialog / suara pengisi",
-      onScreenText: "teks di layar",
-      article: "Full markdown string containing the generated article with heading tags (#, ##, ###), intro, body sections, conclusion, and FAQs. ONLY include this string if target contentType is \"artikel\"",
-    };
+    const authHeader = request.headers.authorization || request.headers.Authorization;
 
-    const prompt = [
-      isLouderTechnologies
-        ? "You are a Senior Social Media Copywriter and SEO Content Specialist for LouderTechnologies."
-        : "You are a Senior Social Media Copywriter and SEO Content Specialist for GMT Group (Indonesia).",
-      "Using the following input data, generate a complete content of the specified type.",
-      `Target Type: ${contentType}`,
-      "",
-      "--- INPUT BRIEF DATA ---",
-      `Format Awal: ${selectedIdea.format}`,
-      `Ide Utama: ${selectedIdea.idea}`,
-      `Content Pillar: ${selectedIdea.pillar}`,
-      `Objective: ${selectedIdea.objective}`,
-      `Format Guide: ${selectedIdea.formatGuide}`,
-      `Yang dilakukan: ${selectedIdea.action}`,
-      `Kenapa format ini: ${selectedIdea.reason}`,
-      `Dampaknya: ${selectedIdea.impact}`,
-      account ? `Username: @${account.username}\nBio: ${account.biography}` : "",
-      "-------------------------",
-      "",
-      "Please adapt the brief to the target type and output it as JSON according to the schema rules below.",
-      languageInstruction,
-      ...(isLouderTechnologies ? getLouderTechnologiesInstructions() : []),
-      "Write like a real social media specialist: warm, specific, natural, and ready to post.",
-      "Do not prefix normal sentences with '-', '/', '|', bullet symbols, or decorative separators.",
-      "Use clean sentences and natural line breaks instead of markdown-style bullets unless the field explicitly needs a short list.",
-      contentType === "carousel"
-        ? "Carousel requirement: return 5 to 8 distinct carouselSlides. Do not return only one slide. Each slide needs a different headline, visual direction, and copy."
-        : "",
-      "",
-      "JSON Schema:",
-      "{",
-      '  "contentType": "' + contentType + '",',
-      '  "title": "Title / main focus of this content",',
-      '  "caption": {',
-      `    "hook": "${schemaLanguage.hook}",`,
-      `    "body": "${schemaLanguage.body}",`,
-      `    "cta": "${schemaLanguage.cta}",`,
-      '    "hashtags": ["list", "of", "relevant", "hashtags"]',
-      "  },",
-      '  "content": {',
-      '    "script": [  // ONLY include this array if target contentType is "reals" or "reels" or "video"',
-      `      {"timecode": "0-3s", "visual": "${schemaLanguage.visual}", "voiceOver": "${schemaLanguage.voiceOver}", "onScreenText": "${schemaLanguage.onScreenText}"}`,
-      "    ],",
-      '    "storyFrames": [ // ONLY include this array if target contentType is "story"',
-      '      {"frame": "1", "visual": "visual frame", "text": "teks overlay/sticker", "stickerOrCta": "fitur interaksi (poll/question/link)"}',
-      "    ],",
-      '    "carouselSlides": [ // ONLY include this array if target contentType is "carousel"; MUST contain 5-8 items',
-      '      {"slide": "1", "headline": "Hook utama", "visual": "visual slide pembuka", "copy": "kalimat pendek yang natural"},',
-      '      {"slide": "2", "headline": "Konteks masalah", "visual": "visual pendukung", "copy": "kalimat pendek yang natural"},',
-      '      {"slide": "3", "headline": "Insight penting", "visual": "visual detail", "copy": "kalimat pendek yang natural"},',
-      '      {"slide": "4", "headline": "Solusi praktis", "visual": "visual solusi", "copy": "kalimat pendek yang natural"},',
-      '      {"slide": "5", "headline": "CTA", "visual": "visual penutup", "copy": "ajakan save/share/comment/DM"}',
-      "    ],",
-      `    "article": "${schemaLanguage.article.replace(/"/g, '\\"')}"`,
-      "  },",
-      '  "metadata": {',
-      '    "visualDirection": "Visual tone, font guidelines, coloring or audio instructions",',
-      '    "shotList": ["shot 1 detail", "shot 2 detail"],',
-      '    "publishChecklist": ["qa checklist before publish", "qa checklist 2"]',
-      "  }",
-      "}",
-      "",
-      "Generate a rich, thorough, production-ready copywriting or article draft. Avoid using placeholders or short generic sentences.",
-      "Return ONLY valid JSON. No markdown fences like ```json. No commentary."
-    ].join("\n");
+    const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
+    const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/generate-content`;
 
-    const result = await callAiJson(prompt);
+    const backendResponse = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authHeader ? { Authorization: authHeader } : {})
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!backendResponse.ok) {
+      const errorText = await backendResponse.text();
+      throw new Error(errorText || `Backend returned status ${backendResponse.status}`);
+    }
+
+    const result = await backendResponse.json();
+
     json(response, 200, normalizeGeneratedContent({
       result,
       selectedIdea,
