@@ -151,7 +151,12 @@ export function DashboardChatbot() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch("/api/chatbot", {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
+      const targetUrl = apiBaseUrl 
+        ? `${apiBaseUrl.replace(/\/$/, "")}/api/meta/role-chatbot` 
+        : "/api/chatbot";
+
+      const response = await fetch(targetUrl, {
         method: "POST",
         headers,
         body: JSON.stringify({
