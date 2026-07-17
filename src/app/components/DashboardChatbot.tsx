@@ -166,6 +166,15 @@ export function DashboardChatbot() {
         throw new Error(payload.error || "Gagal mendapatkan respon chatbot.");
       }
 
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const payload = await response.json();
+        const reply = payload.answer || payload.message || payload.response || "";
+        setMessages([...nextMessages, { role: "assistant", content: reply }]);
+        setIsLoading(false);
+        return;
+      }
+
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error("Pemberi respon stream tidak didukung di browser ini.");
