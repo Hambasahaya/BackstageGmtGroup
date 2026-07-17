@@ -1,6 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, Plus, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api, type WalletDto, type WithdrawDto } from "../services/api";
+import { api, type PreorderDto, type WalletDto, type WithdrawDto } from "../services/api";
 
 const defaultWallet: WalletDto = {
   total_commission: 12500000,
@@ -43,6 +43,18 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit",
   month: "short",
   year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const dayDateFormatter = new Intl.DateTimeFormat("id-ID", {
+  weekday: "long",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+const timeFormatter = new Intl.DateTimeFormat("id-ID", {
   hour: "2-digit",
   minute: "2-digit",
 });
@@ -110,35 +122,75 @@ type MobileTransaction = {
   subtitle: string;
   amount: number;
   status: "Success" | "On progress";
+  details?: Array<{
+    id: string;
+    poNumber: string;
+    amount: number;
+    createdAt: string;
+  }>;
 };
 
-function MobileTransactionItem({ transaction }: { transaction: MobileTransaction }) {
+function MobileTransactionItem({
+  transaction,
+  isExpanded,
+  onToggle,
+}: {
+  transaction: MobileTransaction;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
   const isIncoming = transaction.type === "in";
   const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
+  const hasDetails = isIncoming && !!transaction.details?.length;
 
   return (
-    <div className="flex items-center gap-3 border-b border-slate-100 py-4 last:border-0">
-      <div
-        className={[
-          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-          isIncoming ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-700",
-        ].join(" ")}
+    <div className="border-b border-slate-100 py-4 last:border-0">
+      <button
+        type="button"
+        onClick={hasDetails ? onToggle : undefined}
+        className="flex w-full items-center gap-3 text-left"
       >
-        <Icon className="h-6 w-6" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-bold text-slate-950">{transaction.title}</p>
-        <p className="mt-1 truncate text-sm text-slate-400">{transaction.subtitle}</p>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className={["text-lg font-bold", isIncoming ? "text-emerald-600" : "text-slate-950"].join(" ")}>
-          {isIncoming ? "+" : "-"}
-          {currencyFormatter.format(transaction.amount)}
-        </p>
-        <p className={["mt-1 text-sm font-semibold", transaction.status === "Success" ? "text-emerald-500" : "text-amber-500"].join(" ")}>
-          {transaction.status}
-        </p>
-      </div>
+        <div
+          className={[
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
+            isIncoming ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-700",
+          ].join(" ")}
+        >
+          <Icon className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-bold text-slate-950">{transaction.title}</p>
+          <p className="mt-1 truncate text-sm text-slate-400">{transaction.subtitle}</p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={["text-lg font-bold", isIncoming ? "text-emerald-600" : "text-slate-950"].join(" ")}>
+            {isIncoming ? "+" : "-"}
+            {currencyFormatter.format(transaction.amount)}
+          </p>
+          <p className={["mt-1 text-sm font-semibold", transaction.status === "Success" ? "text-emerald-500" : "text-amber-500"].join(" ")}>
+            {transaction.status}
+          </p>
+        </div>
+      </button>
+
+      {isExpanded && hasDetails && (
+        <div className="mt-4 space-y-3 rounded-lg bg-slate-50 px-4 py-3">
+          {transaction.details?.map((detail) => {
+            const date = new Date(detail.createdAt);
+
+            return (
+              <div key={detail.id} className="flex items-start justify-between gap-3 border-b border-slate-200 pb-3 last:border-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-950">{detail.poNumber}</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">{dayDateFormatter.format(date)}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">Jam {timeFormatter.format(date)}</p>
+                </div>
+                <p className="shrink-0 text-sm font-bold text-emerald-600">+{currencyFormatter.format(detail.amount)}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -148,6 +200,8 @@ export function AgentWithdraw() {
   const [withdraws, setWithdraws] = useState<WithdrawDto[]>(defaultWithdraws);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  const [commissionPreorders, setCommissionPreorders] = useState<PreorderDto[]>([]);
+  const [expandedMobileTransactionId, setExpandedMobileTransactionId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -157,9 +211,18 @@ export function AgentWithdraw() {
     setErrorMessage("");
 
     try {
-      const [walletResponse, withdrawResponse] = await Promise.all([api.agentWallet(), api.agentWithdraws()]);
+      const [walletResponse, withdrawResponse, preorderResponse] = await Promise.all([
+        api.agentWallet(),
+        api.agentWithdraws(),
+        api.agentPreorders("approve"),
+      ]);
       setWallet(walletResponse.wallet ?? emptyWallet);
       setWithdraws(Array.isArray(withdrawResponse.withdraws) ? withdrawResponse.withdraws : []);
+      setCommissionPreorders(
+        Array.isArray(preorderResponse.preorders)
+          ? preorderResponse.preorders.filter((preorder) => preorder.status === "approve" && preorder.total_komisi > 0)
+          : [],
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal memuat data withdraw agent.");
     } finally {
@@ -181,9 +244,15 @@ export function AgentWithdraw() {
         id: "total-commission",
         type: "in",
         title: "Komisi masuk",
-        subtitle: "Dari PO approved",
+        subtitle: commissionPreorders.length ? `${commissionPreorders.length} PO approved` : "Dari PO approved",
         amount: wallet.total_commission,
         status: "Success",
+        details: commissionPreorders.map((preorder) => ({
+          id: String(preorder.id),
+          poNumber: preorder.po_number ?? `PO-${preorder.id}`,
+          amount: preorder.total_komisi,
+          createdAt: preorder.created_at ?? new Date().toISOString(),
+        })),
       });
     }
 
@@ -199,7 +268,7 @@ export function AgentWithdraw() {
     });
 
     return transactions;
-  }, [wallet.total_commission, withdraws]);
+  }, [commissionPreorders, wallet.total_commission, withdraws]);
 
   const openWithdrawModal = () => {
     setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
@@ -254,7 +323,7 @@ export function AgentWithdraw() {
         </button>
       </div>
 
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:gap-4 lg:max-w-sm">
         <StatCard
           label="Total komisi"
           value={currencyFormatter.format(wallet.total_commission)}
@@ -262,9 +331,6 @@ export function AgentWithdraw() {
           featuredMobile
           pendingValue={currencyFormatter.format(wallet.pending_withdraw)}
         />
-        <StatCard label="Available balance" value={currencyFormatter.format(wallet.available_balance)} detail="Saldo yang bisa di-withdraw" />
-        <StatCard label="Pending withdraw" value={currencyFormatter.format(wallet.pending_withdraw)} detail="Menunggu proses admin" />
-        <StatCard label="Withdrawn balance" value={currencyFormatter.format(wallet.withdrawn_balance)} detail="Sudah disetujui admin" />
       </section>
 
       {errorMessage && (
@@ -284,7 +350,12 @@ export function AgentWithdraw() {
         <div className="mt-2 overflow-hidden rounded-lg bg-white px-1 sm:hidden">
           {mobileTransactions.length > 0 ? (
             mobileTransactions.map((transaction) => (
-              <MobileTransactionItem key={transaction.id} transaction={transaction} />
+              <MobileTransactionItem
+                key={transaction.id}
+                transaction={transaction}
+                isExpanded={expandedMobileTransactionId === transaction.id}
+                onToggle={() => setExpandedMobileTransactionId((current) => current === transaction.id ? null : transaction.id)}
+              />
             ))
           ) : (
             <div className="py-6 text-sm font-medium text-slate-500">Belum ada transaksi.</div>
