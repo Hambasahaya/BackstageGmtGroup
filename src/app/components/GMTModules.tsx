@@ -1581,21 +1581,30 @@ export function MarketingIntegrations() {
 
   const competitorActivityMap = new Map<string, Record<string, string | number>>();
 
+  const startDate = new Date(appliedDateRange.since);
+  const endDate = new Date(appliedDateRange.until);
+  const msInDay = 24 * 60 * 60 * 1000;
+  
+  if (startDate <= endDate) {
+    for (let d = startDate.getTime(); d <= endDate.getTime(); d += msInDay) {
+      const dateObj = new Date(d);
+      const dateStr = dateObj.toISOString().split("T")[0];
+      competitorActivityMap.set(dateStr, {
+        date: dateObj.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }),
+        rawDate: dateStr,
+      });
+    }
+  }
+
   for (const metric of competitorMetricConfig) {
     for (const media of metric.competitor.publicMedia || []) {
       const dateStr = media.timestamp ? media.timestamp.split("T")[0] : undefined;
       const dateKey = dateStr || media.id;
-      if (!dateKey) continue;
+      if (!dateKey || !competitorActivityMap.has(dateKey)) continue;
 
-      const current = competitorActivityMap.get(dateKey) || {
-        date: dateStr ? new Date(dateStr).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "-",
-        rawDate: dateStr || "",
-      };
-      
+      const current = competitorActivityMap.get(dateKey)!;
       const currentVal = (current[metric.key] as number) || 0;
       current[metric.key] = currentVal + (competitorChartMetric === "views" ? (media.views || 0) : (media.interactions || 0));
-      
-      competitorActivityMap.set(dateKey, current);
     }
   }
 
@@ -2333,16 +2342,55 @@ export function MarketingIntegrations() {
               {competitorActivityData.length ? (
                 <div className="mt-5 h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={competitorActivityData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                      <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: "#64748B", fontSize: 12 }} axisLine={false} tickLine={false} width={55} />
-                      <Tooltip contentStyle={{ borderRadius: 10, borderColor: "#E2E8F0" }} formatter={(value) => formatNumber(toNumber(value))} />
-                      <Legend />
+                    <AreaChart data={competitorActivityData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                      <defs>
+                        {competitorMetricConfig.map(metric => (
+                          <linearGradient key={`color-${metric.key}`} id={`color-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={metric.color} stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor={metric.color} stopOpacity={0}/>
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={12} />
+                      <YAxis tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => new Intl.NumberFormat("id-ID").format(Number(v))} />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white/90 backdrop-blur-md p-3 border border-slate-200 shadow-xl rounded-xl">
+                                <p className="font-bold text-slate-800 mb-2">{label}</p>
+                                <div className="flex flex-col gap-1.5">
+                                  {payload.map((entry: any, index: number) => (
+                                    <div key={index} className="flex items-center gap-2 text-sm">
+                                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }}></span>
+                                      <span className="text-slate-600 font-medium">{entry.name}:</span>
+                                      <span className="text-slate-950 font-bold">{new Intl.NumberFormat("id-ID").format(Number(entry.value))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }} 
+                        cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '4 4' }} 
+                      />
+                      <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                       {competitorMetricConfig.map((metric) => (
-                        <Line key={metric.key} type="monotone" dataKey={metric.key} stroke={metric.color} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 6 }} connectNulls />
+                        <Area 
+                          key={metric.key} 
+                          type="monotone" 
+                          dataKey={metric.key} 
+                          stroke={metric.color} 
+                          fill={`url(#color-${metric.key})`} 
+                          strokeWidth={2.5} 
+                          dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: metric.color }} 
+                          activeDot={{ r: 6, strokeWidth: 0, fill: metric.color }} 
+                          connectNulls 
+                        />
                       ))}
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
