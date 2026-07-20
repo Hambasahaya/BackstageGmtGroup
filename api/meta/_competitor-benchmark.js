@@ -1,4 +1,4 @@
-import { findInstagramPage, getStoredTokenBundle, json, metaFetch } from "./_meta-client.js";
+import { json } from "./_meta-client.js";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -23,87 +23,81 @@ const parseUsernames = (requestUrl) => {
     .slice(0, 8);
 };
 
-const isWithinRange = (timestamp, since, until) => {
-  if (!timestamp || (!since && !until)) return true;
+const fetchApifyData = async (usernames) => {
+  const token = process.env.APIFY_API_TOKEN;
+  if (!token) {
+    throw new Error("APIFY_API_TOKEN is not configured in the environment variables.");
+  }
+  const actor = "apify~instagram-profile-scraper";
+  const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${token}`;
+  
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usernames })
+  });
 
-  const time = Date.parse(timestamp);
-  if (!Number.isFinite(time)) return true;
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Apify API error ${response.status}`);
+  }
 
-  const sinceTime = since ? Date.parse(`${since}T00:00:00Z`) : Number.NEGATIVE_INFINITY;
-  const untilTime = until ? Date.parse(`${until}T23:59:59Z`) : Number.POSITIVE_INFINITY;
-
-  return time >= sinceTime && time <= untilTime;
+  return response.json();
 };
 
-const getPublicMedia = (account, since, until) => {
-  const media = account.media?.data || [];
-  return media
-    .filter((item) => isWithinRange(item.timestamp, since, until))
-    .map((item) => {
-      const likes = Number(item.like_count) || 0;
-      const comments = Number(item.comments_count) || 0;
+const mapApifyToBenchmark = (apifyData) => {
+  const results = [];
+  const warnings = [];
+
+  for (const profile of apifyData) {
+    if (profile.error) {
+      warnings.push(`@${profile.username || 'unknown'}: ${profile.error}`);
+      continue;
+    }
+
+    const publicMedia = (profile.latestPosts || []).map(post => {
+      const likes = post.likesCount || 0;
+      const comments = post.commentsCount || 0;
       return {
-        id: item.id,
-        caption: item.caption || "",
-        mediaType: item.media_type || "",
-        timestamp: item.timestamp || "",
-        permalink: item.permalink || "",
+        id: post.shortCode || post.id,
+        caption: post.caption || "",
+        mediaType: post.type?.toUpperCase() || "IMAGE",
+        timestamp: post.timestamp || "",
+        permalink: post.url || `https://www.instagram.com/p/${post.shortCode}/`,
         likes,
         comments,
         interactions: likes + comments,
       };
     });
-};
 
-const buildSummary = (account, publicMedia, since, until) => {
-  const followers = Number(account.followers_count) || 0;
-  const likes = publicMedia.reduce((total, item) => total + item.likes, 0);
-  const comments = publicMedia.reduce((total, item) => total + item.comments, 0);
-  const interactions = likes + comments;
-  const avgInteractions = publicMedia.length ? interactions / publicMedia.length : 0;
-  const avgEngagementRate = followers && publicMedia.length ? avgInteractions / followers : null;
-  const sinceTime = since ? Date.parse(`${since}T00:00:00Z`) : undefined;
-  const untilTime = until ? Date.parse(`${until}T23:59:59Z`) : undefined;
-  const rangeDays = sinceTime && untilTime && untilTime >= sinceTime
-    ? Math.max(1, Math.round((untilTime - sinceTime) / (24 * 60 * 60 * 1000)) + 1)
-    : 30;
+    const postCount = publicMedia.length;
+    const likes = publicMedia.reduce((sum, p) => sum + p.likes, 0);
+    const comments = publicMedia.reduce((sum, p) => sum + p.comments, 0);
+    const interactions = likes + comments;
+    const avgInteractions = postCount > 0 ? interactions / postCount : 0;
+    const followers = profile.followersCount || 0;
+    const avgEngagementRate = followers > 0 ? avgInteractions / followers : 0;
 
-  return {
-    posts: publicMedia.length,
-    likes,
-    comments,
-    interactions,
-    avgInteractions,
-    avgEngagementRate,
-    postingFrequencyPerWeek: publicMedia.length / (rangeDays / 7),
-  };
-};
-
-const fetchCompetitor = async ({ viewerIgUserId, username, accessToken, since, until, limit }) => {
-  const fields = [
-    `business_discovery.username(${username}){`,
-    "id,username,name,profile_picture_url,followers_count,media_count,",
-    `media.limit(${limit}){id,caption,media_type,timestamp,like_count,comments_count,permalink}`,
-    "}",
-  ].join("");
-  const payload = await metaFetch(`/${viewerIgUserId}`, { fields }, accessToken);
-  const account = payload.business_discovery;
-
-  if (!account?.username) {
-    throw new Error(`Akun @${username} tidak ditemukan atau tidak tersedia melalui business_discovery.`);
+    results.push({
+      username: profile.username,
+      name: profile.fullName || "",
+      profilePictureUrl: profile.profilePicUrl || "",
+      followersCount: followers,
+      mediaCount: profile.postsCount || 0,
+      publicMedia,
+      summary: {
+        posts: postCount,
+        likes,
+        comments,
+        interactions,
+        avgInteractions,
+        avgEngagementRate,
+        postingFrequencyPerWeek: postCount > 0 ? (postCount / 30) * 7 : 0
+      }
+    });
   }
 
-  const publicMedia = getPublicMedia(account, since, until);
-
-  return {
-    username: account.username,
-    name: account.name || "",
-    profilePictureUrl: account.profile_picture_url || "",
-    followersCount: Number(account.followers_count) || 0,
-    mediaCount: Number(account.media_count) || 0,
-    publicMedia,
-    summary: buildSummary(account, publicMedia, since, until),
-  };
+  return { results, warnings };
 };
 
 export default async function handler(request, response) {
@@ -125,51 +119,29 @@ export default async function handler(request, response) {
     const requestUrl = new URL(request.url, `http://${request.headers.host}`);
     const usernames = parseUsernames(requestUrl);
     const { since, until } = parseDateRange(requestUrl);
-    const limit = Math.max(3, Math.min(Number(process.env.META_COMPETITOR_MEDIA_LIMIT || 24), 50));
 
     if (!usernames.length) {
       json(response, 200, {
         connected: false,
         setupRequired: true,
-        message: "Set META_COMPETITOR_USERNAMES=kompetitor1,kompetitor2 untuk menampilkan benchmark kompetitor.",
+        message: "Masukkan username kompetitor untuk membandingkan data melalui Apify.",
         competitors: [],
         warnings: [],
       });
       return;
     }
 
-    const bundle = await getStoredTokenBundle(request);
-    const page = findInstagramPage(bundle, undefined, requestUrl.searchParams.get("igUserId"));
-    const viewerIgUserId = requestUrl.searchParams.get("igUserId") || page?.instagram_business_account?.id;
-    const accessToken = page?.access_token || process.env.META_PAGE_ACCESS_TOKEN || bundle.userAccessToken;
-
-    if (!viewerIgUserId || !accessToken) {
-      json(response, 400, { error: "Instagram Business account dan access token diperlukan untuk business_discovery." });
-      return;
-    }
-
-    const results = await Promise.all(usernames.map(async (username) => {
-      try {
-        return {
-          data: await fetchCompetitor({ viewerIgUserId, username, accessToken, since, until, limit }),
-          warning: null,
-        };
-      } catch (error) {
-        return {
-          data: null,
-          warning: `@${username}: ${error.message}`,
-        };
-      }
-    }));
+    const apifyData = await fetchApifyData(usernames);
+    const { results, warnings } = mapApifyToBenchmark(apifyData);
 
     json(response, 200, {
       connected: true,
-      source: "instagram_business_discovery",
+      source: "apify_instagram_scraper",
       dateRange: { since, until },
-      competitors: results.map((result) => result.data).filter(Boolean),
-      warnings: results.map((result) => result.warning).filter(Boolean),
+      competitors: results,
+      warnings,
     });
   } catch (error) {
-    json(response, 500, { error: error.message || "Competitor benchmark failed." });
+    json(response, 500, { error: error.message || "Competitor benchmark failed via Apify." });
   }
 }
