@@ -67,6 +67,7 @@ const mapApifyToBenchmark = (apifyData) => {
         likes,
         comments,
         interactions: likes + comments,
+        views: post.videoViewCount || 0,
       };
     });
 

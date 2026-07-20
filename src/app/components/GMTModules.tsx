@@ -1101,6 +1101,7 @@ export function MarketingIntegrations() {
   const [untilDate, setUntilDate] = useState(defaultDateRange.until);
   const [appliedDateRange, setAppliedDateRange] = useState(defaultDateRange);
   const [dateFilterError, setDateFilterError] = useState("");
+  const [competitorChartMetric, setCompetitorChartMetric] = useState<"interactions" | "views">("interactions");
 
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
@@ -1554,20 +1555,39 @@ export function MarketingIntegrations() {
     total: accountTrendData.reduce((sum, point) => sum + (toNumber(point[metric.key]) || 0), 0),
   }));
   const competitorColors = ["#0F766E", "#2563EB", "#DB2777", "#F59E0B", "#7C3AED", "#0891B2", "#65A30D", "#EA580C"];
-  const competitorMetricConfig = (competitorBenchmark?.competitors || []).map((competitor, index) => ({
+  
+  const currentAccountCompetitor = profile && mediaItems.length ? {
+    username: profile.username || "Akun Saya",
+    name: profile.name || "",
+    followersCount: profile.followers_count || 0,
+    mediaCount: profile.media_count || 0,
+    publicMedia: mediaItems.map(media => ({
+      id: media.id,
+      timestamp: media.timestamp,
+      interactions: (media.like_count || 0) + (media.comments_count || 0)
+    }))
+  } : null;
+
+  const competitorsToGraph = currentAccountCompetitor 
+    ? [currentAccountCompetitor, ...(competitorBenchmark?.competitors || [])]
+    : (competitorBenchmark?.competitors || []);
+
+  const competitorMetricConfig = competitorsToGraph.map((competitor, index) => ({
     key: `@${competitor.username}`,
-    color: competitorColors[index % competitorColors.length],
+    color: index === 0 && currentAccountCompetitor ? "#1E293B" : competitorColors[(index - (currentAccountCompetitor ? 1 : 0) + competitorColors.length) % competitorColors.length],
     competitor,
   }));
+
   const competitorActivityMap = new Map<string, Record<string, string | number>>();
 
   for (const metric of competitorMetricConfig) {
     for (const media of metric.competitor.publicMedia || []) {
       const dateKey = media.timestamp || media.id;
+      if (!dateKey) continue;
       const current = competitorActivityMap.get(dateKey) || {
         date: media.timestamp ? new Date(media.timestamp).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "-",
       };
-      current[metric.key] = media.interactions || 0;
+      current[metric.key] = competitorChartMetric === "views" ? (media.views || 0) : (media.interactions || 0);
       competitorActivityMap.set(dateKey, current);
     }
   }
@@ -2265,12 +2285,18 @@ export function MarketingIntegrations() {
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 className="font-semibold text-slate-950">Interaksi Publik per Tanggal Posting</h3>
-                  <p className="mt-1 text-xs text-slate-500">Nilai grafik = likes + comments. Reach dan impressions kompetitor tidak tersedia sebagai data publik.</p>
+                  <p className="mt-1 text-xs text-slate-500">Nilai grafik = {competitorChartMetric === "views" ? "Video views / plays. Views untuk foto tidak dikirim publik oleh Instagram." : "likes + comments. Reach dan impressions kompetitor tidak tersedia sebagai data publik."}</p>
                 </div>
-                <StatusBadge tone="slate">Public data</StatusBadge>
+                <div className="flex flex-col gap-2 sm:items-end">
+                  <StatusBadge tone="slate">Public data</StatusBadge>
+                  <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+                    <button onClick={() => setCompetitorChartMetric("interactions")} className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${competitorChartMetric === "interactions" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Interactions</button>
+                    <button onClick={() => setCompetitorChartMetric("views")} className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${competitorChartMetric === "views" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Views (Video)</button>
+                  </div>
+                </div>
               </div>
               {competitorActivityData.length ? (
                 <div className="mt-5 h-80 w-full">

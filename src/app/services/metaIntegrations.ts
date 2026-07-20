@@ -168,6 +168,7 @@ export type CompetitorBenchmark = {
       likes: number;
       comments: number;
       interactions: number;
+      views?: number;
     }>;
     summary: {
       posts: number;
