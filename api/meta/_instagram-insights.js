@@ -192,14 +192,20 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
     };
   }
 
-  // Filter posts to only include the last 7 days to save LLM tokens
-  const now = Date.now();
-  const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-  const recentPosts = mediaItems.filter(media => {
-    if (!media.timestamp) return false;
-    const postTime = new Date(media.timestamp).getTime();
-    return (now - postTime) <= sevenDaysInMs;
-  });
+  // Use mediaPayload instead of raw mediaItems, and allow up to 30 posts
+  // to ensure posts within the selected date range get reasoning.
+  const recentPosts = mediaPayload.slice(0, 30);
+
+  if (recentPosts.length === 0) {
+    return {
+      data: mediaItems.map((media) => ({
+        ...media,
+        ai_reasoning: fallbackById.get(media.id),
+        ai_reasoning_source: "local",
+      })),
+      warning: null,
+    };
+  }
 
   try {
     const response = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning`, {
