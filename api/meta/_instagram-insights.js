@@ -155,6 +155,7 @@ const getMediaReasoningPayload = (mediaItems) =>
       mediaType: media.media_type,
       productType: media.media_product_type,
       postedAt: media.timestamp,
+      permalink: media.permalink || "",
       metrics: {
         reach,
         views,
