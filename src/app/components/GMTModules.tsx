@@ -2342,15 +2342,7 @@ export function MarketingIntegrations() {
               {competitorActivityData.length ? (
                 <div className="mt-5 h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={competitorActivityData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                      <defs>
-                        {competitorMetricConfig.map(metric => (
-                          <linearGradient key={`color-${metric.key}`} id={`color-${metric.key}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={metric.color} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={metric.color} stopOpacity={0}/>
-                          </linearGradient>
-                        ))}
-                      </defs>
+                    <BarChart data={competitorActivityData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                       <XAxis dataKey="date" tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={12} />
                       <YAxis tick={{ fill: "#64748B", fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} width={55} tickFormatter={(v) => new Intl.NumberFormat("id-ID").format(Number(v))} />
@@ -2374,23 +2366,18 @@ export function MarketingIntegrations() {
                           }
                           return null;
                         }} 
-                        cursor={{ stroke: '#94A3B8', strokeWidth: 1, strokeDasharray: '4 4' }} 
+                        cursor={{ fill: '#F1F5F9' }} 
                       />
                       <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                       {competitorMetricConfig.map((metric) => (
-                        <Area 
+                        <Bar 
                           key={metric.key} 
-                          type="monotone" 
                           dataKey={metric.key} 
-                          stroke={metric.color} 
-                          fill={`url(#color-${metric.key})`} 
-                          strokeWidth={2.5} 
-                          dot={{ r: 4, strokeWidth: 2, fill: '#fff', stroke: metric.color }} 
-                          activeDot={{ r: 6, strokeWidth: 0, fill: metric.color }} 
-                          connectNulls 
+                          fill={metric.color} 
+                          radius={[4, 4, 0, 0]}
                         />
                       ))}
-                    </AreaChart>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
