@@ -192,9 +192,15 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
     };
   }
 
-  // Use mediaPayload instead of raw mediaItems, and allow up to 30 posts
-  // to ensure posts within the selected date range get reasoning.
-  const recentPosts = mediaPayload.slice(0, 30);
+  // Filter posts to only include the last 7 days to save LLM tokens and prevent timeouts.
+  // We use mediaPayload because it contains the correct structure for the backend.
+  const now = Date.now();
+  const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
+  const recentPosts = mediaPayload.filter(item => {
+    if (!item.postedAt) return false;
+    const postTime = new Date(item.postedAt).getTime();
+    return (now - postTime) <= sevenDaysInMs;
+  });
 
   if (recentPosts.length === 0) {
     return {
@@ -212,7 +218,8 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
     
     // Flow 1: Attempt to get reasoning from cache via GET
     const getParams = new URLSearchParams();
-    if (profile?.id) getParams.set("ig_user_id", profile.id);
+    if (profile?.username) getParams.set("account", profile.username);
+    else if (profile?.id) getParams.set("ig_user_id", profile.id);
     if (dateRange?.since) getParams.set("since", dateRange.since);
     if (dateRange?.until) getParams.set("until", dateRange.until);
 
