@@ -53,15 +53,17 @@ export function DashboardChatbot() {
 
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
       const targetUrl = apiBaseUrl 
-        ? `${apiBaseUrl.replace(/\/$/, "")}/api/chatbot` 
-        : "/api/chatbot";
+        ? `${apiBaseUrl.replace(/\/$/, "")}/api/meta/role-chatbot` 
+        : "/api/meta/role-chatbot";
 
       const response = await fetch(targetUrl, {
         method: "POST",
         headers,
         body: JSON.stringify({
           message: query,
-          history: messages,
+          context: "",
+          task: "social_media_dashboard",
+          client_key: "dashboard"
         }),
       });
 
