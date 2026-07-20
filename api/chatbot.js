@@ -55,7 +55,7 @@ export default async function handler(request, response) {
     }
 
     const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
-    const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/role-chatbot`;
+    const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/chatbot`;
 
     const aiResponse = await fetch(targetUrl, {
       method: "POST",

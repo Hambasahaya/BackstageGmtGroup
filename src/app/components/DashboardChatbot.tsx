@@ -14,9 +14,6 @@ export function DashboardChatbot() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [context, setContext] = useState("");
-  const [isFetchingContext, setIsFetchingContext] = useState(false);
-  const [hasLoadedContext, setHasLoadedContext] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -26,108 +23,11 @@ export function DashboardChatbot() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Load context data on open/load
-  const loadContextData = async () => {
-    if (hasLoadedContext || isFetchingContext) return;
-    setIsFetchingContext(true);
-    
-    try {
-      const [prodRes, artRes, webRes, igRes] = await Promise.allSettled([
-        api.products(),
-        api.articles({ limit: 50 }),
-        fetchWebsiteAnalytics(30),
-        fetchInstagramInsights(undefined, undefined, true),
-      ]);
-
-      const contextParts: string[] = [];
-
-      // 1. Parse Products
-      if (prodRes.status === "fulfilled" && prodRes.value.products) {
-        const prodList = prodRes.value.products
-          .map((p) => {
-            const tiers = p.commission_tiers
-              ? Object.entries(p.commission_tiers)
-                  .map(([tier, val]) => `${tier}: Rp${val.toLocaleString("id-ID")}`)
-                  .join(", ")
-              : "Tidak ada tier khusus";
-            return [
-              `- Nama Produk: ${p.namaproduct}`,
-              `  Harga: Rp${p.price.toLocaleString("id-ID")}`,
-              `  Unit: ${p.unit || "unit"}`,
-              `  Status: ${p.status}`,
-              `  Komisi Utama: Rp${(p.komisi || 0).toLocaleString("id-ID")}`,
-              `  Komisi Tiering: ${tiers}`,
-              `  Deskripsi: ${p.deskripsi || "Tidak ada deskripsi."}`
-            ].join("\n");
-          })
-          .join("\n\n");
-        contextParts.push(`GMT Group Products (Daftar Lengkap Detail):\n${prodList}`);
-      }
-
-      // 2. Parse Articles
-      if (artRes.status === "fulfilled" && artRes.value.articles) {
-        const artList = artRes.value.articles
-          .map((a) => `- ${a.title} (Kategori: ${a.category || "Umum"}, Status: ${a.status || "published"})`)
-          .join("\n");
-        contextParts.push(`GMT Group Articles:\n${artList}`);
-      }
-
-      // 3. Parse GA4 Websites
-      if (webRes.status === "fulfilled" && webRes.value.properties) {
-        const webList = webRes.value.properties
-          .map(
-            (p) =>
-              `- ${p.name} (${p.domain}): Sesi=${p.totals.sessions}, Pengunjung=${p.totals.users}, Pageviews=${p.totals.pageviews}, Rerata Durasi=${p.totals.averageSessionDuration}s. Keyword Teratas: ${p.keywordPerformance
-                ?.slice(0, 5)
-                .map((k) => `${k.keyword} (${k.clicks} klik)`)
-                .join(", ")}`
-          )
-          .join("\n");
-        contextParts.push(`Website Google Analytics Data (30 Hari Terakhir):\n${webList}`);
-      }
-
-      // 4. Parse Instagram Insights
-      if (igRes.status === "fulfilled" && igRes.value.connected && igRes.value.profile) {
-        const profile = igRes.value.profile;
-        const mediaList = (igRes.value.media || [])
-          .slice(0, 10)
-          .map((m) => {
-            const metrics = `Likes: ${m.like_count || 0}, Comments: ${m.comments_count || 0}`;
-            const aiStrategy = [
-              m.ai_angle ? `Angle/Pillar: ${m.ai_angle}` : "",
-              m.ai_reasoning ? `Analisis AI: ${m.ai_reasoning}` : "",
-              m.ai_action ? `Saran Aksi: ${m.ai_action}` : ""
-            ].filter(Boolean).join("\n    ");
-            return [
-              `- Post [ID: ${m.id}, Tipe: ${m.media_type}, Tanggal: ${m.timestamp ? new Date(m.timestamp).toLocaleDateString("id-ID") : "N/A"}]`,
-              `  Metrik: ${metrics}`,
-              `  Caption: ${m.caption || "Tidak ada caption."}`,
-              aiStrategy ? `  Strategi Konten:\n    ${aiStrategy}` : ""
-            ].filter(Boolean).join("\n");
-          })
-          .join("\n\n");
-        const igData = [
-          `Instagram Account: @${profile.username} (${profile.name})`,
-          `Followers: ${profile.followers_count}, Total Media: ${profile.media_count}, Mengikuti: ${profile.follows_count || 0}`,
-          `Daftar Postingan & Performa Detail:\n${mediaList}`,
-        ].join("\n");
-        contextParts.push(`Social Media (Instagram Insights & Post Analytics):\n${igData}`);
-      }
-
-      setContext(contextParts.join("\n\n"));
-      setHasLoadedContext(true);
-    } catch (err) {
-      console.error("Gagal memuat konteks chatbot:", err);
-    } finally {
-      setIsFetchingContext(false);
-    }
-  };
 
   const handleToggleChat = () => {
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
     if (nextOpen) {
-      void loadContextData();
       setTimeout(() => chatInputRef.current?.focus(), 150);
     }
   };
@@ -153,7 +53,7 @@ export function DashboardChatbot() {
 
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
       const targetUrl = apiBaseUrl 
-        ? `${apiBaseUrl.replace(/\/$/, "")}/api/meta/role-chatbot` 
+        ? `${apiBaseUrl.replace(/\/$/, "")}/api/chatbot` 
         : "/api/chatbot";
 
       const response = await fetch(targetUrl, {
@@ -162,7 +62,6 @@ export function DashboardChatbot() {
         body: JSON.stringify({
           message: query,
           history: messages,
-          context: context,
         }),
       });
 
@@ -364,13 +263,7 @@ export function DashboardChatbot() {
             </div>
           </div>
 
-          {/* Context Loading Indicator */}
-          {isFetchingContext && (
-            <div className="bg-teal-950/30 border-b border-teal-900/30 px-4 py-1.5 flex items-center justify-center gap-2 text-[10px] text-teal-300">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Sinkronisasi data Dashboard...
-            </div>
-          )}
+
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
