@@ -13,39 +13,50 @@ export default async function handler(request, response) {
     return;
   }
 
-  if (request.method !== "POST") {
+  if (request.method !== "POST" && request.method !== "GET") {
     json(response, 405, { error: "Method not allowed" });
     return;
   }
 
   try {
-    const body = await new Promise((resolve, reject) => {
-      let raw = "";
-      request.on("data", (chunk) => { raw += chunk; });
-      request.on("end", () => {
-        try { resolve(raw ? JSON.parse(raw) : {}); }
-        catch (error) { reject(error); }
-      });
-      request.on("error", reject);
-    });
-
-    const { account, dateRange, posts } = body;
-    if (!posts || !Array.isArray(posts)) {
-      json(response, 400, { error: "Missing or invalid posts array" });
-      return;
-    }
-
     const authHeader = request.headers.authorization || request.headers.Authorization;
-    const targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning`;
-
-    const backendResponse = await fetch(targetUrl, {
-      method: "POST",
+    let targetUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning`;
+    let fetchOptions = {
+      method: request.method,
       headers: {
         "Content-Type": "application/json",
         ...(authHeader ? { Authorization: authHeader } : {}),
       },
-      body: JSON.stringify({ account, dateRange, posts }),
-    });
+    };
+
+    if (request.method === "GET") {
+      // Forward query parameters
+      const url = new URL(request.url, `http://${request.headers.host}`);
+      if (url.search) {
+        targetUrl += url.search;
+      }
+      delete fetchOptions.headers["Content-Type"];
+    } else {
+      // Handle POST body
+      const body = await new Promise((resolve, reject) => {
+        let raw = "";
+        request.on("data", (chunk) => { raw += chunk; });
+        request.on("end", () => {
+          try { resolve(raw ? JSON.parse(raw) : {}); }
+          catch (error) { reject(error); }
+        });
+        request.on("error", reject);
+      });
+
+      const { account, dateRange, posts } = body;
+      if (!posts || !Array.isArray(posts)) {
+        json(response, 400, { error: "Missing or invalid posts array" });
+        return;
+      }
+      fetchOptions.body = JSON.stringify({ account, dateRange, posts });
+    }
+
+    const backendResponse = await fetch(targetUrl, fetchOptions);
 
     if (!backendResponse.ok) {
       const errorText = await backendResponse.text();

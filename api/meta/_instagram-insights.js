@@ -208,29 +208,58 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
   }
 
   try {
-    const response = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning`, {
-      method: "POST",
+    let items = [];
+    
+    // Flow 1: Attempt to get reasoning from cache via GET
+    const getParams = new URLSearchParams();
+    if (profile?.id) getParams.set("ig_user_id", profile.id);
+    if (dateRange?.since) getParams.set("since", dateRange.since);
+    if (dateRange?.until) getParams.set("until", dateRange.until);
+
+    const getResponse = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning?${getParams.toString()}`, {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
         ...(authHeader ? { Authorization: authHeader } : {})
-      },
-      body: JSON.stringify({
-        account: {
-          username: profile?.username,
-          name: profile?.name,
-          biography: profile?.biography,
-          followers_count: profile?.followers_count,
-          website: profile?.website
-        },
-        dateRange,
-        posts: recentPosts
-      })
+      }
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}`);
+
+    if (getResponse.ok) {
+      const getPayload = await getResponse.json();
+      // If the cache contains at least as many items as we need, use it.
+      if (getPayload.cached && getPayload.total >= recentPosts.length) {
+        items = Array.isArray(getPayload?.items) ? getPayload.items : [];
+      }
     }
-    const payload = await response.json();
-    const items = Array.isArray(payload?.items) ? payload.items : [];
+
+    // Flow 2: If cache is insufficient or fails, generate via POST
+    if (items.length === 0) {
+      const postResponse = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {})
+        },
+        body: JSON.stringify({
+          account: {
+            username: profile?.username,
+            name: profile?.name,
+            biography: profile?.biography,
+            followers_count: profile?.followers_count,
+            website: profile?.website
+          },
+          dateRange,
+          posts: recentPosts
+        })
+      });
+      if (postResponse.ok) {
+        const postPayload = await postResponse.json();
+        items = Array.isArray(postPayload?.items) ? postPayload.items : [];
+      } else {
+        const errorText = await postResponse.text();
+        console.error("Insights reasoning POST failed:", postResponse.status, errorText);
+      }
+    }
+
     const reasoningById = new Map(
       items
         .filter((item) => item?.id && typeof item.reasoning === "string")
