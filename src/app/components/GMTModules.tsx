@@ -1090,6 +1090,7 @@ export function MarketingIntegrations() {
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isCompetitorLoading, setIsCompetitorLoading] = useState(false);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
+  const [customCompetitors, setCustomCompetitors] = useState("");
   const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
   const [contentSort, setContentSort] = useState<"newest" | "oldest" | "reach" | "views" | "engagement" | "likes" | "comments" | "saves">("newest");
   const [accountTrendChartType, setAccountTrendChartType] = useState<"line" | "bar">("line");
@@ -1263,12 +1264,13 @@ export function MarketingIntegrations() {
   const loadCompetitorBenchmark = async (
     igUserId: string,
     dateRange: { since: string; until: string } = appliedDateRange,
+    usernames?: string[]
   ) => {
     setIsCompetitorLoading(true);
     setCompetitorError("");
 
     try {
-      const result = await fetchCompetitorBenchmark(igUserId, dateRange);
+      const result = await fetchCompetitorBenchmark(igUserId, dateRange, usernames);
       setCompetitorBenchmark(result);
     } catch (error) {
       setCompetitorBenchmark(null);
@@ -2201,7 +2203,35 @@ export function MarketingIntegrations() {
         )}
       </SectionCard>
 
-      <SectionCard icon={GitCompare} title="Benchmark Kompetitor" description="Grafik terpisah memakai data publik yang bisa diambil: followers, jumlah media, dan interaksi publik dari posting terbaru.">
+      <SectionCard icon={GitCompare} title="Benchmark Kompetitor" description="Bandingkan langsung akun IG pilihan dengan kompetitor (masukkan username dipisah koma seperti Social Blade).">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="w-full sm:max-w-xs text-sm font-semibold text-slate-700">
+            Username Kompetitor
+            <input 
+              value={customCompetitors}
+              onChange={(e) => setCustomCompetitors(e.target.value)}
+              placeholder="e.g. awkarin, raffinagita1717" 
+              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const usernames = customCompetitors.split(",").map(u => u.trim()).filter(Boolean);
+                  void loadCompetitorBenchmark(selectedInstagramId, appliedDateRange, usernames.length ? usernames : undefined);
+                }
+              }}
+            />
+          </label>
+          <button 
+            onClick={() => {
+              const usernames = customCompetitors.split(",").map(u => u.trim()).filter(Boolean);
+              void loadCompetitorBenchmark(selectedInstagramId, appliedDateRange, usernames.length ? usernames : undefined);
+            }}
+            disabled={isCompetitorLoading || !selectedInstagramId}
+            className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400"
+          >
+            {isCompetitorLoading ? "Memuat..." : "Bandingkan"}
+          </button>
+        </div>
+
         {isCompetitorLoading ? (
           <EmptyState text="Sedang memuat benchmark kompetitor dari Meta Business Discovery..." />
         ) : competitorError ? (

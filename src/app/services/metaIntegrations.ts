@@ -257,11 +257,13 @@ export async function fetchInstagramInsights(
 export async function fetchCompetitorBenchmark(
   igUserId?: string,
   dateRange?: { since: string; until: string },
+  usernames?: string[],
 ) {
   const params = new URLSearchParams();
   if (igUserId) params.set("igUserId", igUserId);
   if (dateRange?.since) params.set("since", dateRange.since);
   if (dateRange?.until) params.set("until", dateRange.until);
+  if (usernames?.length) params.set("usernames", usernames.join(","));
   const query = params.size ? `?${params.toString()}` : "";
   const response = await fetch(`/api/meta/competitor-benchmark${query}`, {
     headers: getGetHeaders(),
