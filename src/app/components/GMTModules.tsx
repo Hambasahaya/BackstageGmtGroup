@@ -1090,7 +1090,8 @@ export function MarketingIntegrations() {
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isCompetitorLoading, setIsCompetitorLoading] = useState(false);
   const [isConnectingMeta, setIsConnectingMeta] = useState(false);
-  const [customCompetitors, setCustomCompetitors] = useState("");
+  const [customCompetitorInput, setCustomCompetitorInput] = useState("");
+  const [customCompetitorsList, setCustomCompetitorsList] = useState<string[]>([]);
   const [selectedContentIdeaIndex, setSelectedContentIdeaIndex] = useState(0);
   const [contentSort, setContentSort] = useState<"newest" | "oldest" | "reach" | "views" | "engagement" | "likes" | "comments" | "saves">("newest");
   const [accountTrendChartType, setAccountTrendChartType] = useState<"line" | "bar">("line");
@@ -1582,19 +1583,30 @@ export function MarketingIntegrations() {
 
   for (const metric of competitorMetricConfig) {
     for (const media of metric.competitor.publicMedia || []) {
-      const dateKey = media.timestamp || media.id;
+      const dateStr = media.timestamp ? media.timestamp.split("T")[0] : undefined;
+      const dateKey = dateStr || media.id;
       if (!dateKey) continue;
+
       const current = competitorActivityMap.get(dateKey) || {
-        date: media.timestamp ? new Date(media.timestamp).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "-",
+        date: dateStr ? new Date(dateStr).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "-",
+        rawDate: dateStr || "",
       };
-      current[metric.key] = competitorChartMetric === "views" ? (media.views || 0) : (media.interactions || 0);
+      
+      const currentVal = (current[metric.key] as number) || 0;
+      current[metric.key] = currentVal + (competitorChartMetric === "views" ? (media.views || 0) : (media.interactions || 0));
+      
       competitorActivityMap.set(dateKey, current);
     }
   }
 
-  const competitorActivityData = Array.from(competitorActivityMap.entries())
-    .sort(([first], [second]) => first.localeCompare(second))
-    .map(([, value]) => value);
+  const competitorActivityData = Array.from(competitorActivityMap.values())
+    .sort((a, b) => {
+      const dateA = a.rawDate as string;
+      const dateB = b.rawDate as string;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateA.localeCompare(dateB);
+    });
   const competitorSummaryRows = (competitorBenchmark?.competitors || []).map((competitor) => [
     <div className="min-w-0">
       <p className="truncate font-semibold text-slate-900">@{competitor.username}</p>
@@ -2223,33 +2235,53 @@ export function MarketingIntegrations() {
         )}
       </SectionCard>
 
-      <SectionCard icon={GitCompare} title="Benchmark Kompetitor" description="Bandingkan langsung akun IG pilihan dengan kompetitor (masukkan username dipisah koma seperti Social Blade).">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="w-full sm:max-w-xs text-sm font-semibold text-slate-700">
+      <SectionCard icon={GitCompare} title="Benchmark Kompetitor" description="Bandingkan langsung akun IG pilihan dengan beberapa kompetitor.">
+        <div className="mb-4">
+          <label className="text-sm font-semibold text-slate-700 block mb-2">
             Username Kompetitor
+          </label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {customCompetitorsList.map((username, index) => (
+              <span key={index} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 border border-slate-200">
+                @{username}
+                <button type="button" onClick={() => setCustomCompetitorsList(prev => prev.filter((_, i) => i !== index))} className="ml-1 text-slate-400 hover:text-slate-600 text-base font-bold">
+                  &times;
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <input 
-              value={customCompetitors}
-              onChange={(e) => setCustomCompetitors(e.target.value)}
-              placeholder="e.g. awkarin, raffinagita1717" 
-              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" 
+              value={customCompetitorInput}
+              onChange={(e) => setCustomCompetitorInput(e.target.value)}
+              placeholder="Ketik username lalu Enter (e.g. awkarin)" 
+              className="w-full sm:max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" 
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const usernames = customCompetitors.split(",").map(u => u.trim()).filter(Boolean);
-                  void loadCompetitorBenchmark(selectedInstagramId, appliedDateRange, usernames.length ? usernames : undefined);
+                if (e.key === 'Enter' && customCompetitorInput.trim()) {
+                  const newUsernames = customCompetitorInput.split(",").map(u => u.trim().replace(/^@/, "").toLowerCase()).filter(Boolean);
+                  const updatedList = Array.from(new Set([...customCompetitorsList, ...newUsernames]));
+                  setCustomCompetitorsList(updatedList);
+                  setCustomCompetitorInput("");
                 }
               }}
             />
-          </label>
-          <button 
-            onClick={() => {
-              const usernames = customCompetitors.split(",").map(u => u.trim()).filter(Boolean);
-              void loadCompetitorBenchmark(selectedInstagramId, appliedDateRange, usernames.length ? usernames : undefined);
-            }}
-            disabled={isCompetitorLoading || !selectedInstagramId}
-            className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400"
-          >
-            {isCompetitorLoading ? "Memuat..." : "Bandingkan"}
-          </button>
+            <button 
+              onClick={() => {
+                let currentList = customCompetitorsList;
+                if (customCompetitorInput.trim()) {
+                  const newUsernames = customCompetitorInput.split(",").map(u => u.trim().replace(/^@/, "").toLowerCase()).filter(Boolean);
+                  currentList = Array.from(new Set([...customCompetitorsList, ...newUsernames]));
+                  setCustomCompetitorsList(currentList);
+                  setCustomCompetitorInput("");
+                }
+                void loadCompetitorBenchmark(selectedInstagramId, appliedDateRange, currentList.length ? currentList : undefined);
+              }}
+              disabled={isCompetitorLoading || !selectedInstagramId}
+              className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:bg-slate-400"
+            >
+              {isCompetitorLoading ? "Memuat..." : "Bandingkan"}
+            </button>
+          </div>
         </div>
 
         {isCompetitorLoading ? (

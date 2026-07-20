@@ -135,6 +135,19 @@ export default async function handler(request, response) {
     const apifyData = await fetchApifyData(usernames);
     const { results, warnings } = mapApifyToBenchmark(apifyData);
 
+    const authHeader = request.headers?.authorization || request.headers?.Authorization;
+    if (authHeader && results.length > 0) {
+      const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
+      fetch(`${apiBaseUrl.replace(/\/$/, "")}/api/meta/competitor-benchmark/save`, {
+        method: "POST",
+        headers: {
+          "Authorization": authHeader,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ competitors: results })
+      }).catch(err => console.error("Failed to save competitor benchmark to backend:", err));
+    }
+
     json(response, 200, {
       connected: true,
       source: "apify_instagram_scraper",
