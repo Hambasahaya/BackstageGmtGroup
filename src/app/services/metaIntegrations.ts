@@ -63,7 +63,7 @@ export type InstagramInsights = {
     ai_action?: string;
     ai_angle?: string;
     ai_status?: string;
-    ai_reasoning_source?: "alibaba" | "local" | "backend_ai";
+    ai_reasoning_source?: "alibaba" | "local" | "backend_ai" | "sosmed_agent_claude";
     insights?: {
       data?: Array<{
         name: string;

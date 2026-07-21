@@ -1896,7 +1896,7 @@ export function MarketingIntegrations() {
           <p className="text-xs font-semibold text-[#0F766E]">Aksi: {media.ai_action}</p>
         )}
         <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>
-          {media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Alibaba" : "Local"}
+          {media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Sosmed Agent Claude" : "Local"}
         </StatusBadge>
       </div>,
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",

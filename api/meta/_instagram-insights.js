@@ -215,7 +215,7 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
                   ai_action: reasoning?.action,
                   ai_angle: reasoning?.angle,
                   ai_status: reasoning?.status,
-                  ai_reasoning_source: reasoning?.reasoning ? "backend_ai" : "local",
+                  ai_reasoning_source: reasoning?.reasoning ? "sosmed_agent_claude" : "local",
                 };
               }),
               warning: null,
@@ -306,7 +306,7 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
           ai_action: reasoning?.action,
           ai_angle: reasoning?.angle,
           ai_status: reasoning?.status,
-          ai_reasoning_source: reasoning?.reasoning ? "backend_ai" : "local",
+          ai_reasoning_source: reasoning?.reasoning ? "sosmed_agent_claude" : "local",
         };
       }),
       warning: null,
@@ -939,7 +939,7 @@ const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
       ai_action: item.action || item.ai_action || "",
       ai_angle: item.angle || item.ai_angle || "",
       ai_status: item.status || item.ai_status || "",
-      ai_reasoning_source: (item.reasoning || item.ai_reasoning) ? "backend_ai" : "local",
+      ai_reasoning_source: (item.reasoning || item.ai_reasoning) ? "sosmed_agent_claude" : "local",
       insights: { data: insightsData }
     };
   });
