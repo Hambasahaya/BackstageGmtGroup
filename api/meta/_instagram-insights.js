@@ -182,7 +182,51 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
   const mediaPayload = getMediaReasoningPayload(mediaItems);
   const fallbackById = new Map(mediaPayload.map((item) => [item.id, item.fallbackReasoning]));
 
+  const igUserId = profile?.id;
+  const since = dateRange?.since;
+  const until = dateRange?.until;
+
   if (skipAi) {
+    // Attempt to read cached reasoning via GET /api/meta/insights/reasoning
+    if (igUserId && since && until) {
+      try {
+        const queryParams = new URLSearchParams({ ig_user_id: igUserId, since, until });
+        const getUrl = `${apiBaseUrl.replace(/\/$/, "")}/api/meta/insights/reasoning?${queryParams.toString()}`;
+        const getRes = await fetch(getUrl, {
+          headers: { ...(authHeader ? { Authorization: authHeader } : {}) },
+        });
+
+        if (getRes.ok) {
+          const getPayload = await getRes.json();
+          const items = Array.isArray(getPayload?.items) ? getPayload.items : [];
+          if (items.length > 0) {
+            const reasoningById = new Map(
+              items
+                .filter((item) => item?.id && (typeof item.reasoning === "string" || item.status || item.action))
+                .map((item) => [String(item.id), item]),
+            );
+
+            return {
+              data: mediaItems.map((media) => {
+                const reasoning = reasoningById.get(String(media.id));
+                return {
+                  ...media,
+                  ai_reasoning: reasoning?.reasoning || fallbackById.get(media.id),
+                  ai_action: reasoning?.action,
+                  ai_angle: reasoning?.angle,
+                  ai_status: reasoning?.status,
+                  ai_reasoning_source: reasoning?.reasoning ? "backend_ai" : "local",
+                };
+              }),
+              warning: null,
+            };
+          }
+        }
+      } catch (getErr) {
+        console.warn("[skipAi] Failed to fetch cached reasoning, using local fallback:", getErr.message);
+      }
+    }
+
     return {
       data: mediaItems.map((media) => ({
         ...media,
@@ -194,7 +238,6 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
   }
 
   // Filter posts to only include the last 7 days to save LLM tokens and prevent timeouts.
-  // We use mediaPayload because it contains the correct structure for the backend.
   const now = Date.now();
   const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
   const recentPosts = mediaPayload.filter(item => {
@@ -222,7 +265,7 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
         ...(authHeader ? { Authorization: authHeader } : {})
       },
       body: JSON.stringify({
-        ig_user_id: profile?.id,
+        ig_user_id: igUserId,
         dateRange,
         account: {
           username: profile?.username,
@@ -892,10 +935,11 @@ const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
       timestamp: item.timestamp || "",
       like_count: likesVal,
       comments_count: commentsVal,
-      ai_reasoning: item.reasoning,
-      ai_action: "",
-      ai_angle: "",
-      ai_reasoning_source: "database",
+      ai_reasoning: item.reasoning || item.ai_reasoning || "",
+      ai_action: item.action || item.ai_action || "",
+      ai_angle: item.angle || item.ai_angle || "",
+      ai_status: item.status || item.ai_status || "",
+      ai_reasoning_source: (item.reasoning || item.ai_reasoning) ? "backend_ai" : "local",
       insights: { data: insightsData }
     };
   });
