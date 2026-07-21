@@ -14,6 +14,7 @@ export function DashboardChatbot() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string>(() => `session-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -51,19 +52,15 @@ export function DashboardChatbot() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
-      const targetUrl = apiBaseUrl 
-        ? `${apiBaseUrl.replace(/\/$/, "")}/api/meta/role-chatbot` 
-        : "/api/meta/role-chatbot";
+      const targetUrl = "/api/chatbot";
 
       const response = await fetch(targetUrl, {
         method: "POST",
         headers,
         body: JSON.stringify({
+          session_id: sessionId,
           message: query,
-          context: "",
-          task: "social_media_dashboard",
-          client_key: "dashboard"
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
 
@@ -167,6 +164,7 @@ export function DashboardChatbot() {
 
   const handleResetChat = () => {
     setMessages([]);
+    setSessionId(`session-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`);
   };
 
   // Simple and premium React parser for chatbot markdown

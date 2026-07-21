@@ -13,6 +13,7 @@ import integrationsStatusHandler from "./_integrations-status.js";
 import instagramDashboardStoreHandler from "./_instagram-dashboard-store.js";
 import insightsReasoningHandler from "./_insights-reasoning.js";
 import insightsContentBriefHandler from "./_insights-content-brief.js";
+import insightsContentPlanHandler from "./_insights-content-plan.js";
 import insightsReferencesAnalysisHandler from "./_insights-references-analysis.js";
 import roleChatbotHandler from "./_role-chatbot.js";
 
@@ -31,6 +32,7 @@ const handlers = {
   "/api/meta/instagram-dashboard/store": instagramDashboardStoreHandler,
   "/api/meta/insights/reasoning": insightsReasoningHandler,
   "/api/meta/insights/content-brief": insightsContentBriefHandler,
+  "/api/meta/insights/content-plan": insightsContentPlanHandler,
   "/api/meta/insights/references-analysis": insightsReferencesAnalysisHandler,
   "/api/meta/role-chatbot": roleChatbotHandler,
 };

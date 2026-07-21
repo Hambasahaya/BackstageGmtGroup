@@ -62,7 +62,8 @@ export type InstagramInsights = {
     ai_reasoning?: string;
     ai_action?: string;
     ai_angle?: string;
-    ai_reasoning_source?: "alibaba" | "local";
+    ai_status?: string;
+    ai_reasoning_source?: "alibaba" | "local" | "backend_ai";
     insights?: {
       data?: Array<{
         name: string;
@@ -81,18 +82,30 @@ export type InstagramInsights = {
     };
   };
   contentBrief?: {
-    source: "alibaba";
+    source: string;
+    account?: string;
+    business_observation?: string;
+    performance_insights?: string[];
+    weekly_focus?: string;
     summary?: string;
+    execution_notes?: string[];
     items: Array<{
       day: string;
       format: string;
+      status?: "Proven" | "Eksperimen" | string;
       pillar?: string;
+      content_pillar?: "Edukasi" | "Branding" | "Informasi" | "Transaksional" | string;
       objective?: string;
       idea: string;
+      ide_utama?: string;
       formatGuide: string;
+      format_eksekusi?: string;
       action: string;
+      yang_dilakukan?: string;
       reason: string;
+      kenapa_format_ini?: string;
       impact: string;
+      dampaknya?: string;
       assistant?: {
         formatType?: string;
         caption?: {
@@ -390,4 +403,94 @@ export async function deleteContentBriefCache(igUserId: string) {
     method: "DELETE",
     query: { ig_user_id: igUserId },
   });
+}
+
+export async function fetchInsightsReasoning(payload: {
+  ig_user_id: string;
+  dateRange: { since: string; until: string };
+}) {
+  const response = await fetch("/api/meta/insights/reasoning", {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return readJsonResponse<{
+    items: Array<{
+      id: string;
+      reasoning: string;
+      action?: string;
+      angle?: string;
+      status?: string;
+    }>;
+    rows: Array<{
+      id: string;
+      content: string;
+      type: string;
+      reach: number;
+      views: number;
+      likes: number;
+      comments: number;
+      shares: number;
+      saves: number;
+      engagement_rate: number;
+      reasoning: string;
+      action?: string;
+      angle?: string;
+      status?: string;
+      link: string;
+    }>;
+  }>(response, "Failed to fetch post reasoning.");
+}
+
+export async function fetchCachedInsightsReasoning(params: {
+  ig_user_id: string;
+  since: string;
+  until: string;
+  post_id?: string;
+}) {
+  const query = new URLSearchParams({
+    ig_user_id: params.ig_user_id,
+    since: params.since,
+    until: params.until,
+  });
+  if (params.post_id) {
+    query.set("post_id", params.post_id);
+  }
+  const response = await fetch(`/api/meta/insights/reasoning?${query.toString()}`, {
+    method: "GET",
+    headers: getGetHeaders(),
+  });
+  return readJsonResponse<{
+    cached: boolean;
+    total: number;
+    filter: {
+      account: string;
+      since: string;
+      until: string;
+      post_id?: string;
+    };
+    items: Array<{
+      id: string;
+      reasoning: string;
+      action?: string;
+      angle?: string;
+      status?: string;
+    }>;
+  }>(response, "Failed to fetch cached post reasoning.");
+}
+
+export async function fetchContentPlan(payload: {
+  ig_user_id: string;
+  profile?: { username?: string };
+  dateRange: { since: string; until: string };
+  force_refresh?: boolean;
+}) {
+  const response = await fetch("/api/meta/insights/content-plan", {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return readJsonResponse<{
+    contentBrief: InstagramInsights["contentBrief"];
+  }>(response, "Failed to generate content plan.");
 }

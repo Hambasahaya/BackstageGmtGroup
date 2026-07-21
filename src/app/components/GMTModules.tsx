@@ -1862,6 +1862,13 @@ export function MarketingIntegrations() {
     return second.postedAtTime - first.postedAtTime;
   });
 
+  const getStatusTone = (status?: string): StatusTone => {
+    if (status === "Top Performer") return "green";
+    if (status === "Underperformer") return "red";
+    if (status === "Average") return "yellow";
+    return "blue";
+  };
+
   const contentRows = sortedContentTableItems.map((item) => {
     const { media, reach, likes, comments, shares, saves, views, engagementRate, reasoning } = item;
     return [
@@ -1877,9 +1884,20 @@ export function MarketingIntegrations() {
       formatNumber(shares),
       formatNumber(saves),
       formatPercent(engagementRate),
-      <div className="max-w-sm space-y-2">
+      <div className="max-w-sm space-y-1.5">
+        {media.ai_status && (
+          <div className="flex flex-wrap items-center gap-1">
+            <StatusBadge tone={getStatusTone(media.ai_status)}>{media.ai_status}</StatusBadge>
+            {media.ai_angle && <StatusBadge tone="teal">{media.ai_angle}</StatusBadge>}
+          </div>
+        )}
         <p className="text-xs leading-5 text-slate-600">{reasoning}</p>
-        <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>{media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Alibaba" : "Local"}</StatusBadge>
+        {media.ai_action && (
+          <p className="text-xs font-semibold text-[#0F766E]">Aksi: {media.ai_action}</p>
+        )}
+        <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>
+          {media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Alibaba" : "Local"}
+        </StatusBadge>
       </div>,
       media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
     ];
@@ -2689,10 +2707,13 @@ export function MarketingIntegrations() {
               <div key={`summary-${idea.day}`} className="rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge tone={contentBriefSource !== "local" ? "blue" : "slate"}>{contentBriefSource !== "local" ? "Alibaba" : "Local"}</StatusBadge>
+                  {idea.status && (
+                    <StatusBadge tone={idea.status === "Proven" ? "green" : "yellow"}>{idea.status}</StatusBadge>
+                  )}
                   <span className="text-xs font-semibold text-slate-500">{idea.day}</span>
                 </div>
                 <p className="mt-3 text-sm font-bold text-slate-950">{index + 1}. {idea.format}</p>
-                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{idea.idea}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{idea.ide_utama || idea.idea}</p>
                 {idea.objective ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{idea.objective}</p> : null}
               </div>
             ))}
@@ -2724,7 +2745,12 @@ export function MarketingIntegrations() {
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <StatusBadge tone={selectedContentIdea.format === "Reels" ? "blue" : selectedContentIdea.format === "Story" ? "yellow" : "teal"}>{selectedContentIdea.day}</StatusBadge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge tone={selectedContentIdea.format === "Reels" ? "blue" : selectedContentIdea.format === "Story" ? "yellow" : "teal"}>{selectedContentIdea.day}</StatusBadge>
+                        {selectedContentIdea.status && (
+                          <StatusBadge tone={selectedContentIdea.status === "Proven" ? "green" : "yellow"}>{selectedContentIdea.status}</StatusBadge>
+                        )}
+                      </div>
                       <h4 className="mt-3 text-xl font-bold text-slate-950">{selectedContentIdea.format}</h4>
                     </div>
                     <div className="text-left sm:text-right">
@@ -2735,15 +2761,15 @@ export function MarketingIntegrations() {
 
                   <div className="mt-5 rounded-lg bg-slate-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ide utama</p>
-                    <p className="mt-2 text-base font-semibold leading-7 text-slate-950">{selectedContentIdea.idea}</p>
+                    <p className="mt-2 text-base font-semibold leading-7 text-slate-950">{selectedContentIdea.ide_utama || selectedContentIdea.idea}</p>
                   </div>
 
-                  {(selectedContentIdea.pillar || selectedContentIdea.objective) && (
+                  {(selectedContentIdea.content_pillar || selectedContentIdea.pillar || selectedContentIdea.objective) && (
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      {selectedContentIdea.pillar && (
+                      {(selectedContentIdea.content_pillar || selectedContentIdea.pillar) && (
                         <div className="rounded-lg border border-slate-200 p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Content pillar</p>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.pillar}</p>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.content_pillar || selectedContentIdea.pillar}</p>
                         </div>
                       )}
                       {selectedContentIdea.objective && (
@@ -2758,22 +2784,22 @@ export function MarketingIntegrations() {
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="rounded-lg border border-slate-200 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Format eksekusi</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.formatGuide}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.format_eksekusi || selectedContentIdea.formatGuide}</p>
                     </div>
                     <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Kenapa format ini</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.reason}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.kenapa_format_ini || selectedContentIdea.reason}</p>
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Yang dilakukan</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.action}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{selectedContentIdea.yang_dilakukan || selectedContentIdea.action}</p>
                     </div>
                     <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Dampaknya</p>
-                      <p className="mt-2 text-sm leading-6 text-emerald-800">{selectedContentIdea.impact}</p>
+                      <p className="mt-2 text-sm leading-6 text-emerald-800">{selectedContentIdea.dampaknya || selectedContentIdea.impact}</p>
                     </div>
                   </div>
 

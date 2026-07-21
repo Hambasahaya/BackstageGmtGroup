@@ -222,6 +222,8 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
         ...(authHeader ? { Authorization: authHeader } : {})
       },
       body: JSON.stringify({
+        ig_user_id: profile?.id,
+        dateRange,
         account: {
           username: profile?.username,
           name: profile?.name,
@@ -229,7 +231,6 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
           followers_count: profile?.followers_count,
           website: profile?.website
         },
-        dateRange,
         posts: recentPosts
       })
     });
@@ -237,7 +238,11 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
     let items = [];
     if (postResponse.ok) {
       const postPayload = await postResponse.json();
-      items = Array.isArray(postPayload?.items) ? postPayload.items : [];
+      items = Array.isArray(postPayload?.rows) && postPayload.rows.length
+        ? postPayload.rows
+        : Array.isArray(postPayload?.items)
+          ? postPayload.items
+          : [];
     } else {
       const errorText = await postResponse.text();
       console.error("Insights reasoning POST failed:", postResponse.status, errorText);
@@ -245,18 +250,19 @@ const enrichMediaReasoning = async ({ mediaItems, profile, dateRange, skipAi, au
 
     const reasoningById = new Map(
       items
-        .filter((item) => item?.id && typeof item.reasoning === "string")
-        .map((item) => [item.id, item]),
+        .filter((item) => item?.id && (typeof item.reasoning === "string" || item.status || item.action))
+        .map((item) => [String(item.id), item]),
     );
 
     return {
       data: mediaItems.map((media) => {
-        const reasoning = reasoningById.get(media.id);
+        const reasoning = reasoningById.get(String(media.id));
         return {
           ...media,
           ai_reasoning: reasoning?.reasoning || fallbackById.get(media.id),
           ai_action: reasoning?.action,
           ai_angle: reasoning?.angle,
+          ai_status: reasoning?.status,
           ai_reasoning_source: reasoning?.reasoning ? "backend_ai" : "local",
         };
       }),
@@ -703,20 +709,26 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
   const profileViews = getMetricSum("profile_views");
   const followersGrowth = getMetricSum("follower_count") || getMetricSum("follows_and_unfollows");
   
-  const content = mediaItems.map(item => {
+  const posts = mediaItems.map(item => {
     const reachVal = getMediaMetricValue(item, "reach", "accounts_reached") || 0;
     const likesVal = item.like_count || 0;
     const commentsVal = item.comments_count || 0;
     const sharesVal = getMediaMetricValue(item, "shares") || 0;
     const savesVal = getMediaMetricValue(item, "saved", "saves") || 0;
     const viewsVal = getMediaMetricValue(item, "impressions", "views", "plays") || 0;
+    const watchTimeVal = getMediaMetricValue(item, "ig_reels_video_view_total_time") || 0;
     const interactionsVal = getMediaMetricValue(item, "total_interactions") ?? (likesVal + commentsVal + sharesVal + savesVal);
     const engagementRateVal = reachVal ? (interactionsVal / reachVal) * 100 : 0;
     
     return {
-      id: item.id,
+      id: String(item.id),
       caption: item.caption || "",
+      media_type: item.media_type || "IMAGE",
+      contentType: getContentType(item),
       type: getContentType(item),
+      permalink: item.permalink || "",
+      link: item.permalink || "",
+      timestamp: item.timestamp || "",
       reach: reachVal,
       views: viewsVal,
       likes: likesVal,
@@ -725,16 +737,24 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
       saves: savesVal,
       engagement_rate: Math.round(engagementRateVal * 100) / 100,
       reasoning: item.ai_reasoning || item.fallbackReasoning || "",
-      link: item.permalink || ""
+      metrics: {
+        reach: reachVal,
+        views: viewsVal,
+        likes: likesVal,
+        comments: commentsVal,
+        shares: sharesVal,
+        saves: savesVal,
+        watch_time: watchTimeVal,
+      }
     };
   });
 
-  const avgEngagementRate = content.length ? content.reduce((sum, c) => sum + c.engagement_rate, 0) / content.length : 0;
+  const avgEngagementRate = posts.length ? posts.reduce((sum, c) => sum + c.engagement_rate, 0) / posts.length : 0;
   const followers = profile.followers_count || 0;
   const followerGrowthRate = followers ? (followersGrowth / followers) * 100 : 0;
 
   const hashtagsMap = new Map();
-  content.forEach(item => {
+  posts.forEach(item => {
     const tags = item.caption.match(/#[a-zA-Z0-9_]+/g) || [];
     tags.forEach(tag => {
       const normalized = tag.toLowerCase();
@@ -766,9 +786,20 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
     objective: item.objective || "Engagement"
   }));
 
+  const audienceObj = {
+    age: audience?.demographics?.age || [],
+    gender: audience?.demographics?.gender || [],
+    city: audience?.demographics?.city || [],
+    country: audience?.demographics?.country || []
+  };
+
   return {
-    ig_user_id: profile.id,
-    ig_username: profile.username,
+    ig_user_id: String(profile.id),
+    ig_username: profile.username || "",
+    dateRange: {
+      since: dateRange.since,
+      until: dateRange.until,
+    },
     since: dateRange.since,
     until: dateRange.until,
     followers,
@@ -782,13 +813,10 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
     account_impressions: impressions,
     avg_engagement_rate: Math.round(avgEngagementRate * 100) / 100,
     follower_growth_rate: Math.round(followerGrowthRate * 100) / 100,
-    audience_demographics: {
-      age: audience?.demographics?.age || [],
-      gender: audience?.demographics?.gender || [],
-      city: audience?.demographics?.city || [],
-      country: audience?.demographics?.country || []
-    },
-    content,
+    audience: audienceObj,
+    audience_demographics: audienceObj,
+    posts: posts,
+    content: posts,
     best_time_to_post: bestTime,
     frequency_correlation: {
       summary: `Posting ${Math.round((mediaItems.length / 4) * 10) / 10}x/minggu memberi engagement stabil.`
@@ -799,7 +827,10 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
 };
 
 const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
-  const dateRange = { since: dbData.since, until: dbData.until };
+  const dateRange = {
+    since: dbData.dateRange?.since || dbData.since,
+    until: dbData.dateRange?.until || dbData.until
+  };
   const profile = {
     id: dbData.ig_user_id,
     username: dbData.ig_username,
@@ -807,7 +838,7 @@ const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
     biography: "",
     followers_count: dbData.followers,
     follows_count: dbData.follows_count || 0,
-    media_count: dbData.content_count || dbData.content?.length || 0,
+    media_count: dbData.content_count || dbData.posts?.length || dbData.content?.length || 0,
     profile_picture_url: "",
     website: ""
   };
@@ -816,42 +847,51 @@ const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
     {
       name: "reach",
       period: "day",
-      values: [{ value: dbData.reach, end_time: `${dbData.until}T00:00:00+0000` }]
+      values: [{ value: dbData.reach, end_time: `${dateRange.until}T00:00:00+0000` }]
     },
     {
       name: "views",
       period: "day",
-      values: [{ value: dbData.impressions, end_time: `${dbData.until}T00:00:00+0000` }]
+      values: [{ value: dbData.impressions, end_time: `${dateRange.until}T00:00:00+0000` }]
     },
     {
       name: "profile_views",
       period: "day",
-      values: [{ value: dbData.profile_views, end_time: `${dbData.until}T00:00:00+0000` }]
+      values: [{ value: dbData.profile_views, end_time: `${dateRange.until}T00:00:00+0000` }]
     },
     {
       name: "follower_count",
       period: "day",
-      values: [{ value: dbData.followers_growth, end_time: `${dbData.until}T00:00:00+0000` }]
+      values: [{ value: dbData.followers_growth, end_time: `${dateRange.until}T00:00:00+0000` }]
     }
   ];
 
-  const media = (dbData.content || []).map(item => {
+  const postsList = dbData.posts || dbData.content || [];
+  const media = postsList.map(item => {
+    const reachVal = item.metrics?.reach ?? item.reach ?? 0;
+    const viewsVal = item.metrics?.views ?? item.views ?? 0;
+    const sharesVal = item.metrics?.shares ?? item.shares ?? 0;
+    const savesVal = item.metrics?.saves ?? item.saves ?? 0;
+    const likesVal = item.metrics?.likes ?? item.likes ?? 0;
+    const commentsVal = item.metrics?.comments ?? item.comments ?? 0;
+    const itemType = item.contentType || item.type || "Feed";
+
     const insightsData = [
-      { name: "reach", values: [{ value: item.reach }] },
-      { name: "views", values: [{ value: item.views }] },
-      { name: "shares", values: [{ value: item.shares || 0 }] },
-      { name: "saves", values: [{ value: item.saves || 0 }] }
+      { name: "reach", values: [{ value: reachVal }] },
+      { name: "views", values: [{ value: viewsVal }] },
+      { name: "shares", values: [{ value: sharesVal }] },
+      { name: "saves", values: [{ value: savesVal }] }
     ];
 
     return {
-      id: item.id,
+      id: String(item.id),
       caption: item.caption,
-      media_type: item.type === "Carousel" ? "CAROUSEL_ALBUM" : item.type === "Reels" ? "VIDEO" : "IMAGE",
-      media_product_type: item.type === "Reels" ? "REELS" : "FEED",
-      permalink: item.link,
-      timestamp: "",
-      like_count: item.likes,
-      comments_count: item.comments,
+      media_type: item.media_type || (itemType === "Carousel" ? "CAROUSEL_ALBUM" : itemType === "Reels" ? "VIDEO" : "IMAGE"),
+      media_product_type: itemType === "Reels" ? "REELS" : itemType === "Story" ? "STORY" : "FEED",
+      permalink: item.permalink || item.link || "",
+      timestamp: item.timestamp || "",
+      like_count: likesVal,
+      comments_count: commentsVal,
       ai_reasoning: item.reasoning,
       ai_action: "",
       ai_angle: "",
@@ -861,13 +901,14 @@ const mapDashboardDbToInsights = (dbData, pageId, pageName) => {
   });
 
   const onlineFollowers = dbData.best_time_to_post?.hour ? [{ label: dbData.best_time_to_post.hour, value: 100 }] : [];
+  const audienceObj = dbData.audience || dbData.audience_demographics || {};
   const audience = {
     onlineFollowers,
     demographics: {
-      age: dbData.audience_demographics?.age || [],
-      gender: dbData.audience_demographics?.gender || [],
-      city: dbData.audience_demographics?.city || [],
-      country: dbData.audience_demographics?.country || []
+      age: audienceObj.age || [],
+      gender: audienceObj.gender || [],
+      city: audienceObj.city || [],
+      country: audienceObj.country || []
     }
   };
 

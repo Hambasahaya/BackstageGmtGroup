@@ -4,7 +4,7 @@ import { json } from "./_meta-client.js";
 const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 export default async function handler(request, response) {
-  response.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
 
   if (request.method === "OPTIONS") {
@@ -48,12 +48,7 @@ export default async function handler(request, response) {
         request.on("error", reject);
       });
 
-      const { account, dateRange, posts } = body;
-      if (!posts || !Array.isArray(posts)) {
-        json(response, 400, { error: "Missing or invalid posts array" });
-        return;
-      }
-      fetchOptions.body = JSON.stringify({ account, dateRange, posts });
+      fetchOptions.body = JSON.stringify(body);
     }
 
     const backendResponse = await fetch(targetUrl, fetchOptions);
