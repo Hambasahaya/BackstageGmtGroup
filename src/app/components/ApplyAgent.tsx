@@ -55,7 +55,7 @@ const verificationInitial: VerificationForm = {
   domicile: "",
 };
 
-const TERMS_PDF_URL = "/nda/NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE.pdf";
+const TERMS_PDF_URL = encodeURI("/nda/NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE.pdf");
 
 function TextField({
   label,
@@ -280,7 +280,6 @@ export function ApplyAgent() {
     !verificationForm.account_number.trim() ||
     !verificationForm.tempat_lahir.trim() ||
     !verificationForm.tanggal_lahir.trim() ||
-    !(verificationForm.domicile ?? "").trim() ||
     !verificationForm.full_address.trim() ||
     !applyForm.agent_motivation.trim() ||
     (applyForm.referral_source === "teman_kerabat" && !applyForm.referral_name?.trim()) ||
@@ -290,15 +289,15 @@ export function ApplyAgent() {
   useEffect(() => {
     fetch("https://raw.githubusercontent.com/Caknoooo/provinces-cities-indonesia/master/json/regencies.json")
       .then((res) => res.json())
-      .then((data) => setRegions(data))
-      .catch(() => {});
+      .then((data) => setRegions(Array.isArray(data) ? data : []))
+      .catch(() => setRegions([]));
   }, []);
 
   const syncLatestStatus = useCallback(async () => {
     try {
       const latestUser = await refreshStoredUser();
-      setStatus(latestUser.detail_user?.status ?? null);
-      setIsVerificationCompleted(hasCompletedVerification(latestUser.detail_user));
+      setStatus(latestUser?.detail_user?.status ?? null);
+      setIsVerificationCompleted(hasCompletedVerification(latestUser?.detail_user));
     } catch {
     }
   }, []);
@@ -345,9 +344,11 @@ export function ApplyAgent() {
         ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
       });
 
-      saveAuthSession(getAuthToken() ?? "", verificationResponse.user);
-      setStatus(verificationResponse.user.detail_user?.status ?? "verif");
-      setIsVerificationCompleted(true);
+      if (verificationResponse?.user) {
+        saveAuthSession(getAuthToken() ?? "", verificationResponse.user);
+        setStatus(verificationResponse.user.detail_user?.status ?? "verif");
+        setIsVerificationCompleted(hasCompletedVerification(verificationResponse.user.detail_user));
+      }
       setApplyForm(applyInitial);
       setVerificationForm(verificationInitial);
       const message = response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.";
@@ -387,9 +388,11 @@ export function ApplyAgent() {
         ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
       });
       const token = getAuthToken() ?? "";
-      saveAuthSession(token, response.user);
-      setStatus(response.user.detail_user?.status ?? "verif");
-      setIsVerificationCompleted(true);
+      if (response?.user) {
+        saveAuthSession(token, response.user);
+        setStatus(response.user.detail_user?.status ?? "verif");
+        setIsVerificationCompleted(hasCompletedVerification(response.user.detail_user));
+      }
       const message = response.message || "Data verifikasi berhasil dilengkapi.";
       setSuccessMessage(message);
       setFeedbackDialog({

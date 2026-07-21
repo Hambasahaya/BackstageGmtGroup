@@ -53,7 +53,22 @@ export function MyGmtEntry() {
           // Session response is enough for a role-based fallback.
         }
 
-        navigate(getRoleHomePath(user), { replace: true });
+        const targetClient = searchParams.get("target_client") || searchParams.get("client");
+        const rawRedirect =
+          searchParams.get("redirect") ||
+          searchParams.get("source_url") ||
+          searchParams.get("return_url") ||
+          searchParams.get("origin_url");
+
+        const destination =
+          rawRedirect ||
+          (targetClient ? `/sso/start?${searchParams.toString()}` : getRoleHomePath(user));
+
+        if (/^https?:\/\//i.test(destination)) {
+          window.location.href = destination;
+        } else {
+          navigate(destination, { replace: true });
+        }
       } catch {
         if (isActive) {
           navigate(`/register?redirect=${encodeURIComponent("/apply-agent")}`, { replace: true });

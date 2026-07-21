@@ -16,18 +16,45 @@ export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const storedUser = getStoredUser();
+  const token = getAuthToken();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const redirectPath = useMemo(() => searchParams.get("redirect") || "", [searchParams]);
+
+  const targetClient = searchParams.get("target_client") || searchParams.get("client");
+  const rawRedirect =
+    searchParams.get("redirect") ||
+    searchParams.get("source_url") ||
+    searchParams.get("return_url") ||
+    searchParams.get("origin_url");
+
+  const redirectTarget = useMemo(() => {
+    if (rawRedirect) {
+      return rawRedirect;
+    }
+    if (targetClient) {
+      return `/sso/start?${searchParams.toString()}`;
+    }
+    return "";
+  }, [rawRedirect, targetClient, searchParams]);
+
+  const performRedirect = (user: UserSession) => {
+    const destination = redirectTarget || getRoleHomePath(user);
+    if (/^https?:\/\//i.test(destination)) {
+      window.location.href = destination;
+    } else {
+      navigate(destination, { replace: true });
+    }
+  };
 
   useEffect(() => {
     rememberLoginSourceFromPage(searchParams);
   }, [searchParams]);
 
-  if (getAuthToken() && storedUser) {
-    return <Navigate to={redirectPath || getRoleHomePath(storedUser)} replace />;
+  if (token && storedUser) {
+    performRedirect(storedUser);
+    return null;
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -44,7 +71,7 @@ export function Login() {
       } catch {
         // Login response still carries role for the normal redirect path.
       }
-      navigate(redirectPath || getRoleHomePath(user), { replace: true });
+      performRedirect(user);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Login gagal. Periksa email dan password.");
     } finally {
