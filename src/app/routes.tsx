@@ -18,6 +18,8 @@ import { MyGmtEntry } from "./components/MyGmtEntry";
 import { Register } from "./components/Register";
 import { SalesOrders } from "./components/SalesOrders";
 import { SsoCallback } from "./components/SsoCallback";
+import { SsoStart } from "./components/SsoStart";
+import { ErrorPage, NotFoundPage } from "./components/ErrorPage";
 import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
 import { SuperAdminOnboardingVideos } from "./components/SuperAdminOnboardingVideos";
 import { ProductManagement } from "./components/ProductManagement";
@@ -80,29 +82,45 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     Component: Login,
+    errorElement: <ErrorPage />,
   },
   {
     path: "/forgot-password",
     Component: ForgotPassword,
+    errorElement: <ErrorPage />,
   },
   {
     path: "/reset-password",
     Component: ResetPassword,
+    errorElement: <ErrorPage />,
   },
   {
     path: "/register",
     Component: Register,
+    errorElement: <ErrorPage />,
   },
   {
     path: "/mygmt",
     Component: MyGmtEntry,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/sso/start",
+    Component: SsoStart,
+    errorElement: <ErrorPage />,
   },
   {
     path: "/sso/callback",
     Component: SsoCallback,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "*",
+    Component: NotFoundPage,
   },
   {
     path: "/",
+    errorElement: <ErrorPage />,
     element: (
       <AuthGate>
         <Layout />
