@@ -3,6 +3,7 @@ import {
   Check,
   Edit3,
   Eye,
+  Image as ImageIcon,
   Layers,
   Loader2,
   Package,
@@ -712,6 +713,204 @@ export function ProductManagement() {
     reader.readAsText(file);
   };
 
+  // Handle Bulk Image / CSV Foto Import
+  const handleBulkImageImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const fileList = Array.from(e.target.files);
+    e.target.value = "";
+
+    const csvFiles = fileList.filter((f) => f.name.toLowerCase().endsWith(".csv"));
+    const imageFiles = fileList.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|svg)$/i.test(f.name));
+
+    if (csvFiles.length === 0 && imageFiles.length === 0) {
+      void Swal.fire({
+        icon: "warning",
+        title: "File Tidak Valid",
+        text: "Pilihlah file foto (JPG, PNG, WEBP) atau file CSV yang berisi pemetaan nama produk dan foto.",
+        confirmButtonColor: "#0F766E",
+      });
+      return;
+    }
+
+    void Swal.fire({
+      title: "Memproses Deteksi Gambar...",
+      html: "Mengambil data produk saat ini...",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
+    try {
+      const currentProductsResponse = await api.products();
+      const currentProducts = currentProductsResponse.products || [];
+
+      if (currentProducts.length === 0) {
+        void Swal.fire({
+          icon: "warning",
+          title: "Katalog Produk Kosong",
+          text: "Belum ada produk di database untuk dicocokkan dengan gambar.",
+          confirmButtonColor: "#0F766E",
+        });
+        return;
+      }
+
+      // Build CSV name-to-photo map if CSV uploaded
+      const csvMap = new Map<string, string>();
+      if (csvFiles.length > 0) {
+        const csvText = await csvFiles[0].text();
+        const rows = parseCSV(csvText);
+        if (rows.length >= 2) {
+          const headers = rows[0].map((h) => h.trim().toLowerCase());
+          let nameIdx = headers.indexOf("model");
+          if (nameIdx === -1) nameIdx = headers.indexOf("namaproduct");
+          if (nameIdx === -1) nameIdx = headers.indexOf("name");
+          if (nameIdx === -1) nameIdx = headers.indexOf("nama");
+
+          let photoIdx = headers.indexOf("foto");
+          if (photoIdx === -1) photoIdx = headers.indexOf("gambar");
+          if (photoIdx === -1) photoIdx = headers.indexOf("filename");
+          if (photoIdx === -1) photoIdx = headers.indexOf("image");
+
+          if (nameIdx !== -1 && photoIdx !== -1) {
+            rows.slice(1).forEach((r) => {
+              const pName = r[nameIdx]?.trim().toLowerCase();
+              const pPhoto = r[photoIdx]?.trim().toLowerCase();
+              if (pName && pPhoto) {
+                csvMap.set(pPhoto, pName);
+                csvMap.set(pName, pPhoto);
+              }
+            });
+          }
+        }
+      }
+
+      let updatedCount = 0;
+      let failedCount = 0;
+      const unmatchedFiles: string[] = [];
+      const updatedProducts: string[] = [];
+
+      // Helper to match an image file to a product
+      const findProduct = (imgFile: File) => {
+        const fullFileName = imgFile.name.trim();
+        const fileNameLower = fullFileName.toLowerCase();
+        const baseName = fullFileName.replace(/\.[^/.]+$/, "").trim();
+        const baseNameLower = baseName.toLowerCase();
+        const cleanBase = baseNameLower.replace(/[^a-z0-9]/g, "");
+
+        // 1. Check CSV map if available
+        if (csvMap.has(fileNameLower) || csvMap.has(baseNameLower)) {
+          const mappedName = csvMap.get(fileNameLower) || csvMap.get(baseNameLower);
+          const matched = currentProducts.find((p) => p.namaproduct?.toLowerCase().trim() === mappedName);
+          if (matched) return matched;
+        }
+
+        // 2. Exact match on namaproduct
+        let matched = currentProducts.find((p) => p.namaproduct?.toLowerCase().trim() === baseNameLower);
+        if (matched) return matched;
+
+        // 3. Clean alphanumeric match
+        matched = currentProducts.find((p) => (p.namaproduct || "").toLowerCase().replace(/[^a-z0-9]/g, "") === cleanBase);
+        if (matched) return matched;
+
+        // 4. Substring match (if cleanBase length >= 3)
+        if (cleanBase.length >= 3) {
+          matched = currentProducts.find((p) => {
+            const pClean = (p.namaproduct || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+            return pClean.length >= 3 && (pClean.includes(cleanBase) || cleanBase.includes(pClean));
+          });
+          if (matched) return matched;
+        }
+
+        return null;
+      };
+
+      for (let i = 0; i < imageFiles.length; i++) {
+        const imgFile = imageFiles[i];
+        const product = findProduct(imgFile);
+
+        Swal.update({
+          html: `Mendeteksi & mengunggah foto <b>${i + 1}</b> dari <b>${imageFiles.length}</b>...<br/>
+                 <span class="text-xs text-slate-500">File: ${imgFile.name}</span>`
+        });
+
+        if (!product) {
+          unmatchedFiles.push(imgFile.name);
+          continue;
+        }
+
+        try {
+          const formData = new FormData();
+          formData.append("namaproduct", product.namaproduct);
+          formData.append("deskripsi", product.deskripsi || "");
+          formData.append("unit", product.unit || "paket");
+          formData.append("price", String(product.price));
+          formData.append("status", product.status || "tersedia");
+          formData.append("komisi", String(product.komisi || 0));
+          formData.append("foto", imgFile);
+          if (product.commission_tiers && Object.keys(product.commission_tiers).length > 0) {
+            formData.append("commission_tiers", JSON.stringify(product.commission_tiers));
+          }
+
+          await api.updateProduct(product.id, formData);
+          updatedCount++;
+          updatedProducts.push(`${product.namaproduct} (${imgFile.name})`);
+        } catch {
+          failedCount++;
+        }
+      }
+
+      await Swal.fire({
+        icon: updatedCount > 0 ? "success" : "info",
+        title: "Import Gambar Foto Selesai",
+        html: `<div class="text-left space-y-2">
+                <p>Hasil deteksi otomatis nama produk & pembaruan foto:</p>
+                <ul class="list-disc pl-5 text-sm space-y-1">
+                  <li>Produk Berhasil Diperbarui: <b class="text-emerald-600">${updatedCount}</b></li>
+                  <li>Foto Tidak Cocok (Diabaikan): <b class="text-amber-600">${unmatchedFiles.length}</b></li>
+                  ${failedCount > 0 ? `<li>Gagal Diunggah: <b class="text-rose-600">${failedCount}</b></li>` : ""}
+                </ul>
+                ${
+                  updatedProducts.length > 0
+                    ? `
+                  <div className="mt-2 rounded bg-emerald-50 p-2 text-xs text-emerald-800 border border-emerald-200">
+                    <b>Produk yang terupdate:</b>
+                    <div className="max-h-24 overflow-y-auto mt-1 space-y-0.5">
+                      ${updatedProducts.slice(0, 8).map((p) => `<div>✓ ${p}</div>`).join("")}
+                      ${updatedProducts.length > 8 ? `<div>...dan ${updatedProducts.length - 8} produk lainnya</div>` : ""}
+                    </div>
+                  </div>
+                `
+                    : ""
+                }
+                ${
+                  unmatchedFiles.length > 0
+                    ? `
+                  <div className="mt-2 rounded bg-amber-50 p-2 text-xs text-amber-800 border border-amber-200">
+                    <b>Foto tidak menemukan nama produk cocok (${unmatchedFiles.length}):</b>
+                    <div className="max-h-24 overflow-y-auto mt-1 space-y-0.5 font-mono">
+                      ${unmatchedFiles.slice(0, 8).map((f) => `<div>• ${f}</div>`).join("")}
+                      ${unmatchedFiles.length > 8 ? `<div>...dan ${unmatchedFiles.length - 8} foto lainnya</div>` : ""}
+                    </div>
+                  </div>
+                `
+                    : ""
+                }
+               </div>`,
+        confirmButtonColor: "#0F766E",
+      });
+
+      await loadProducts();
+    } catch (error) {
+      void Swal.fire({
+        icon: "error",
+        title: "Import Gambar Gagal",
+        text: error instanceof Error ? error.message : "Terjadi kesalahan saat memproses gambar.",
+        confirmButtonColor: "#0F766E",
+      });
+    }
+  };
+
   // Filtered products list for rendering
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -836,6 +1035,18 @@ export function ProductManagement() {
               type="file"
               accept=".csv"
               onChange={handleCSVImport}
+              className="sr-only"
+            />
+          </label>
+
+          <label className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-350 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm cursor-pointer transition hover:bg-slate-50 focus-within:ring-2 focus-within:ring-teal-500" title="Unggah foto produk atau file CSV untuk deteksi & pembaruan foto otomatis">
+            <ImageIcon className="h-4 w-4 text-slate-500" />
+            Import Gambar Foto
+            <input
+              type="file"
+              accept="image/*,.csv"
+              multiple
+              onChange={handleBulkImageImport}
               className="sr-only"
             />
           </label>

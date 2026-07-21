@@ -763,6 +763,9 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
     const interactionsVal = getMediaMetricValue(item, "total_interactions") ?? (likesVal + commentsVal + sharesVal + savesVal);
     const engagementRateVal = reachVal ? (interactionsVal / reachVal) * 100 : 0;
     
+    const isAiReasoning = Boolean(item.ai_reasoning_source && item.ai_reasoning_source !== "local");
+    const reasoningVal = isAiReasoning ? (item.ai_reasoning || "") : "";
+
     return {
       id: String(item.id),
       caption: item.caption || "",
@@ -779,7 +782,10 @@ const mapInsightsToDashboardDb = (profile, insights, mediaWithReasoning, audienc
       shares: sharesVal,
       saves: savesVal,
       engagement_rate: Math.round(engagementRateVal * 100) / 100,
-      reasoning: item.ai_reasoning || item.fallbackReasoning || "",
+      reasoning: reasoningVal,
+      action: isAiReasoning ? (item.ai_action || "") : "",
+      angle: isAiReasoning ? (item.ai_angle || "") : "",
+      status: isAiReasoning ? (item.ai_status || "") : "",
       metrics: {
         reach: reachVal,
         views: viewsVal,
