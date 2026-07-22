@@ -19,7 +19,7 @@ export default async function handler(request, response) {
     const { META_APP_ID, META_REDIRECT_URI } = getRequiredConfig();
     const scopes =
       process.env.META_SCOPES ||
-      "pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights,instagram_content_publish";
+      "pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_insights,instagram_manage_comments,instagram_content_publish";
     const state = process.env.META_OAUTH_STATE || "";
     const url = new URL(`https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`);
 

@@ -653,7 +653,7 @@ const getRecentMedia = async ({ igUserId, accessToken, since, until }) => {
       `/${igUserId}/media`,
       {
         fields:
-          "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,insights.metric(reach,total_interactions,saved)",
+          "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,comments.limit(50){id,text,username,timestamp},insights.metric(reach,total_interactions,saved)",
         limit: Math.max(1, Math.min(Number(process.env.META_MEDIA_LIMIT || 25), 100)),
         since,
         until,

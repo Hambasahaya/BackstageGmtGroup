@@ -66,6 +66,11 @@ import {
 import { apiRequest } from "../services/api";
 import { fetchKeywordResearch, type KeywordResearchResponse } from "../services/seoIntegrations";
 import { fetchWebsiteAnalytics, type WebsiteAnalyticsResponse } from "../services/websiteAnalytics";
+import {
+  isSocialAgentConfigured,
+  syncAndFetchSocialAgent,
+  type SocialAgentBundle,
+} from "../services/socialMediaAgent";
 
 type StatusTone = "green" | "yellow" | "red" | "blue" | "slate" | "teal";
 
@@ -1083,6 +1088,9 @@ export function MarketingIntegrations() {
   const defaultDateRange = getDefaultInstagramDateRange();
   const [metaHealth, setMetaHealth] = useState<MetaAccountHealth | null>(null);
   const [instagramInsights, setInstagramInsights] = useState<InstagramInsights | null>(null);
+  const [socialAgent, setSocialAgent] = useState<SocialAgentBundle | null>(null);
+  const [socialAgentError, setSocialAgentError] = useState("");
+  const [isSocialAgentLoading, setIsSocialAgentLoading] = useState(false);
   const [competitorBenchmark, setCompetitorBenchmark] = useState<CompetitorBenchmark | null>(null);
   const [selectedInstagramId, setSelectedInstagramId] = useState("");
   const [metaError, setMetaError] = useState("");
@@ -1360,6 +1368,34 @@ export function MarketingIntegrations() {
       }
 
       setInstagramInsights(insightsData);
+      if (isSocialAgentConfigured()) {
+        setIsSocialAgentLoading(true);
+        setSocialAgentError("");
+        void syncAndFetchSocialAgent(insightsData, dateRange)
+          .then((result) => {
+            setSocialAgent(result);
+            const reasoning = new Map(
+              (result.reasoning.data || []).map((item) => [String(item.ig_media_id), item]),
+            );
+            setInstagramInsights((current) => current ? {
+              ...current,
+              media: current.media.map((item) => {
+                const ai = reasoning.get(String(item.id));
+                if (!ai) return item;
+                return {
+                  ...item,
+                  ai_reasoning: ai.ai_reasoning || item.ai_reasoning,
+                  ai_action: Array.isArray(ai.ai_action) ? ai.ai_action.join(" ") : ai.ai_action || item.ai_action,
+                  ai_angle: ai.ai_topic_badge || item.ai_angle,
+                  ai_status: ai.ai_performance_badge || item.ai_status,
+                  ai_reasoning_source: "sosmed_agent_claude",
+                };
+              }),
+            } : current);
+          })
+          .catch((error) => setSocialAgentError(error instanceof Error ? error.message : "Social Media Agent gagal dimuat."))
+          .finally(() => setIsSocialAgentLoading(false));
+      }
       void loadCompetitorBenchmark(igUserId, dateRange);
     } catch (error) {
       setInstagramInsights(null);
@@ -2180,6 +2216,52 @@ export function MarketingIntegrations() {
           {metaError || metaHealth?.error}
         </div>
       )}
+      <SectionCard icon={Brain} title="Social Media AI Agent" description="Analitik dan rangkuman AI dari service Social Media Agent terpisah.">
+        {!isSocialAgentConfigured() ? (
+          <EmptyState text="Atur VITE_SOSMED_AGENT_BASE_URL untuk mengaktifkan sinkronisasi dan analitik Social Media Agent." />
+        ) : isSocialAgentLoading ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            {[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-lg bg-slate-100" />)}
+          </div>
+        ) : socialAgentError ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{socialAgentError}</div>
+        ) : socialAgent ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone="green">Synced</StatusBadge>
+                <span className="text-xs font-semibold text-slate-600">@{socialAgent.account.username}</span>
+                <span className="text-xs text-slate-500">UUID {socialAgent.account.id}</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-700">{socialAgent.summary.summary || "Ringkasan AI belum tersedia."}</p>
+              {socialAgent.summary.key_points?.length ? (
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                  {socialAgent.summary.key_points.map((point) => <li key={point}>{point}</li>)}
+                </ul>
+              ) : null}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ["Positive", socialAgent.sentiment.sentiment?.positive, "green" as StatusTone],
+                ["Neutral", socialAgent.sentiment.sentiment?.neutral, "slate" as StatusTone],
+                ["Negative", socialAgent.sentiment.sentiment?.negative, "red" as StatusTone],
+                ["Komentar dianalisis", socialAgent.sentiment.analyzed_comments_count, "blue" as StatusTone],
+              ].map(([label, value, tone]) => (
+                <div key={String(label)} className="rounded-lg border border-slate-200 p-3">
+                  <StatusBadge tone={tone as StatusTone}>{String(label)}</StatusBadge>
+                  <p className="mt-2 text-xl font-bold text-slate-950">{label === "Komentar dianalisis" ? formatNumber(value as number) : `${value ?? 0}%`}</p>
+                </div>
+              ))}
+            </div>
+            {socialAgent.sentiment.summary ? <p className="text-sm leading-6 text-slate-600">{socialAgent.sentiment.summary}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              {[...(socialAgent.sentiment.keywords || []), ...(socialAgent.sentiment.suggested_hashtags || [])].map((item) => (
+                <span key={item} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{item}</span>
+              ))}
+            </div>
+          </div>
+        ) : <EmptyState text="Data Agent akan dimuat setelah data Instagram tersedia." />}
+      </SectionCard>
       <SectionCard icon={Instagram} title="Account / Profile Level" description="Metrik profil dan aktivitas akun Instagram yang dipilih.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {accountMetrics.map((metric) => (
