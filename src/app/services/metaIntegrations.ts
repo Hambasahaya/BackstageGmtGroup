@@ -55,6 +55,8 @@ export type InstagramInsights = {
     caption?: string;
     media_type?: string;
     media_product_type?: string;
+    media_url?: string;
+    thumbnail_url?: string;
     permalink?: string;
     timestamp?: string;
     like_count?: number;
@@ -78,6 +80,7 @@ export type InstagramInsights = {
   audience?: {
     onlineFollowers?: Array<{ label: string; value: number }>;
     demographics?: {
+      ageGender?: Array<{ label: string; value: number }>;
       age?: Array<{ label: string; value: number }>;
       gender?: Array<{ label: string; value: number }>;
       city?: Array<{ label: string; value: number }>;
@@ -239,16 +242,36 @@ function getGetHeaders() {
   }
   return headers;
 }
+const INTEGRATIONS_TIMEOUT_MS = 5 * 60 * 1000;
+
+async function integrationFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), INTEGRATIONS_TIMEOUT_MS);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Proses Integrations melewati batas waktu 5 menit. Silakan coba kembali.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 
 export async function fetchMetaAuthUrl() {
-  const response = await fetch("/api/meta/auth-url", {
+  const response = await integrationFetch("/api/meta/auth-url", {
     headers: getGetHeaders(),
   });
   return readJsonResponse<{ url: string; scopes: string[] }>(response, "Failed to create Meta OAuth URL.");
 }
 
 export async function fetchMetaAccounts() {
-  const response = await fetch("/api/meta/accounts", {
+  const response = await integrationFetch("/api/meta/accounts", {
     headers: getGetHeaders(),
   });
   return readJsonResponse<MetaAccountHealth>(response, "Failed to fetch Meta accounts.");
@@ -265,7 +288,7 @@ export async function fetchInstagramInsights(
   if (dateRange?.until) params.set("until", dateRange.until);
   if (skipAi) params.set("skip_ai", "true");
   const query = params.size ? `?${params.toString()}` : "";
-  const response = await fetch(`/api/meta/instagram-insights${query}`, {
+  const response = await integrationFetch(`/api/meta/instagram-insights${query}`, {
     headers: getGetHeaders(),
   });
   return readJsonResponse<InstagramInsights>(response, "Failed to fetch Instagram insights.");
@@ -282,7 +305,7 @@ export async function fetchCompetitorBenchmark(
   if (dateRange?.until) params.set("until", dateRange.until);
   if (usernames?.length) params.set("usernames", usernames.join(","));
   const query = params.size ? `?${params.toString()}` : "";
-  const response = await fetch(`/api/meta/competitor-benchmark${query}`, {
+  const response = await integrationFetch(`/api/meta/competitor-benchmark${query}`, {
     headers: getGetHeaders(),
   });
   return readJsonResponse<CompetitorBenchmark>(response, "Failed to fetch competitor benchmark.");
@@ -300,7 +323,7 @@ export async function generateReferenceBrief(payload: {
   selectedBrief?: unknown;
   references: Array<Record<string, unknown>>;
 }) {
-  const response = await fetch("/api/meta/reference-brief", {
+  const response = await integrationFetch("/api/meta/reference-brief", {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(payload),
@@ -319,7 +342,7 @@ export async function generateContentFromBrief(payload: {
     website?: string;
   };
 }) {
-  const response = await fetch("/api/meta/generate-content", {
+  const response = await integrationFetch("/api/meta/generate-content", {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(payload),
@@ -352,7 +375,7 @@ export async function autoPostInstagramContent(payload: {
   content: any;
   reference?: Record<string, unknown>;
 }) {
-  const response = await fetch("/api/meta/auto-post", {
+  const response = await integrationFetch("/api/meta/auto-post", {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(payload),
@@ -412,7 +435,7 @@ export async function fetchInsightsReasoning(payload: {
   ig_user_id: string;
   dateRange: { since: string; until: string };
 }) {
-  const response = await fetch("/api/meta/insights/reasoning", {
+  const response = await integrationFetch("/api/meta/insights/reasoning", {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(payload),
@@ -459,7 +482,7 @@ export async function fetchCachedInsightsReasoning(params: {
   if (params.post_id) {
     query.set("post_id", params.post_id);
   }
-  const response = await fetch(`/api/meta/insights/reasoning?${query.toString()}`, {
+  const response = await integrationFetch(`/api/meta/insights/reasoning?${query.toString()}`, {
     method: "GET",
     headers: getGetHeaders(),
   });
@@ -488,7 +511,7 @@ export async function fetchContentPlan(payload: {
   dateRange: { since: string; until: string };
   force_refresh?: boolean;
 }) {
-  const response = await fetch("/api/meta/insights/content-plan", {
+  const response = await integrationFetch("/api/meta/insights/content-plan", {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(payload),

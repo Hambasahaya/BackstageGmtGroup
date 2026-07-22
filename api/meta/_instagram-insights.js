@@ -471,6 +471,7 @@ const getFollowerDemographic = async ({ igUserId, accessToken, breakdown }) => {
 const getAudienceInsights = async ({ igUserId, accessToken }) => {
   const warnings = [];
   const demographics = {
+    ageGender: [],
     age: [],
     gender: [],
     city: [],
@@ -486,14 +487,20 @@ const getAudienceInsights = async ({ igUserId, accessToken }) => {
     const ageGender = await getFollowerDemographic({ igUserId, accessToken, breakdown: "age,gender" });
     const ageMap = new Map();
     const genderMap = new Map();
+    const ageGenderMap = new Map();
 
     for (const item of ageGender) {
       const [age, gender] = item.dimension_values || [];
       const value = Number(item.value) || 0;
       if (age) ageMap.set(age, (ageMap.get(age) || 0) + value);
       if (gender) genderMap.set(gender, (genderMap.get(gender) || 0) + value);
+      if (age && gender) {
+        const label = `${age}.${gender}`;
+        ageGenderMap.set(label, (ageGenderMap.get(label) || 0) + value);
+      }
     }
 
+    demographics.ageGender = sortBreakdown(Array.from(ageGenderMap.entries()).map(([label, value]) => ({ label, value })));
     demographics.age = sortBreakdown(Array.from(ageMap.entries()).map(([label, value]) => ({ label, value })));
     demographics.gender = sortBreakdown(Array.from(genderMap.entries()).map(([label, value]) => ({ label, value })));
   } catch (error) {
@@ -653,7 +660,7 @@ const getRecentMedia = async ({ igUserId, accessToken, since, until }) => {
       `/${igUserId}/media`,
       {
         fields:
-          "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,comments.limit(50){id,text,username,timestamp},insights.metric(reach,total_interactions,saved)",
+          "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,comments.limit(50){id,text,username,timestamp},insights.metric(reach,total_interactions,saved)",
         limit: Math.max(1, Math.min(Number(process.env.META_MEDIA_LIMIT || 25), 100)),
         since,
         until,
@@ -662,7 +669,7 @@ const getRecentMedia = async ({ igUserId, accessToken, since, until }) => {
       ),
       metaFetch(
         `/${igUserId}/stories`,
-        { fields: "id,caption,media_type,media_product_type,permalink,timestamp" },
+        { fields: "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp" },
         accessToken,
       ).catch((error) => ({ data: [], warning: `stories: ${error.message}` })),
     ]);

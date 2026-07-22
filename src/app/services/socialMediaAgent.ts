@@ -1,7 +1,7 @@
 import type { InstagramInsights } from "./metaIntegrations";
 
 const baseUrl = (import.meta.env.VITE_SOSMED_AGENT_BASE_URL || "").replace(/\/$/, "");
-const timeoutMs = 60_000;
+const timeoutMs = 5 * 60 * 1000;
 
 export type SocialAgentAccount = { id: string; ig_user_id: string; username: string; name?: string | null };
 export type SocialAgentBundle = {
@@ -39,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (!response.ok) throw new Error(payload?.detail || payload?.error || `Social Media Agent error (${response.status}).`);
     return payload as T;
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") throw new Error("Social Media Agent melewati batas waktu 60 detik.");
+    if (error instanceof DOMException && error.name === "AbortError") throw new Error("Social Media Agent melewati batas waktu 5 menit. Silakan coba kembali.");
     throw error;
   } finally {
     window.clearTimeout(timeout);
@@ -52,6 +52,21 @@ const metric = (media: InstagramInsights["media"][number], name: string) => {
 };
 const toRecord = (items?: Array<{ label: string; value: number }>) =>
   Object.fromEntries((items || []).map((item) => [item.label, item.value]));
+const toOnlineFollowersRecord = (items?: Array<{ label: string; value: number }>) =>
+  Object.fromEntries((items || []).map((item) => {
+    const hour = item.label.match(/^(\d{1,2})(?::\d{2})?$/)?.[1];
+    return [hour === undefined ? item.label : String(Number(hour)), item.value];
+  }));
+const accountInsightValue = (value: number | Record<string, unknown>) => {
+  if (typeof value === "number") return value;
+  return Object.values(value).reduce<number>((total, item) => {
+    if (typeof item === "number") return total + item;
+    if (item && typeof item === "object") {
+      return total + Object.values(item).reduce<number>((sum, nested) => sum + (Number(nested) || 0), 0);
+    }
+    return total + (Number(item) || 0);
+  }, 0);
+};
 
 export function buildHourlySyncPayload(data: InstagramInsights) {
   const profile = data.profile;
@@ -61,6 +76,8 @@ export function buildHourlySyncPayload(data: InstagramInsights) {
     caption: item.caption || null,
     media_type: item.media_type || "UNKNOWN",
     media_product_type: item.media_product_type || "FEED",
+    media_url: item.media_url || null,
+    thumbnail_url: item.thumbnail_url || item.media_url || null,
     permalink: item.permalink || null,
     posted_at: item.timestamp || new Date().toISOString(),
     like_count: item.like_count || 0,
@@ -96,15 +113,15 @@ export function buildHourlySyncPayload(data: InstagramInsights) {
     media_list: media.filter((item) => item.media_product_type !== "STORY"),
     stories_list: media.filter((item) => item.media_product_type === "STORY"),
     demographics: {
-      age_gender: toRecord(data.audience?.demographics?.age),
+      age_gender: toRecord(data.audience?.demographics?.ageGender),
       city: toRecord(data.audience?.demographics?.city),
       country: toRecord(data.audience?.demographics?.country),
-      online_followers: toRecord(data.audience?.onlineFollowers),
+      online_followers: toOnlineFollowersRecord(data.audience?.onlineFollowers),
     },
     account_insights: data.insights.flatMap((item) =>
       item.values.map((point) => ({
         metric: item.name,
-        value: typeof point.value === "number" ? point.value : 0,
+        value: accountInsightValue(point.value),
         period: item.period || "day",
         end_time: point.end_time || undefined,
       })),

@@ -1908,34 +1908,47 @@ export function MarketingIntegrations() {
   const contentRows = sortedContentTableItems.map((item) => {
     const { media, reach, likes, comments, shares, saves, views, engagementRate, reasoning } = item;
     return [
-      <div className="max-w-xs">
-        <p className="line-clamp-2 font-medium text-slate-900">{media.caption || "Konten tanpa caption"}</p>
+      <div className="w-64">
+        <p className="line-clamp-3 font-semibold leading-5 text-slate-900">{media.caption || "Konten tanpa caption"}</p>
         <p className="mt-1 text-xs text-slate-500">{media.timestamp ? new Date(media.timestamp).toLocaleDateString("id-ID") : "-"}</p>
       </div>,
-      <StatusBadge tone={media.media_type === "VIDEO" ? "blue" : "teal"}>{media.media_type || "POST"}</StatusBadge>,
-      formatNumber(reach),
-      formatNumber(views),
-      formatNumber(likes),
-      formatNumber(comments),
-      formatNumber(shares),
-      formatNumber(saves),
-      formatPercent(engagementRate),
-      <div className="max-w-sm space-y-1.5">
-        {media.ai_status && (
-          <div className="flex flex-wrap items-center gap-1">
-            <StatusBadge tone={getStatusTone(media.ai_status)}>{media.ai_status}</StatusBadge>
-            {media.ai_angle && <StatusBadge tone="teal">{media.ai_angle}</StatusBadge>}
-          </div>
-        )}
-        <p className="text-xs leading-5 text-slate-600">{reasoning}</p>
-        {media.ai_action && (
-          <p className="text-xs font-semibold text-[#0F766E]">Aksi: {media.ai_action}</p>
-        )}
-        <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>
-          {media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Sosmed Agent Claude" : "Local"}
-        </StatusBadge>
+      <div className="flex w-36 flex-wrap gap-1.5">
+        <StatusBadge tone={media.media_type === "VIDEO" ? "blue" : "teal"}>{item.contentType}</StatusBadge>
+        {media.ai_status ? <StatusBadge tone={getStatusTone(media.ai_status)}>{media.ai_status}</StatusBadge> : null}
+        {media.ai_angle ? <StatusBadge tone="teal">{media.ai_angle}</StatusBadge> : null}
       </div>,
-      media.permalink ? <a className="font-semibold text-[#0F766E] hover:underline" href={media.permalink} target="_blank" rel="noreferrer">Buka</a> : "-",
+      <div className="grid min-w-48 grid-cols-2 gap-x-5 gap-y-2 text-xs">
+        {[
+          ["Reach", reach],
+          ["Views", views],
+          ["Likes", likes],
+          ["Comments", comments],
+          ["Shares", shares],
+          ["Saves", saves],
+        ].map(([label, value]) => (
+          <div key={String(label)}>
+            <p className="text-slate-500">{label}</p>
+            <p className="mt-0.5 font-bold text-slate-900">{formatNumber(value as number)}</p>
+          </div>
+        ))}
+      </div>,
+      <div className="min-w-24">
+        <p className="text-base font-bold text-[#0F766E]">{formatPercent(engagementRate)}</p>
+        <p className="mt-1 text-xs text-slate-500">Engagement rate</p>
+      </div>,
+      <details className="w-72 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-[#0F766E]">Lihat analisis AI</summary>
+        <p className="mt-3 text-xs leading-5 text-slate-600">{reasoning}</p>
+        {media.ai_action ? <p className="mt-2 text-xs font-semibold leading-5 text-[#0F766E]">Aksi: {media.ai_action}</p> : null}
+        <div className="mt-2">
+          <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>
+            {media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Sosmed Agent Claude" : "Local"}
+          </StatusBadge>
+        </div>
+      </details>,
+      media.permalink ? (
+        <a className="inline-flex rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-teal-100" href={media.permalink} target="_blank" rel="noreferrer">Buka post</a>
+      ) : <span className="text-slate-400">—</span>,
     ];
   });
   const customContentReferences = (instagramInsights?.contentReferences || []).map((reference, index) => ({
@@ -2587,7 +2600,63 @@ export function MarketingIntegrations() {
                 </select>
               </label>
             </div>
-            <DataTable columns={["Konten", "Tipe", "Reach", "Views", "Likes", "Comments", "Shares", "Saves", "Eng. rate", "Reasoning", "Link"]} rows={contentRows} />
+            <div className="hidden lg:block">
+              <DataTable columns={["Konten", "Tipe & status", "Performa", "Engagement", "Analisis", "Link"]} rows={contentRows} />
+            </div>
+            <div className="space-y-3 lg:hidden">
+              {sortedContentTableItems.map((item) => {
+                const { media, reach, likes, comments, shares, saves, views, engagementRate, reasoning } = item;
+                return (
+                  <article key={media.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-100 p-4">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusBadge tone={media.media_type === "VIDEO" ? "blue" : "teal"}>{item.contentType}</StatusBadge>
+                        {media.ai_status ? <StatusBadge tone={getStatusTone(media.ai_status)}>{media.ai_status}</StatusBadge> : null}
+                        {media.ai_angle ? <StatusBadge tone="teal">{media.ai_angle}</StatusBadge> : null}
+                      </div>
+                      <p className="mt-3 line-clamp-3 text-sm font-semibold leading-6 text-slate-900">{media.caption || "Konten tanpa caption"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{media.timestamp ? new Date(media.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Tanggal tidak tersedia"}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-px bg-slate-200">
+                      {[
+                        ["Reach", reach],
+                        ["Views", views],
+                        ["Likes", likes],
+                        ["Comments", comments],
+                        ["Shares", shares],
+                        ["Saves", saves],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="bg-white p-3 text-center">
+                          <p className="text-[11px] text-slate-500">{label}</p>
+                          <p className="mt-1 text-sm font-bold text-slate-900">{formatNumber(value as number)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-slate-500">Engagement rate</p>
+                          <p className="mt-1 text-xl font-bold text-[#0F766E]">{formatPercent(engagementRate)}</p>
+                        </div>
+                        {media.permalink ? (
+                          <a className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-[#0F766E]" href={media.permalink} target="_blank" rel="noreferrer">Buka post</a>
+                        ) : null}
+                      </div>
+                      <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <summary className="cursor-pointer text-sm font-semibold text-slate-800">Analisis dan rekomendasi AI</summary>
+                        <p className="mt-3 text-xs leading-5 text-slate-600">{reasoning}</p>
+                        {media.ai_action ? <p className="mt-2 text-xs font-semibold leading-5 text-[#0F766E]">Aksi: {media.ai_action}</p> : null}
+                        <div className="mt-3">
+                          <StatusBadge tone={media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "blue" : "slate"}>
+                            {media.ai_reasoning_source && media.ai_reasoning_source !== "local" ? "Sosmed Agent Claude" : "Local"}
+                          </StatusBadge>
+                        </div>
+                      </details>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <EmptyState text={isMetaLoading ? "Sedang memuat konten Instagram..." : "Belum ada data konten untuk akun yang dipilih."} />
