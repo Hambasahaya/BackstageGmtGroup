@@ -4,6 +4,7 @@ export type PaymentStatus = "unpaid" | "pending" | "paid" | "expired" | "failed"
 export type PaymentMode = "full" | "split" | "50%" | "100%" | "50" | "100";
 export type WithdrawStatus = "on_progress" | "approval";
 export type OnboardingProgressStatus = "in_progress" | "completed";
+export const onboardingProgressUpdatedEvent = "onboarding-progress-updated";
 
 export type ProductDto = {
   id: number;
@@ -55,6 +56,7 @@ export type PreorderDto = {
     email?: string | null;
   } | null;
   nama_customer: string;
+  nama_perusahaan?: string | null;
   email: string;
   alamat: string;
   no_hp: string;

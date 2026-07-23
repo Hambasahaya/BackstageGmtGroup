@@ -41,6 +41,7 @@ type PurchaseOrder = {
   poNumber: string;
   status: "draft" | "in_review" | "approve" | "invalid";
   customerName: string;
+  customerCompany: string;
   customerEmail: string;
   customerPhone: string;
   customerAddress: string;
@@ -67,6 +68,7 @@ type AgentActionLoading =
   | { type: "delete"; poId: number }
   | { type: "print"; poId: number }
   | { type: "quotation"; poId: number }
+  | { type: "submit"; poId: number }
   | null;
 
 const commissionPercent = 10;
@@ -110,6 +112,7 @@ const defaultPurchaseOrders: PurchaseOrder[] = [
     poNumber: "PO-1008",
     status: "in_review",
     customerName: "PT Cahaya Eventindo",
+    customerCompany: "PT Cahaya Eventindo",
     customerEmail: "procurement@cahayaevent.id",
     customerPhone: "081234567890",
     customerAddress: "Jl. Gatot Subroto No. 12, Jakarta",
@@ -130,6 +133,7 @@ const defaultPurchaseOrders: PurchaseOrder[] = [
     poNumber: "PO-1007",
     status: "draft",
     customerName: "Bina Kreatif Production",
+    customerCompany: "Bina Kreatif Production",
     customerEmail: "admin@binakreatif.id",
     customerPhone: "082112345678",
     customerAddress: "Jl. Diponegoro No. 8, Bandung",
@@ -254,6 +258,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     poNumber: preorder.po_number ?? `PO-${preorder.id}`,
     status: preorder.status,
     customerName: preorder.nama_customer,
+    customerCompany: preorder.nama_perusahaan ?? "",
     customerEmail: preorder.email,
     customerPhone: preorder.no_hp,
     customerAddress: preorder.alamat,
@@ -285,6 +290,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
 
 function toPreorderPayload(
   customerName: string,
+  customerCompany: string,
   customerEmail: string,
   customerPhone: string,
   customerAddress: string,
@@ -296,6 +302,7 @@ function toPreorderPayload(
 
   return {
     nama_customer: customerName.trim(),
+    nama_perusahaan: customerCompany.trim(),
     email: normalizedEmail,
     alamat: customerAddress.trim(),
     no_hp: customerPhone.trim(),
@@ -410,6 +417,7 @@ export function AgentPurchaseOrder() {
   const [products, setProducts] = useState<Product[]>(defaultProducts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
+  const [customerCompany, setCustomerCompany] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -434,6 +442,7 @@ export function AgentPurchaseOrder() {
   const isPrintingPo = (poId: number) => actionLoading?.type === "print" && actionLoading.poId === poId;
   const isDownloadingQuotation = (poId: number) =>
     actionLoading?.type === "quotation" && actionLoading.poId === poId;
+  const isSubmittingPo = (poId: number) => actionLoading?.type === "submit" && actionLoading.poId === poId;
 
   const loadData = async (silent = false) => {
     if (!silent) {
@@ -485,6 +494,7 @@ export function AgentPurchaseOrder() {
 
   const resetForm = () => {
     setCustomerName("");
+    setCustomerCompany("");
     setCustomerEmail("");
     setCustomerPhone("");
     setCustomerAddress("");
@@ -576,6 +586,7 @@ export function AgentPurchaseOrder() {
 
     setEditingPoId(po.id);
     setCustomerName(po.customerName);
+    setCustomerCompany(po.customerCompany);
     setCustomerEmail(po.customerEmail);
     setCustomerPhone(po.customerPhone);
     setCustomerAddress(po.customerAddress);
@@ -621,7 +632,7 @@ export function AgentPurchaseOrder() {
   const validateForm = () => {
     const normalizedEmail = normalizeEmail(customerEmail);
 
-    if (!customerName.trim() || !normalizedEmail || !customerPhone.trim() || !customerAddress.trim()) {
+    if (!customerName.trim() || !customerCompany.trim() || !normalizedEmail || !customerPhone.trim() || !customerAddress.trim()) {
       setFormError("Lengkapi data customer sebelum menyimpan PO.");
       return false;
     }
@@ -658,7 +669,7 @@ export function AgentPurchaseOrder() {
     const normalizedEmail = normalizeEmail(customerEmail);
     setCustomerEmail(normalizedEmail);
 
-    const payload = toPreorderPayload(customerName, normalizedEmail, customerPhone, customerAddress, notes, paymentMode, items);
+    const payload = toPreorderPayload(customerName, customerCompany, normalizedEmail, customerPhone, customerAddress, notes, paymentMode, items);
 
     setIsPersistingPo(true);
     setActionLoading({ type: "persist", mode: status === "in_review" ? "in_review" : "draft" });
@@ -731,6 +742,38 @@ export function AgentPurchaseOrder() {
       await Swal.fire({
         title: "Gagal",
         text: error instanceof Error ? error.message : "Gagal mencetak PDF PO.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const submitPurchaseOrder = async (po: PurchaseOrder) => {
+    if (po.status !== "draft" || actionLoading || isPersistingPo) {
+      return;
+    }
+
+    setActionLoading({ type: "submit", poId: po.id });
+    openProcessingAlert("Mengirim PO", "Mohon tunggu sampai PO tersimpan dan terkirim ke sales.");
+
+    try {
+      await api.submitPreorder(po.id);
+      await loadData(true);
+      await Swal.fire({
+        title: "PO terkirim",
+        text: "Purchase order berhasil dikirim ke sales dan data PO sudah diperbarui.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
+    } catch (error) {
+      Swal.close();
+      const message = error instanceof Error ? error.message : "Gagal mengirim PO.";
+      setErrorMessage(message);
+      await Swal.fire({
+        title: "Gagal",
+        text: message,
         icon: "error",
         confirmButtonColor: "#0F766E",
       });
@@ -853,7 +896,7 @@ export function AgentPurchaseOrder() {
             purchaseOrders.map((po) => {
               const isExpanded = expandedMobilePoId === po.id;
               const isDeleting = isDeletingPo(po.id);
-              const isDownloading = isDownloadingQuotation(po.id);
+              const isSubmitting = isSubmittingPo(po.id);
 
               return (
                 <article key={po.id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -966,12 +1009,12 @@ export function AgentPurchaseOrder() {
                         {po.status === "draft" && (
                           <button
                             type="button"
-                            onClick={() => downloadQuotationPdf(po)}
-                            disabled={Boolean(actionLoading) || isPersistingPo || downloadingQuotationId === po.id}
+                            onClick={() => submitPurchaseOrder(po)}
+                            disabled={Boolean(actionLoading) || isPersistingPo}
                             className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#115E59] disabled:cursor-wait disabled:bg-[#0F766E]/60"
                           >
-                            {isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                            {isDownloading ? "Loading" : "Send Invoice"}
+                            {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                            {isSubmitting ? "Mengirim..." : "Send Invoice"}
                           </button>
                         )}
                       </div>
@@ -1097,6 +1140,15 @@ export function AgentPurchaseOrder() {
                     onChange={(event) => setCustomerName(event.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                     placeholder="Nama customer"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">Nama perusahaan</span>
+                  <input
+                    value={customerCompany}
+                    onChange={(event) => setCustomerCompany(event.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    placeholder="Nama perusahaan"
                   />
                 </label>
                 <label className="block">

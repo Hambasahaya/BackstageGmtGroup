@@ -39,6 +39,7 @@ import {
   connectSalesNotificationStream,
   getLogoutRedirectUrl,
   getStoredUser,
+  onboardingProgressUpdatedEvent,
   type PreorderDto,
   type AgentApplicationStatus,
   type NotificationDto,
@@ -386,13 +387,33 @@ export function Layout() {
   }, []);
 
   useEffect(() => {
-    if (currentRole === "agent" && currentAgentStatus === "official_agent") {
-      api.onboardingProgress()
+    if (currentRole !== "agent" || currentAgentStatus !== "official_agent") {
+      setIsOnboardingCompleted(false);
+      return;
+    }
+
+    const refreshOnboardingStatus = () => {
+      void api.onboardingProgress()
         .then((data) => setIsOnboardingCompleted(data.is_completed))
         .catch(() => {
-          // ignore
+          // Keep the last known state if synchronization fails.
         });
-    }
+    };
+    const handleOnboardingProgressUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ is_completed?: boolean }>).detail;
+      if (typeof detail?.is_completed === "boolean") {
+        setIsOnboardingCompleted(detail.is_completed);
+        return;
+      }
+      refreshOnboardingStatus();
+    };
+
+    refreshOnboardingStatus();
+    window.addEventListener(onboardingProgressUpdatedEvent, handleOnboardingProgressUpdated);
+
+    return () => {
+      window.removeEventListener(onboardingProgressUpdatedEvent, handleOnboardingProgressUpdated);
+    };
   }, [currentRole, currentAgentStatus]);
 
   useEffect(() => {

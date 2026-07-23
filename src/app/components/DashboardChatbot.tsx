@@ -221,7 +221,7 @@ export function DashboardChatbot() {
       {/* Floating Toggle Button (Bottom Right) */}
       <button
         onClick={handleToggleChat}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-teal-600 to-emerald-500 text-white shadow-[0_8px_30px_rgba(15,118,110,0.4)] hover:shadow-[0_8px_30px_rgba(16,185,129,0.6)] border border-teal-400/20 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group focus:outline-none"
+        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-teal-600 to-emerald-500 text-white shadow-[0_8px_30px_rgba(15,118,110,0.4)] hover:shadow-[0_8px_30px_rgba(16,185,129,0.6)] border border-teal-400/20 backdrop-blur-md transition-all duration-300 hover:scale-110 active:scale-95 group focus:outline-none md:bottom-6 md:right-6"
         title="Hubungi Asisten AI"
         aria-label="Toggle Chatbot"
       >
@@ -230,7 +230,7 @@ export function DashboardChatbot() {
 
       {/* Chat Window Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-[420px] max-w-[calc(100vw-3rem)] h-[560px] max-h-[calc(100vh-8rem)] z-50 rounded-2xl shadow-2xl flex flex-col bg-slate-950/95 border border-slate-800 backdrop-blur-xl overflow-hidden transition-all duration-300 origin-bottom-right animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-40 right-4 w-[420px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-12rem)] z-50 rounded-2xl shadow-2xl flex flex-col bg-slate-950/95 border border-slate-800 backdrop-blur-xl overflow-hidden transition-all duration-300 origin-bottom-right animate-in fade-in slide-in-from-bottom-5 md:bottom-24 md:right-6 md:max-w-[calc(100vw-3rem)] md:max-h-[calc(100vh-8rem)]">
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-950 to-teal-950/80 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">

@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock3, Lock, PlayCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactPlayer from "react-player";
-import { api, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
+import { api, onboardingProgressUpdatedEvent, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
 
 const emptySummary: OnboardingSummaryDto = {
   completed_count: 0,
@@ -160,22 +160,22 @@ export function AgentOnboarding() {
         completed_at: status === "completed" ? new Date().toISOString() : undefined,
       };
 
-      setSummary((current) => {
-        const mergedProgress = upsertProgress(current.progress, savedProgress);
-        const completedCount = mergedProgress.filter((item) => item.status === "completed").length;
-        const totalRequired = normalizedSummary.total_required || current.total_required || videos.length;
+      const mergedProgress = upsertProgress(summary.progress, savedProgress);
+      const completedCount = mergedProgress.filter((item) => item.status === "completed").length;
+      const totalRequired = normalizedSummary.total_required || summary.total_required || videos.length;
+      const resolvedSummary: OnboardingSummaryDto = {
+        ...summary,
+        ...normalizedSummary,
+        progress: mergedProgress,
+        completed_count: normalizedSummary.completed_count || completedCount,
+        total_required: totalRequired,
+        completion_percent:
+          normalizedSummary.completion_percent || (totalRequired ? Math.round((completedCount / totalRequired) * 100) : 0),
+        is_completed: normalizedSummary.is_completed || (totalRequired > 0 && completedCount >= totalRequired),
+      };
 
-        return {
-          ...current,
-          ...normalizedSummary,
-          progress: mergedProgress,
-          completed_count: normalizedSummary.completed_count || completedCount,
-          total_required: totalRequired,
-          completion_percent:
-            normalizedSummary.completion_percent || (totalRequired ? Math.round((completedCount / totalRequired) * 100) : 0),
-          is_completed: normalizedSummary.is_completed || (totalRequired > 0 && completedCount >= totalRequired),
-        };
-      });
+      setSummary(resolvedSummary);
+      window.dispatchEvent(new CustomEvent(onboardingProgressUpdatedEvent, { detail: resolvedSummary }));
 
       if (status === "completed") {
         setTimeout(() => {
@@ -198,6 +198,7 @@ export function AgentOnboarding() {
   const resetProgress = async () => {
     try {
       await api.resetOnboardingProgress();
+      window.dispatchEvent(new CustomEvent(onboardingProgressUpdatedEvent, { detail: emptySummary }));
       await loadOnboarding();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal reset progress onboarding.");
@@ -209,9 +210,9 @@ export function AgentOnboarding() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">Agent Onboarding</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Video training wajib role agent</h1>
+          <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Video Training Wajib Moxlite Agent</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Materi onboarding dari API agent dengan progress tonton berurutan.
+            Materi onboarding untuk pengetahuan produk dan sistem agent.
           </p>
         </div>
       </div>
@@ -282,8 +283,9 @@ export function AgentOnboarding() {
                         height="100%"
                         controls
                         onEnded={() => {
-                          if (!finishedVideoIds.includes(video.id)) {
+                          if (!finishedVideoIds.includes(video.id) && !savingVideoIds.includes(video.id)) {
                             setFinishedVideoIds((prev) => [...prev, video.id]);
+                            void saveProgress(video, video.duration_seconds, "completed");
                           }
                         }}
                         onError={() =>
