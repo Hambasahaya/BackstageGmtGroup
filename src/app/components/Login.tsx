@@ -70,25 +70,25 @@ export function Login() {
   return (
     <AuthSuiteShell mode="login">
       <div className="flex flex-col gap-2 text-center">
-        <h1 className="text-[27px] font-semibold leading-tight text-white">Login</h1>
-        <p className="text-sm font-normal text-[#666]">Enter your email and password to continue</p>
+        <h1 className="text-[23px] font-semibold leading-tight text-white">Login</h1>
+        <p className="text-xs font-normal text-[#666]">Enter your email and password to continue</p>
       </div>
 
       <button
         type="button"
         onClick={() => setErrorMessage("Login Google belum tersedia pada API dashboard ini.")}
-        className="mt-6 inline-flex h-[72px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#dedede] bg-white text-base font-medium text-[#111] transition hover:bg-[#f2f2f2]"
+        className="mt-5 inline-flex h-[56px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#dedede] bg-white text-sm font-medium text-[#111] transition hover:bg-[#f2f2f2]"
       >
         <GoogleIcon /> Continue with Google
       </button>
 
-      <div className="my-[27px] flex items-center gap-5">
+      <div className="my-[20px] flex items-center gap-5">
         <div className="h-px flex-1 bg-[#d4d4d4]" />
         <span className="text-sm text-[#777]">Or</span>
         <div className="h-px flex-1 bg-[#d4d4d4]" />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-[22px]">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-[17px]">
         <label className="flex flex-col gap-2">
           <span className="text-sm font-normal text-[#9a9a9a]">Email</span>
           <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" className="h-[48px] w-full rounded-[6px] border border-[#e3e3e3] bg-white px-4 text-base text-[#111] outline-none placeholder:text-[#666] focus:border-white" placeholder="m@example.com" required />
@@ -109,7 +109,7 @@ export function Login() {
         </button>
       </form>
 
-      <Link to="/register" className="mt-[45px] self-center px-3 py-3 text-base font-semibold text-[#e7e7e7] transition hover:text-white">
+      <Link to="/register" className="mt-[25px] self-center px-3 py-3 text-sm font-semibold text-[#e7e7e7] transition hover:text-white">
         <span className="mr-3">?</span> Back to register
       </Link>
     </AuthSuiteShell>
