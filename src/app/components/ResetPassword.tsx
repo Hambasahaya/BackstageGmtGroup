@@ -78,7 +78,7 @@ export function ResetPassword() {
           <h1 className="text-xl font-medium text-white">Kata Sandi Diperbarui!</h1>
           <p className="mt-2 max-w-[300px] text-[13px] leading-5 text-[#888]">Kata sandi Anda berhasil diperbarui. Sekarang Anda dapat masuk menggunakan kata sandi baru.</p>
           {successMessage && <p className="mt-3 text-[11px] text-[#a4e2a6]">{successMessage}</p>}
-          <button type="button" onClick={() => navigate("/login")} className="mt-6 w-[150px] rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14]">Masuk</button>
+          <button type="button" onClick={() => navigate("/login")} className="mt-6 w-[150px] rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14]">Login</button>
         </div>
       </AuthSuiteShell>
     );
@@ -87,51 +87,59 @@ export function ResetPassword() {
   return (
     <AuthSuiteShell mode="reset-password">
       <div className="flex flex-col gap-2 text-center">
-        <h1 className="text-xl font-semibold leading-tight text-white">{step === "verify" ? "Verifikasi Email" : "Perbarui Kata Sandi"}</h1>
-        <p className="text-[11px] font-normal text-[#6c6c6c]">{step === "verify" ? "Masukkan email dan kode reset yang dikirim ke email Anda." : "Verifikasi berhasil. Silakan buat kata sandi baru."}</p>
+        <h1 className="text-xl font-semibold leading-tight text-white">{step === "verify" ? "Verify Email" : "Update Password"}</h1>
+        <p className="text-[11px] font-normal text-[#6c6c6c]">{step === "verify" ? "Enter the reset code sent to your email." : "Please fill the form below to update the password."}</p>
       </div>
 
       {step === "verify" ? (
         <form onSubmit={verifyCode} className="mt-10 flex flex-1 flex-col gap-[17px]">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] text-[#9a9a9a]">Alamat Email</span>
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none placeholder:text-[#555]" placeholder="m@contoh.com" required />
+            <span className="text-[11px] text-[#9a9a9a]">Email Address</span>
+            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none placeholder:text-[#555]" placeholder="m@example.com" required />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] text-[#9a9a9a]">Kode Reset</span>
-            <input value={token} onChange={(event) => setToken(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs tracking-[0.2em] text-[#111] outline-none placeholder:tracking-normal placeholder:text-[#555]" placeholder="masukkan kode dari email" required />
+            <span className="text-[11px] text-[#9a9a9a]">Reset Code</span>
+            <input value={token} onChange={(event) => setToken(event.target.value)} inputMode="numeric" autoComplete="one-time-code" className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs tracking-[0.2em] text-[#111] outline-none placeholder:tracking-normal placeholder:text-[#555]" placeholder="enter code from email" required />
           </label>
           {errorMessage && <p className="text-center text-[11px] text-[#ff8a8a]">{errorMessage}</p>}
-          <button type="submit" disabled={isSubmitting} className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14] disabled:opacity-50">{isSubmitting ? <SpinnerIcon /> : "Verifikasi Kode"}</button>
+          <button type="submit" disabled={isSubmitting} className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14] disabled:opacity-50">{isSubmitting ? <SpinnerIcon /> : "Verify Code"}</button>
         </form>
       ) : (
-        <form onSubmit={updatePassword} className="mt-7 flex flex-1 flex-col gap-[14px]">
+        <form onSubmit={updatePassword} className="mt-5 flex flex-1 flex-col gap-[11px]">
           {successMessage && <p className="text-center text-[11px] text-[#a4e2a6]">{successMessage}</p>}
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] text-[#9a9a9a]">Kata Sandi Baru</span>
-            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none" placeholder="kata sandi baru" required />
+            <span className="text-sm text-[#9a9a9a]">Email Address</span>
+            <input value={email} readOnly type="email" className="w-full rounded-[6px] border border-[#e3e3e3] bg-white px-4 text-sm text-[#111] outline-none" placeholder="m@example.com" />
           </label>
-          <div className="rounded-md border border-white/5 bg-white/[0.02] px-3 py-2.5">
-            <p className="mb-1.5 text-[11px] font-medium text-[#e2e2e2]">Kata sandi Anda harus berisi:</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-              <Criterion valid={validations.minLength}>Minimal 8 karakter</Criterion>
-              <Criterion valid={validations.hasNumber}>Setidaknya 1 angka</Criterion>
-              <Criterion valid={validations.hasSpecial}>Setidaknya 1 karakter spesial</Criterion>
-              <Criterion valid={validations.hasUppercase}>Setidaknya 1 huruf besar</Criterion>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm text-[#9a9a9a]">Reset Code</span>
+            <input value={token} readOnly className="w-full rounded-[6px] border border-[#e3e3e3] bg-white px-4 text-sm text-[#111] outline-none" placeholder="enter code from email" />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm text-[#9a9a9a]">New Password</span>
+            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" className="w-full rounded-[6px] border border-[#e3e3e3] bg-white px-4 text-sm text-[#111] outline-none" placeholder="new password" required />
+          </label>
+          <div className="rounded-[7px] border border-white/10 bg-white/[0.02] px-4 py-3">
+            <p className="mb-2 text-xs font-semibold text-[#e2e2e2]">Your password must contains:</p>
+            <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-[10px]">
+              <Criterion valid={validations.minLength}>A minimum of 8 characters.</Criterion>
+              <Criterion valid={validations.hasNumber}>At least one number</Criterion>
+              <Criterion valid={validations.hasSpecial}>At least 1 special character</Criterion>
+              <Criterion valid={validations.hasUppercase}>At least one uppercase letter</Criterion>
             </div>
           </div>
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] text-[#9a9a9a]">Konfirmasi Kata Sandi</span>
-            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none" placeholder="konfirmasi kata sandi baru" required />
+            <span className="text-sm text-[#9a9a9a]">Confirm Password</span>
+            <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" className="w-full rounded-[6px] border border-[#e3e3e3] bg-white px-4 text-sm text-[#111] outline-none" placeholder="confirm new password" required />
           </label>
           {errorMessage && <p className="text-center text-[11px] text-[#ff8a8a]">{errorMessage}</p>}
-          <button type="submit" disabled={isSubmitting || !allCriteriaMet} className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? <SpinnerIcon /> : "Perbarui Kata Sandi"}</button>
+          <button type="submit" disabled={isSubmitting || !allCriteriaMet} className="inline-flex w-full items-center justify-center gap-2 rounded-[6px] border border-transparent bg-[#191a1d] px-4 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50">{isSubmitting ? <SpinnerIcon /> : "Update Password"}</button>
         </form>
       )}
 
-      <div className="mt-auto flex items-center justify-between pt-5">
-        <Link to="/forgot-password" className="text-xs font-medium text-[#888] transition hover:text-white">? Minta kode baru</Link>
-        <Link to="/login" className="text-xs font-medium text-white">Masuk</Link>
+      <div className="mt-auto flex items-center justify-between pt-3">
+        <Link to="/forgot-password" className="text-sm font-medium text-[#888] transition hover:text-white">?  Request new code</Link>
+        <Link to="/login" className="text-sm font-medium text-white">Login</Link>
       </div>
     </AuthSuiteShell>
   );

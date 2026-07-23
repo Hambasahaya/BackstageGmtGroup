@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Github } from "lucide-react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { getRoleHomePath } from "../auth/navigation";
 import { AuthSuiteShell, SpinnerIcon } from "./AuthSuiteShell";
@@ -75,6 +76,7 @@ export function Register() {
   }
 
   const updateForm = (name: keyof RegisterForm, value: string) => {
+    setErrorMessage("");
     setForm((current) => ({ ...current, [name]: value }));
   };
 
@@ -113,21 +115,42 @@ export function Register() {
 
   return (
     <AuthSuiteShell mode="register">
-      <div className="flex flex-col gap-2 text-center">
+      <div className="mt-5 flex flex-col gap-2 text-center">
         <h1 className="text-xl font-semibold leading-tight text-white">Create an account</h1>
-        <p className="text-[11px] font-normal text-[#6c6c6c]">
+        <p className="text-sm font-normal text-[#6c6c6c]">
           Enter your email below to create your account
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-7 flex flex-1 flex-col gap-[17px]">
+      <div className="mt-6 grid grid-cols-2 gap-[22px]">
+        <button type="button" onClick={() => setErrorMessage("Social sign-up belum tersedia pada API dashboard ini.")} className="inline-flex h-[44px] items-center justify-center gap-3 rounded-[6px] border border-[#dedede] bg-white text-sm font-medium text-[#111] hover:bg-[#f2f2f2]">
+          <Github className="h-5 w-5" /> Github
+        </button>
+        <button type="button" onClick={() => setErrorMessage("Social sign-up belum tersedia pada API dashboard ini.")} className="inline-flex h-[44px] items-center justify-center gap-3 rounded-[6px] border border-[#dedede] bg-white text-sm font-medium text-[#111] hover:bg-[#f2f2f2]">
+          <span className="text-lg font-bold text-[#4285F4]">G</span> Sign up with Google
+        </button>
+      </div>
+
+      <div className="my-[22px] flex items-center gap-5">
+        <div className="h-px flex-1 bg-[#d4d4d4]" />
+        <span className="text-sm text-[#777]">Or</span>
+        <div className="h-px flex-1 bg-[#d4d4d4]" />
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-[17px]">
         <div className="grid gap-[18px] sm:grid-cols-2">
           <Field label="Name" name="name" value={form.name} onChange={updateForm} placeholder="eg. User Baru" />
           <Field label="Phone Number" name="phone_number" value={form.phone_number} onChange={updateForm} placeholder="081234567890" />
         </div>
 
         <Field label="Email" name="email" value={form.email} onChange={updateForm} type="email" placeholder="m@example.com" />
-        <Field label="Password" name="password" value={form.password} onChange={updateForm} type="password" placeholder="********" />
+                <label className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[#9a9a9a]">Password</span>
+            <Link to="/forgot-password" className="text-sm text-[#666] transition hover:text-white">Forgot password?</Link>
+          </div>
+          <input value={form.password} onChange={(event) => updateForm("password", event.target.value)} type="password" autoComplete="new-password" className="h-[48px] rounded-[6px] border border-[#e3e3e3] bg-white px-4 text-sm text-[#111] outline-none" placeholder="********" required />
+        </label>
 
         {errorMessage && <p className="-mt-1 text-[11px] leading-snug text-[#ff8a8a]">{errorMessage}</p>}
         {successMessage && <p className="-mt-1 text-[11px] leading-snug text-emerald-300">{successMessage}</p>}
@@ -143,7 +166,7 @@ export function Register() {
 
       <Link
         to={loginPath}
-        className="mt-3 self-center px-3 py-3 text-xs font-medium text-[#e7e7e7] transition hover:text-white"
+        className="mt-auto self-center px-3 py-3 text-sm font-semibold text-[#e7e7e7] transition hover:text-white"
       >
         Back to login <span className="ml-1.5">-&gt;</span>
       </Link>

@@ -377,7 +377,8 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 const assetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL ?? "https://is3.cloudhost.id/gmtsuites";
 export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
 const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
-const defaultLogoutRedirectUrl = import.meta.env.VITE_LOGOUT_REDIRECT_URL ?? "/";
+export const centralAuthUrl = "https://gmtgroup.co.id/gmt-suite-auth?mode=login";
+const defaultLogoutRedirectUrl = import.meta.env.VITE_LOGOUT_REDIRECT_URL ?? centralAuthUrl;
 export const authTokenStorageKey = "token";
 export const authRefreshTokenStorageKey = "refresh_token";
 export const userStorageKey = "gmt-auth-user";
@@ -706,8 +707,13 @@ export function rememberLoginSourceFromPage(searchParams?: URLSearchParams) {
 }
 
 export function getLogoutRedirectUrl() {
-  const storedSource = toSafeRedirectUrl(window.localStorage.getItem(loginSourceStorageKey));
-  return storedSource || toSafeRedirectUrl(defaultLogoutRedirectUrl) || "/";
+  return toSafeRedirectUrl(defaultLogoutRedirectUrl) || centralAuthUrl;
+}
+
+export function redirectToCentralAuth() {
+  if (window.location.href !== centralAuthUrl) {
+    window.location.replace(centralAuthUrl);
+  }
 }
 
 export function clearLoginSource() {
@@ -789,9 +795,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       });
     } catch {
       clearAuthSession();
+      redirectToCentralAuth();
     }
-  } else if (response.status === 401) {
-    clearAuthSession();
+
+    if (response.status === 401) {
+      clearAuthSession();
+      redirectToCentralAuth();
+    }
   }
 
   if (!response.ok) {

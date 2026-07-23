@@ -52,21 +52,20 @@ export function ForgotPassword() {
   return (
     <AuthSuiteShell mode="forgot-password">
       <div className="flex flex-col gap-2 text-center">
-        <h1 className="text-xl font-semibold leading-tight text-white">Lupa Kata Sandi</h1>
-        <p className="text-[11px] font-normal text-[#6c6c6c]">Masukkan alamat email Anda untuk meminta kode reset.</p>
+        <h1 className="text-xl font-semibold leading-tight text-white">Forgot Password</h1>
+        <p className="text-[11px] font-normal text-[#6c6c6c]">Enter your email address to request a reset code.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-10 flex flex-1 flex-col gap-[17px]">
-        <div className="h-6" />
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-normal text-[#9a9a9a]">Alamat Email</span>
+          <span className="text-[11px] font-normal text-[#9a9a9a]">Email Address</span>
           <input
             value={email}
             onChange={(event) => { setEmail(event.target.value); setErrorMessage(""); }}
             type="email"
             autoComplete="email"
             className="w-full rounded-[5px] border border-[#e3e3e3] bg-white px-3 py-[9px] text-xs text-[#111] outline-none transition placeholder:text-[#555] focus:border-white"
-            placeholder="m@contoh.com"
+            placeholder="m@example.com"
             required
           />
         </label>
@@ -79,13 +78,13 @@ export function ForgotPassword() {
           disabled={isSubmitting || countdown > 0}
           className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-[5px] border border-transparent bg-[#191a1d] px-4 py-2.5 text-xs font-medium text-white transition hover:border-white/30 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSubmitting ? <SpinnerIcon /> : countdown > 0 ? `Kirim Kode Reset (${countdownLabel})` : "Kirim Kode Reset"}
+          {isSubmitting ? <SpinnerIcon /> : countdown > 0 ? `Send Reset Code (${countdownLabel})` : "Send Reset Code"}
         </button>
       </form>
 
       <div className="mt-auto flex items-center justify-between pt-6">
         <Link to="/reset-password?step=verify" className="text-xs font-medium text-[#888] transition hover:text-white">Saya punya kode ?</Link>
-        <Link to="/login" className="text-xs font-medium text-white transition hover:text-[#ddd]">Masuk</Link>
+        <Link to="/login" className="text-xs font-medium text-white transition hover:text-[#ddd]">Login</Link>
       </div>
     </AuthSuiteShell>
   );
