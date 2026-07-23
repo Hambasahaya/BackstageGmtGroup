@@ -31,7 +31,7 @@ export function SpinnerIcon() {
 function AuthVisual({ collage }: { collage: boolean }) {
   if (!collage) {
     return (
-      <div className="hidden h-[640px] w-[640px] shrink-0 overflow-hidden rounded-[25px] lg:block">
+      <div className="hidden h-[802px] w-[800px] shrink-0 overflow-hidden rounded-[28px] lg:block">
         <img
           src="/img/bglogin2.png"
           alt="GMT Suite event background"
@@ -42,7 +42,7 @@ function AuthVisual({ collage }: { collage: boolean }) {
   }
 
   return (
-    <div className="hidden h-[640px] w-[640px] shrink-0 grid-cols-4 grid-rows-3 gap-1.5 overflow-hidden rounded-[25px] lg:grid">
+    <div className="hidden h-[802px] w-[800px] shrink-0 grid-cols-4 grid-rows-3 gap-1.5 overflow-hidden rounded-[28px] lg:grid">
       {collageImages.map((image, index) => (
         <div key={image} className="overflow-hidden rounded-lg bg-[#1a1a1a]">
           <img
@@ -67,18 +67,30 @@ export function AuthSuiteShell({
   const useCollage = mode === "forgot-password" || mode === "reset-password";
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#0a0a0a] px-3 py-6 font-sans text-white sm:px-5 sm:py-10">
-      <div className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[1150px] items-center justify-center gap-6 lg:min-h-[calc(100vh-80px)] lg:gap-0">
+    <main className="min-h-screen overflow-x-hidden border-t-[3px] border-[#f1d900] bg-[#0a0a0a] px-3 py-6 font-sans text-white sm:px-5 lg:py-[55px]">
+      <style>{`
+        .gmt-auth-panel h1 { font-size: 27px !important; line-height: 1.2 !important; }
+        .gmt-auth-panel form label > span,
+        .gmt-auth-panel form label > div > span { font-size: 14px !important; }
+        .gmt-auth-panel form input { min-height: 48px !important; padding-left: 16px !important; padding-right: 16px !important; font-size: 16px !important; border-radius: 6px !important; }
+        .gmt-auth-panel form button[type="submit"] { min-height: 50px !important; font-size: 16px !important; border-radius: 6px !important; }
+        @media (max-width: 1023px) {
+          .gmt-auth-panel h1 { font-size: 23px !important; }
+          .gmt-auth-panel form input { font-size: 14px !important; }
+          .gmt-auth-panel form button[type="submit"] { font-size: 14px !important; }
+        }
+      `}</style>
+      <div className="mx-auto flex min-h-[calc(100vh-51px)] w-full max-w-[1430px] items-center justify-center gap-5 lg:min-h-0">
         <div className={isRegister ? "order-2" : "order-1"}>
           <AuthVisual collage={useCollage} />
         </div>
         <section
-          className={`relative z-10 flex min-h-[640px] w-full max-w-[470px] flex-col overflow-y-auto rounded-[20px] bg-[#111] px-4 py-6 shadow-[0_0_0_1px_#2b2b2b,0_24px_70px_rgba(0,0,0,0.55)] sm:px-6 sm:py-8 lg:px-[46px] lg:py-[46px] ${
+          className={`gmt-auth-panel relative z-10 flex min-h-[640px] w-full max-w-[590px] flex-col overflow-y-auto rounded-[28px] bg-[#111] px-5 py-8 shadow-[0_0_0_1px_#303030,0_24px_70px_rgba(0,0,0,0.55)] sm:px-8 lg:min-h-[802px] lg:px-[58px] lg:py-[61px] ${
             isRegister ? "order-1" : "order-2"
           }`}
         >
-          <a href="/mygmt" className="mb-7 flex min-h-[46px] items-center justify-center">
-            <img src="/img/GMT Suite-02 1.png" alt="GMT Suite" className="h-[42px] w-[92px] object-contain" />
+          <a href="/mygmt" className="mb-[54px] flex min-h-[58px] items-center justify-center">
+            <img src="/img/GMT Suite-02 1.png" alt="GMT Suite" className="h-[58px] w-[120px] object-contain" />
           </a>
           {children}
         </section>
