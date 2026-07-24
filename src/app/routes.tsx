@@ -11,8 +11,11 @@ import { AgentApplications } from "./components/AgentApplications";
 import { ApplyAgent } from "./components/ApplyAgent";
 import { Dashboard } from "./components/Dashboard";
 import { EducationEvents } from "./components/EducationEvents";
-import { ExternalAuthRedirect } from "./components/ExternalAuthRedirect";
+import { Login } from "./components/Login";
+import { ForgotPassword } from "./components/ForgotPassword";
+import { ResetPassword } from "./components/ResetPassword";
 import { MyGmtEntry } from "./components/MyGmtEntry";
+import { Register } from "./components/Register";
 import { SalesOrders } from "./components/SalesOrders";
 import { SsoCallback } from "./components/SsoCallback";
 import { SsoStart } from "./components/SsoStart";
@@ -78,22 +81,22 @@ const userOnly: AppRole[] = ["user"];
 export const router = createBrowserRouter([
   {
     path: "/login",
-    Component: ExternalAuthRedirect,
+    Component: Login,
     errorElement: <ErrorPage />,
   },
   {
     path: "/forgot-password",
-    Component: ExternalAuthRedirect,
+    Component: ForgotPassword,
     errorElement: <ErrorPage />,
   },
   {
     path: "/reset-password",
-    Component: ExternalAuthRedirect,
+    Component: ResetPassword,
     errorElement: <ErrorPage />,
   },
   {
     path: "/register",
-    Component: ExternalAuthRedirect,
+    Component: Register,
     errorElement: <ErrorPage />,
   },
   {
