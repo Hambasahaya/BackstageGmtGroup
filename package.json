@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node ./node_modules/vite/bin/vite.js build",
     "dev": "node ./node_modules/vite/bin/vite.js",
-    "articles:migrate": "node ./scripts/migrate-old-articles.mjs"
+    "articles:migrate": "node ./scripts/migrate-old-articles.mjs",
+    "start": "node server.js"
   },
   "dependencies": {
     "@tensorflow-models/blazeface": "^0.1.0",

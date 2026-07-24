@@ -1,6 +1,6 @@
 import { json } from "../meta/_meta-client.js";
 
-const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "http://localhost:8080";
+const apiBaseUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL || "https://gmtsuites.co.id";
 
 export async function authenticate(request, response) {
   const authHeader = request.headers.authorization || request.headers.Authorization;
@@ -19,13 +19,25 @@ export async function authenticate(request, response) {
     });
 
     if (!res.ok) {
-      json(response, 401, { message: "session expired or revoked" });
+      let upstreamMessage = "";
+      try {
+        const payload = await res.json();
+        upstreamMessage = payload.message || payload.error || "";
+      } catch {
+        upstreamMessage = await res.text().catch(() => "");
+      }
+
+      json(response, 401, {
+        message: "session expired or revoked",
+        upstream_status: res.status,
+        upstream_message: upstreamMessage,
+      });
       return null;
     }
 
     const data = await res.json();
     if (!data.user) {
-      json(response, 401, { message: "session expired or revoked" });
+      json(response, 401, { message: "session expired or revoked", upstream_status: res.status });
       return null;
     }
 
@@ -55,3 +67,4 @@ export function authorizeAgentOrUser(user, response) {
   }
   return true;
 }
+

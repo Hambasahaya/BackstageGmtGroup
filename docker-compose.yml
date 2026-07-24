@@ -1,0 +1,23 @@
+﻿services:
+  gmtgroupbe:
+    image: ${DOCKER_IMAGE:-budimansujadmiko/gmtsuites:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gmtgroupbe
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      META_TOKEN_STORE_PATH: /app/data/meta-token-store.json
+      ONBOARDING_VIDEOS_STORE_PATH: /app/data/onboarding-videos.json
+      ONBOARDING_PROGRESS_STORE_PATH: /app/data/onboarding-progress.json
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - gmtgroupbe_data:/app/data
+
+volumes:
+  gmtgroupbe_data:
