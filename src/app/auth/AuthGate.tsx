@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 import { GlobalLoading } from "../components/GlobalLoading";
-import { api, getAuthToken, refreshStoredUser, saveAuthSession, type UserSession } from "../services/api";
+import { api, getAuthToken, refreshStoredUser, saveAuthSession, authSessionUpdatedEvent, type UserSession } from "../services/api";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -45,8 +45,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
     void checkSession();
 
+    // Listen for session updates (e.g. token expired/revoked) to redirect automatically
+    const handleSessionUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ user: UserSession | null }>;
+      if (!customEvent.detail.user && isActive) {
+        setStatus("guest");
+      }
+    };
+
+    window.addEventListener(authSessionUpdatedEvent, handleSessionUpdate);
+
     return () => {
       isActive = false;
+      window.removeEventListener(authSessionUpdatedEvent, handleSessionUpdate);
     };
   }, []);
 
