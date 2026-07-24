@@ -373,7 +373,7 @@ export type ArticlePayload = {
   updated_at?: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://gmtsuites.co.id";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 const assetBaseUrl = import.meta.env.VITE_ASSET_BASE_URL ?? "https://is3.cloudhost.id/gmtsuites";
 export const clientName = import.meta.env.VITE_CLIENT_NAME ?? "website_utama";
 const websiteAUrl = import.meta.env.VITE_WEBSITE_A_URL ?? "";
@@ -819,10 +819,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
 export async function refreshStoredUser(token = getAuthToken()) {
   const response = await apiRequest<{ user: UserSession }>("/api/auth/me");
-  const currentToken = getAuthToken() || token;
 
-  if (currentToken) {
-    saveAuthSession(currentToken, response.user);
+  if (token) {
+    saveAuthSession(token, response.user);
   }
 
   return response.user;
@@ -1055,6 +1054,3 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 };
-
-
-
