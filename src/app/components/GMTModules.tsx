@@ -66,6 +66,7 @@ import {
 import { apiRequest } from "../services/api";
 import { fetchKeywordResearch, type KeywordResearchResponse } from "../services/seoIntegrations";
 import { fetchWebsiteAnalytics, type WebsiteAnalyticsResponse } from "../services/websiteAnalytics";
+import { KeywordRankCompetitorCard } from "./KeywordRankCompetitorCard";
 import {
   isSocialAgentConfigured,
   syncAndFetchSocialAgent,
@@ -796,6 +797,8 @@ export function MultiWebsiteManagement() {
         {pageData.length ? <DataTable columns={["Website", "Page", "Title", "Pageviews", "Users", "Engagement", "Avg. duration"]} rows={pageData.map((page) => [page.website, page.path, <span className="line-clamp-2 max-w-xs">{page.title}</span>, formatNumber(page.pageviews), formatNumber(page.users), formatPercent(page.engagementRate), formatDuration(page.averageSessionDuration)])} /> : <EmptyState text="Belum ada data halaman." />}
       </SectionCard>
 
+      <KeywordRankCompetitorCard availableWebsites={(analytics?.properties || []).map((p) => ({ domain: p.domain, url: `https://${p.domain}/` }))} />
+
       <SectionCard icon={Search} title="Keyword Performance" description="Keyword organik dari Search Console, lengkap dengan ranking, halaman tujuan, clicks/views, impressions, CTR, dan peluang optimasi.">
         {allKeywordData.length ? <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -956,6 +959,8 @@ export function SeoManagement() {
         { label: "AI briefs ready", value: "0", detail: "Menunggu AI provider real" },
       ]}
     >
+      <KeywordRankCompetitorCard defaultSiteUrl={gscSiteUrl} />
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <SectionCard icon={Plug} title="External Integrations" description="Connector readiness untuk data SEO, Ads, dan publishing.">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">

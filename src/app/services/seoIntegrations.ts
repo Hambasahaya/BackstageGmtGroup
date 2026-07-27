@@ -53,3 +53,73 @@ export async function fetchKeywordResearch(input: {
 
   return payload as KeywordResearchResponse;
 }
+
+export type CompetitorSERPItem = {
+  rank: number;
+  domain: string;
+  title: string;
+  url: string;
+  type: string;
+  authorityScore: number;
+  estimatedTrafficShare: string;
+  strengths: string[];
+};
+
+export type OutrankRecommendation = {
+  title: string;
+  description: string;
+  priority: "HIGH" | "MEDIUM" | "LOW";
+};
+
+export type KeywordCheckResponse = {
+  keyword: string;
+  siteUrl: string;
+  targetDomain: string;
+  position: number;
+  positionMatched: boolean;
+  targetPage: string;
+  metrics: {
+    searchVolume: number;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    cpcLow: number;
+    cpcHigh: number;
+    competitionLevel: string;
+    competitionIndex: number;
+  };
+  competitors: CompetitorSERPItem[];
+  recommendations: OutrankRecommendation[];
+  meta: {
+    startDate: string;
+    endDate: string;
+    sources: string[];
+  };
+};
+
+export async function checkKeywordRankAndCompetitors(input: {
+  keyword: string;
+  siteUrl?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch("/api/seo/keyword-check", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error || "Keyword check request failed.");
+  }
+
+  return payload as KeywordCheckResponse;
+}
+
