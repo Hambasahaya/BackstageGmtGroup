@@ -273,6 +273,20 @@ const fetchAdsMetrics = async ({ accessToken, keyword }) => {
   }
 };
 
+// Fetch 100% Free related keywords from Google Suggest API (No API key needed)
+const fetchFreeGoogleSuggestions = async (keyword) => {
+  try {
+    const response = await fetch(
+      `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(keyword)}&hl=id`,
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return (data[1] || []).slice(0, 8);
+  } catch {
+    return [];
+  }
+};
+
 export default async function handler(request, response) {
   response.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   response.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -313,12 +327,13 @@ export default async function handler(request, response) {
 
     const accessToken = await getGoogleAccessToken();
 
-    // Fetch REALTIME live Google SERP, GSC, and Google Ads concurrently
+    // Fetch REALTIME live Google SERP, GSC, Google Ads, and Free Google Suggest API
     const targetDomain = siteUrl.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-    const [liveSerp, gscDetails, adsMetrics] = await Promise.all([
+    const [liveSerp, gscDetails, adsMetrics, suggestions] = await Promise.all([
       fetchLiveGoogleSerp(keyword, targetDomain),
       fetchGscRankDetails({ accessToken, siteUrl, keyword, startDate, endDate }),
       fetchAdsMetrics({ accessToken, keyword }),
+      fetchFreeGoogleSuggestions(keyword),
     ]);
 
     // Compute REAL position
@@ -379,12 +394,15 @@ export default async function handler(request, response) {
       },
       competitors: realCompetitors,
       recommendations,
+      suggestions: suggestions || [],
       isRealtimeLive: true,
+      isFreeApi: true,
       meta: {
         startDate,
         endDate,
         sources: [
-          "google_live_serp_realtime",
+          "google_live_serp_realtime_free",
+          "google_suggest_api_free",
           ...(gscDetails ? ["google_search_console"] : []),
           ...(adsMetrics ? ["google_ads_keyword_planner"] : []),
         ],

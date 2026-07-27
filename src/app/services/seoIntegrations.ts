@@ -90,6 +90,8 @@ export type KeywordCheckResponse = {
   };
   competitors: CompetitorSERPItem[];
   recommendations: OutrankRecommendation[];
+  suggestions?: string[];
+  isFreeApi?: boolean;
   meta: {
     startDate: string;
     endDate: string;

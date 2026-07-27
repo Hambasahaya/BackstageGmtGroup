@@ -448,6 +448,29 @@ export function KeywordRankCompetitorCard({
                 </div>
               ))}
             </div>
+
+            {result.suggestions && result.suggestions.length > 0 && (
+              <div className="mt-4 border-t border-teal-100 pt-4">
+                <p className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-teal-600" />
+                  Rekomendasi Kata Kunci Turunan (Free Google Suggest API):
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {result.suggestions.map((sug, sIdx) => (
+                    <button
+                      key={sIdx}
+                      onClick={() => {
+                        setKeywordInput(sug);
+                        handleSearch(sug);
+                      }}
+                      className="rounded-md border border-teal-200 bg-white px-2.5 py-1 text-xs font-medium text-teal-800 transition hover:bg-teal-50 hover:border-teal-400"
+                    >
+                      + {sug}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
