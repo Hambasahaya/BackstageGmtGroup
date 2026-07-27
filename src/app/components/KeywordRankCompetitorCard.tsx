@@ -260,7 +260,7 @@ export function KeywordRankCompetitorCard({
                       Keyword: <span className="font-bold underline">{result.keyword}</span> • Domain:{" "}
                       <span className="font-bold">{result.targetDomain}</span>
                     </p>
-                    {result.targetPage && (
+                    {result.targetPage ? (
                       <p className="flex items-center gap-1.5 text-xs opacity-80">
                         <span>Landing Page Target:</span>
                         <a
@@ -272,6 +272,13 @@ export function KeywordRankCompetitorCard({
                           <span className="max-w-md truncate">{result.targetPage}</span>
                           <ExternalLink className="h-3 w-3" />
                         </a>
+                      </p>
+                    ) : (
+                      <p className="flex items-center gap-1.5 text-xs text-slate-600 bg-white/60 p-2 rounded-md border border-slate-200 mt-1">
+                        <span className="font-semibold">Landing Page Target:</span>
+                        <span className="italic text-slate-600">
+                          Belum terdeteksi di Top 30 Google (Belum ada halaman spesifik {result.targetDomain} yang masuk peringkat SERP untuk keyword "{result.keyword}")
+                        </span>
                       </p>
                     )}
                   </div>

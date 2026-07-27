@@ -366,7 +366,7 @@ export default async function handler(request, response) {
       targetDomain,
       position: position !== null ? position : 0, // 0 means not found in top live SERP
       positionMatched: Boolean(gscDetails?.matched || liveSerp?.targetRank),
-      targetPage: position ? targetPage : siteUrl,
+      targetPage: position ? targetPage : null,
       metrics: {
         searchVolume: adsMetrics?.searchVolume ?? (gscDetails?.impressions ? Math.round(gscDetails.impressions * 4) : 0),
         clicks: gscDetails?.clicks ?? 0,
