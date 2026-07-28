@@ -1,4 +1,4 @@
-import { CalendarDays, Edit3, Eye, Plus, RefreshCw, Search, Trash2, Users, X, BookmarkCheck } from "lucide-react";
+import { CalendarDays, Edit3, Eye, Plus, RefreshCw, Search, Trash2, Users, X, BookmarkCheck, FileText, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type BookingDto, type EducationDto, type EducationParticipantDto, type EducationPayload } from "../services/api";
 import Swal from "sweetalert2";
@@ -86,9 +86,14 @@ function BookingDetailModal({
   booking: BookingDto;
   onClose: () => void;
 }) {
+  const isEvent = String(booking.type).toLowerCase() === "event";
+  const capacity = booking.capacity ?? booking.eventCapacity;
+  const deckUrl = booking.deck ?? booking.eventDeck ?? booking.deckUrl;
+  const description = booking.description ?? booking.eventDescription;
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4">
-      <div className="my-6 w-full max-w-2xl rounded-lg bg-white shadow-xl">
+      <div className="my-6 w-full max-w-3xl rounded-lg bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
           <div>
             <div className="flex items-center gap-2">
@@ -131,6 +136,48 @@ function BookingDetailModal({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Produk Diminati</p>
             <p className="mt-1 font-semibold text-[#0F766E]">{booking.interestedProduct || "-"}</p>
           </div>
+
+          {/* Event Specific Details */}
+          {(isEvent || capacity !== undefined || deckUrl || description) && (
+            <div className="sm:col-span-2 rounded-lg border border-teal-200 bg-teal-50/50 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <BookmarkCheck className="h-4 w-4 text-[#0F766E]" />
+                <h3 className="font-semibold text-slate-900">Informasi Khusus Event</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kapasitas Event (Capacity)</p>
+                  <p className="mt-1 font-semibold text-slate-900">
+                    {capacity !== undefined && capacity !== null ? `${capacity} Peserta` : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Deck Uploaded</p>
+                  {deckUrl ? (
+                    <a
+                      href={String(deckUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-teal-300 bg-white px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-sm"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-teal-600" />
+                      Buka Dokumen Deck
+                      <ExternalLink className="h-3 w-3 opacity-70" />
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-slate-500">Tidak ada deck diupload</p>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Deskripsi Event (Event Description)</p>
+                  <p className="mt-1 leading-relaxed text-slate-800 bg-white border border-slate-200 rounded-md p-3 text-sm">
+                    {description ? String(description) : "Tidak ada deskripsi event."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dibuat Pada</p>
             <p className="mt-1 text-xs text-slate-500">{booking.created_at || "-"}</p>
@@ -342,7 +389,7 @@ export function EducationEvents() {
   const filteredBookings = useMemo(() => {
     const normalizedSearch = searchTerm.toLowerCase();
     return bookings.filter((item) =>
-      [item.id, item.name, item.email, item.position, item.type, item.category, item.interestedProduct, item.referralSource]
+      [item.id, item.name, item.email, item.position, item.type, item.category, item.interestedProduct, item.referralSource, item.description, item.eventDescription]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -560,7 +607,7 @@ export function EducationEvents() {
                     <th className="px-4 py-3 font-semibold">Tipe</th>
                     <th className="px-4 py-3 font-semibold">Nama / Email</th>
                     <th className="px-4 py-3 font-semibold">Jabatan / Kategori</th>
-                    <th className="px-4 py-3 font-semibold">Produk Diminati</th>
+                    <th className="px-4 py-3 font-semibold">Produk / Deck</th>
                     <th className="px-4 py-3 font-semibold">Tanggal Preferred</th>
                     <th className="px-4 py-3 font-semibold">Action</th>
                   </tr>
@@ -573,33 +620,66 @@ export function EducationEvents() {
                       </td>
                     </tr>
                   ) : filteredBookings.length ? (
-                    filteredBookings.map((b) => (
-                      <tr key={b.id} className="border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-mono font-medium text-slate-900">{b.id}</td>
-                        <td className="px-4 py-3">
-                          <BookingTypeBadge type={b.type} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-950">{b.name}</p>
-                          <p className="text-xs text-slate-500">{b.email}</p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-700">
-                          <p>{b.position || "-"}</p>
-                          <p className="text-xs text-slate-500">{b.category || "-"}</p>
-                        </td>
-                        <td className="px-4 py-3 font-medium text-[#0F766E]">{b.interestedProduct || "-"}</td>
-                        <td className="px-4 py-3 text-slate-700">{b.preferredDate || "-"}</td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => setSelectedBooking(b)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Detail
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    filteredBookings.map((b) => {
+                      const isEvt = String(b.type).toLowerCase() === "event";
+                      const cap = b.capacity ?? b.eventCapacity;
+                      const deck = b.deck ?? b.eventDeck ?? b.deckUrl;
+                      const desc = b.description ?? b.eventDescription;
+
+                      return (
+                        <tr key={b.id} className="border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50/50">
+                          <td className="px-4 py-3 font-mono font-medium text-slate-900">{b.id}</td>
+                          <td className="px-4 py-3">
+                            <BookingTypeBadge type={b.type} />
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-950">{b.name}</p>
+                            <p className="text-xs text-slate-500">{b.email}</p>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            <p>{b.position || "-"}</p>
+                            <p className="text-xs text-slate-500">{b.category || "-"}</p>
+                            {isEvt && cap !== undefined && (
+                              <p className="mt-1 text-xs font-semibold text-purple-700">
+                                Kapasitas: {cap} peserta
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            <p className="font-medium text-[#0F766E]">{b.interestedProduct || "-"}</p>
+                            {isEvt && deck && (
+                              <a
+                                href={String(deck)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-flex items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition"
+                              >
+                                <FileText className="h-3 w-3 text-teal-600" />
+                                Deck Document
+                                <ExternalLink className="h-2.5 w-2.5 opacity-70" />
+                              </a>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            <p>{b.preferredDate || "-"}</p>
+                            {isEvt && desc && (
+                              <p className="mt-1 line-clamp-1 max-w-[200px] text-xs text-slate-500" title={String(desc)}>
+                                {desc}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => setSelectedBooking(b)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              Detail
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">

@@ -320,6 +320,13 @@ export type BookingDto = {
   preferredDate?: string;
   usedGmtProduct?: string;
   interestedProduct?: string;
+  capacity?: number | string;
+  eventCapacity?: number | string;
+  deck?: string;
+  eventDeck?: string;
+  deckUrl?: string;
+  description?: string;
+  eventDescription?: string;
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown;
