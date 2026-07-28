@@ -446,9 +446,14 @@ export function resolveApiAssetUrl(value: string | null | undefined) {
     return value;
   }
 
-  const base = assetBaseUrl.replace(/\/$/, "");
   const normalizedPath = value.startsWith("/") ? value : `/${value}`;
 
+  if (normalizedPath.startsWith("/uploads/")) {
+    const apiBase = apiBaseUrl.replace(/\/$/, "");
+    return `${apiBase}${normalizedPath}`;
+  }
+
+  const base = (assetBaseUrl || apiBaseUrl).replace(/\/$/, "");
   return `${base}${normalizedPath}`;
 }
 
