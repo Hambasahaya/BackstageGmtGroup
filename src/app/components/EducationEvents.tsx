@@ -1,6 +1,6 @@
 import { CalendarDays, Edit3, Eye, Plus, RefreshCw, Search, Trash2, Users, X, BookmarkCheck, FileText, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type BookingDto, type EducationDto, type EducationParticipantDto, type EducationPayload } from "../services/api";
+import { api, resolveApiAssetUrl, type BookingDto, type EducationDto, type EducationParticipantDto, type EducationPayload } from "../services/api";
 import Swal from "sweetalert2";
 
 const currentMonth = new Date().toISOString().slice(0, 7);
@@ -155,7 +155,7 @@ function BookingDetailModal({
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Deck Uploaded</p>
                   {deckUrl ? (
                     <a
-                      href={String(deckUrl)}
+                      href={resolveApiAssetUrl(String(deckUrl))}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-teal-300 bg-white px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-sm"
@@ -649,7 +649,7 @@ export function EducationEvents() {
                             <p className="font-medium text-[#0F766E]">{b.interestedProduct || "-"}</p>
                             {isEvt && deck && (
                               <a
-                                href={String(deck)}
+                                href={resolveApiAssetUrl(String(deck))}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="mt-1 inline-flex items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition"
