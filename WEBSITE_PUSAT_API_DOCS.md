@@ -825,7 +825,54 @@ PUT /api/notifications/:id/read
 PUT /api/notifications/read-all
 ```
 
+## Bookings & Events
+
+### List All Bookings for Admin
+
+```text
+GET /api/bookings
+GET /api/bookings?type=demo
+GET /api/bookings?type=event
+```
+
+Auth: wajib login, role `super_admin`, `sales`, atau `marketing`.
+
+Response 200 OK:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "DEMO-1785213729",
+      "type": "demo",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "position": "Event Director",
+      "referralSource": "Instagram",
+      "category": "Corporate",
+      "preferredDate": "2026-07-28 10:00 AM",
+      "usedGmtProduct": "Yes",
+      "interestedProduct": "Moxlite",
+      "created_at": "2026-07-28T10:00:00+07:00",
+      "updated_at": "2026-07-28T10:00:00+07:00"
+    }
+  ]
+}
+```
+
+Error umum:
+
+```json
+{
+  "success": false,
+  "message": "invalid request",
+  "error": "..."
+}
+```
+
 ## Super Admin Area
+
 
 Semua endpoint di bagian ini wajib login sebagai `super_admin`.
 

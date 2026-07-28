@@ -55,3 +55,13 @@ export function authorizeAgentOrUser(user, response) {
   }
   return true;
 }
+
+export function authorizeAdminOrSalesOrMarketing(user, response) {
+  const allowedRoles = ["super_admin", "sales", "marketing"];
+  if (!allowedRoles.includes(user?.role)) {
+    json(response, 403, { success: false, message: "you do not have access to this resource", error: "you do not have access to this resource" });
+    return false;
+  }
+  return true;
+}
+

@@ -307,6 +307,32 @@ export type EducationListResponse = {
   };
 };
 
+export type BookingType = "demo" | "event" | string;
+
+export type BookingDto = {
+  id: string;
+  type: BookingType;
+  name: string;
+  email: string;
+  position?: string;
+  referralSource?: string;
+  category?: string;
+  preferredDate?: string;
+  usedGmtProduct?: string;
+  interestedProduct?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+};
+
+export type BookingsListResponse = {
+  success: boolean;
+  data: BookingDto[];
+  message?: string;
+  error?: string;
+};
+
+
 export type EducationDetailResponse = {
   success?: boolean;
   message?: string;
@@ -1052,5 +1078,10 @@ export const api = {
     apiRequest<{ message: string; created_count: number; skipped_count: number; created: ArticleDto[]; skipped_slugs: string[] }>("/api/articles/import", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  bookings: (type?: "demo" | "event" | string) =>
+    apiRequest<BookingsListResponse>("/api/bookings", {
+      auth: true,
+      query: { type },
     }),
 };
