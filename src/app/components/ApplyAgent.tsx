@@ -84,6 +84,8 @@ const requiredFieldMessages: Record<RequiredFieldKey, string> = {
   target_product: "Target produk wajib diisi.",
 };
 
+const hasLetter = (value: string) => /[^\W\d_]/u.test(value);
+
 const verificationInitial: VerificationForm = {
   photo: null,
   ktp_photo: null,
@@ -557,7 +559,7 @@ export function ApplyAgent() {
   const getMissingFields = (includeApplyFields = true, includeVerificationFields = true): RequiredFieldKey[] => {
     const missingFields: RequiredFieldKey[] = [];
 
-    if (includeApplyFields && (!applyForm.job.trim() || !/[A-Za-zÀ-ÿ]/.test(applyForm.job))) missingFields.push("job");
+    if (includeApplyFields && (!applyForm.job.trim() || !hasLetter(applyForm.job))) missingFields.push("job");
     if (includeVerificationFields && !verificationForm.photo) missingFields.push("photo");
     if (includeVerificationFields && !verificationForm.ktp_photo) missingFields.push("ktp_photo");
     if (includeVerificationFields && !verificationForm.bank_name.trim()) missingFields.push("bank_name");
@@ -575,10 +577,21 @@ export function ApplyAgent() {
 
   const getFieldError = (field: RequiredFieldKey, includeApplyFields = true) => {
     if (!touchedFields[field]) return "";
+    if (field === "job") {
+      if (!applyForm.job.trim()) return requiredFieldMessages.job;
+      if (!hasLetter(applyForm.job)) return "Pekerjaan harus berisi huruf, tidak boleh angka saja.";
+      return "";
+    }
+    if (field === "account_number") {
+      if (!verificationForm.account_number.trim()) return requiredFieldMessages.account_number;
+      if (/\D/.test(verificationForm.account_number)) return "Nomor rekening hanya boleh berisi angka.";
+      return "";
+    }
     return getMissingFields(includeApplyFields).includes(field) ? requiredFieldMessages[field] : "";
   };
 
   const isFormIncomplete = getMissingFields(true, !isSplitAgentMode).length > 0;
+  const isVerificationIncomplete = getMissingFields(false, true).length > 0;
 
   useEffect(() => {
     fetch("https://raw.githubusercontent.com/Caknoooo/provinces-cities-indonesia/master/json/regencies.json")
@@ -800,7 +813,7 @@ export function ApplyAgent() {
               </div>
               <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} onBlur={() => markFieldTouched("full_address")} error={getFieldError("full_address")} placeholder="Jl. Contoh No. 10" />
               <div className="flex justify-end border-t border-slate-200 pt-5">
-                <button type="submit" disabled={isSubmitting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
+                <button type="submit" disabled={isSubmitting || isVerificationIncomplete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
                   <FileImage className="h-4 w-4" />
                   {isSubmitting ? "Menyimpan..." : "Simpan data verifikasi"}
                 </button>
@@ -1064,6 +1077,10 @@ export function ApplyAgent() {
     </div>
   );
 }
+
+
+
+
 
 
 
