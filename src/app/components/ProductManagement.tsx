@@ -1,4 +1,4 @@
-import {
+﻿import {
   AlertCircle,
   Check,
   Edit3,
@@ -32,6 +32,8 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
 });
 
+const COMMISSION_TIER_KEYS = ["0%", "5%", "10%", "15%", "20%", "25%", "28%"] as const;
+
 export function renderFormattedDescription(text: string | null | undefined) {
   if (!text) return <p className="text-slate-400 italic">Tidak ada deskripsi.</p>;
 
@@ -56,7 +58,7 @@ export function renderFormattedDescription(text: string | null | undefined) {
     const trimmed = line.trim();
 
 
-    const isBullet = trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("•");
+    const isBullet = trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.startsWith("â€¢");
     const numberedMatch = trimmed.match(/^(\d+)\.\s(.*)/);
 
     if (isBullet) {
@@ -529,20 +531,30 @@ export function ProductManagement() {
         if (komisiIdx === -1) komisiIdx = headers.indexOf("komisi_0");
 
         const getTierIdx = (p: string) => {
-          let idx = headers.indexOf(`komisi @ ${p}`);
-          if (idx === -1) idx = headers.indexOf(`komisi_${p}`);
-          if (idx === -1) idx = headers.indexOf(`komisi ${p}`);
-          return idx;
+          const plainPercent = p.replace("%", "");
+          const candidates = [
+            `komisi @ ${p}`,
+            `komisi_${p}`,
+            `komisi_${plainPercent}`,
+            `komisi ${p}`,
+            `komisi ${plainPercent}`,
+            `diskon @ ${p}`,
+            `diskon_${p}`,
+            `diskon_${plainPercent}`,
+            `diskon ${p}`,
+            `diskon ${plainPercent}`,
+            `commission @ ${p}`,
+            `commission_${p}`,
+            `commission_${plainPercent}`,
+            `commission ${p}`,
+            `commission ${plainPercent}`,
+          ];
+          return candidates.reduce((found, candidate) => found !== -1 ? found : headers.indexOf(candidate), -1);
         };
 
-        const tierIdxs: Record<string, number> = {
-          "5%": getTierIdx("5%"),
-          "10%": getTierIdx("10%"),
-          "15%": getTierIdx("15%"),
-          "20%": getTierIdx("20%"),
-          "25%": getTierIdx("25%"),
-          "28%": getTierIdx("28%"),
-        };
+        const tierIdxs: Record<string, number> = Object.fromEntries(
+          COMMISSION_TIER_KEYS.map((tier) => [tier, getTierIdx(tier)])
+        );
 
         const descIdx = headers.indexOf("deskripsi") !== -1 ? headers.indexOf("deskripsi") : headers.indexOf("description");
         const statusIdx = headers.indexOf("status");
@@ -635,7 +647,7 @@ export function ProductManagement() {
             const tiersChanged = () => {
               if (Object.keys(commission_tiers).length === 0) return false;
               const existingTiers = existing.commission_tiers || {};
-              for (const key of ["5%", "10%", "15%", "20%", "25%", "28%"]) {
+              for (const key of COMMISSION_TIER_KEYS) {
                 if (commission_tiers[key] !== undefined && commission_tiers[key] !== existingTiers[key]) {
                   return true;
                 }
@@ -1243,7 +1255,7 @@ export function ProductManagement() {
                   Nilai komisi untuk masing-masing tingkat diskon agen. Jika dikosongkan, sistem akan menghitung secara otomatis.
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {["5%", "10%", "15%", "20%", "25%", "28%"].map((tier) => (
+                  {COMMISSION_TIER_KEYS.map((tier) => (
                     <label key={tier} className="block">
                       <span className="text-[11px] font-semibold text-slate-500 uppercase">
                         Diskon {tier}
@@ -1554,3 +1566,5 @@ export function ProductManagement() {
     </div>
   );
 }
+
+
