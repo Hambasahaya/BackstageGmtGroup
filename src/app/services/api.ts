@@ -1,6 +1,6 @@
 export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
-export type PreorderStatus = "draft" | "in_review" | "approve" | "invalid";
-export type PaymentStatus = "unpaid" | "pending" | "paid" | "expired" | "failed" | "refund";
+export type PreorderStatus = "draft" | "in_review" | "approve" | "shipped" | "barang_sudah_terkirim" | "invalid";
+export type PaymentStatus = "unpaid" | "pending" | "partial" | "paid" | "shipped" | "barang_sudah_terkirim" | "expired" | "failed" | "refund";
 export type PaymentMode = "full" | "split" | "50%" | "100%" | "50" | "100";
 export type WithdrawStatus = "on_progress" | "approval";
 export type OnboardingProgressStatus = "in_progress" | "completed";
@@ -74,6 +74,8 @@ export type PreorderDto = {
   payment_token?: string | null;
   midtrans_order_id?: string | null;
   invalid_reason?: string | null;
+  invoice_received?: boolean;
+  invoice_received_at?: string | null;
   payment_proof?: string | null;
   dp_proof?: string | null;
   remaining_proof?: string | null;
@@ -104,6 +106,27 @@ export type WithdrawDto = {
   status: WithdrawStatus;
   created_at: string;
   approved_at?: string | null;
+  agent_name?: string | null;
+  user_name?: string | null;
+  bank_name?: string | null;
+  bank?: string | null;
+  account_number?: string | null;
+  nomor_rekening?: string | null;
+  nama_penerima?: string | null;
+  recipient_name?: string | null;
+  account_holder?: string | null;
+  transfer_proof?: string | null;
+  payment_proof?: string | null;
+  proof_of_transfer?: string | null;
+  bukti_transfer?: string | null;
+  user?: {
+    name?: string | null;
+    detail_user?: DetailUserDto;
+  } | null;
+  agent?: {
+    name?: string | null;
+    detail_user?: DetailUserDto;
+  } | null;
 };
 
 export type OnboardingVideoDto = {
@@ -171,7 +194,16 @@ export type DetailUserDto = {
   ktp_photo?: string | null;
   full_address?: string | null;
   bank_name?: string | null;
+  bank?: string | null;
   account_number?: string | null;
+  nomor_rekening?: string | null;
+  nama_penerima?: string | null;
+  recipient_name?: string | null;
+  account_holder?: string | null;
+  transfer_proof?: string | null;
+  payment_proof?: string | null;
+  proof_of_transfer?: string | null;
+  bukti_transfer?: string | null;
   status?: AgentApplicationStatus | null;
   created_at?: string;
   updated_at?: string;
@@ -234,6 +266,85 @@ export type AgentVerificationPayload = {
   ttl: string;
   full_address: string;
   domicile?: string;
+};
+
+
+export type CustomerCareTicketType = "complaint" | "demo_request" | "warranty_claim" | "general_support";
+export type CustomerCareTicketStatus = "diterima" | "diproses" | "menunggu_customer" | "selesai";
+export type CustomerCareTicketCategory =
+  | "produk_rusak"
+  | "barang_kurang_salah"
+  | "keterlambatan_pengiriman"
+  | "pembayaran"
+  | "garansi"
+  | "lainnya";
+
+export type CustomerCareInvoiceDto = {
+  invoice_id: number;
+  invoice_number: string;
+  date: string;
+  products: { product_id: number; product_name: string; qty: number }[];
+};
+
+export type CustomerCareAttachmentDto = {
+  id: number;
+  ticket_id: number;
+  file_url: string;
+  file_type: "image" | "video" | string;
+  created_at: string;
+};
+
+export type CustomerCareLogDto = {
+  id: number;
+  ticket_id?: number;
+  actor_id?: number;
+  action: string;
+  note?: string;
+  created_at: string;
+};
+
+export type CustomerCareMessageDto = {
+  id: number;
+  ticket_id?: number;
+  sender_id?: number;
+  sender_name: string;
+  sender_role: string;
+  message: string;
+  created_at: string;
+};
+
+export type CustomerCareTicketDto = {
+  id: number;
+  ticket_number: string;
+  type: CustomerCareTicketType;
+  invoice_id?: number;
+  invoice_number?: string;
+  product_id?: number;
+  product_name?: string;
+  category: CustomerCareTicketCategory | string;
+  subject: string;
+  description?: string;
+  status: CustomerCareTicketStatus;
+  pic_id?: number;
+  pic_name?: string;
+  contact_channel?: string;
+  rating?: number | null;
+  feedback?: string | null;
+  response_due_at?: string;
+  resolve_due_at?: string;
+  attachments?: CustomerCareAttachmentDto[];
+  logs?: CustomerCareLogDto[];
+  created_at: string;
+};
+
+export type CustomerCareTicketPayload = {
+  type: CustomerCareTicketType;
+  invoice_id?: number;
+  product_id?: number;
+  category: string;
+  subject: string;
+  description?: string;
+  contact_channel?: string;
 };
 
 export type AgentApplicationDto = UserSession & {
@@ -984,7 +1095,9 @@ export const api = {
   createPreorderPaymentLink: (id: number) =>
     apiRequest<PaymentLinkResponse>(`/api/preorders/${id}/payment-link`, { method: "POST" }),
   preorderPdf: (id: number) => apiRequest<Blob>(`/api/preorders/${id}/pdf`),
-  salesUpdatePreorderStatus: (id: number, payload: { status: "approve" | "invalid"; invalid_reason?: string }) =>
+  confirmInvoiceReceived: (id: number) =>
+    apiRequest<{ message: string; preorder: PreorderDto }>(`/api/preorders/${id}/confirm-invoice-received`, { method: "POST" }),
+  salesUpdatePreorderStatus: (id: number, payload: { status: "approve" | "invalid" | "shipped" | "barang_sudah_terkirim"; invalid_reason?: string; payment_status?: PaymentStatus }) =>
     apiRequest<{ message: string; preorder: PreorderDto }>(`/api/sales/preorders/${id}/status`, {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -1024,9 +1137,81 @@ export const api = {
   superAdminDashboard: () => apiRequest<{ message: string }>("/api/super-admin/dashboard"),
   superAdminWithdraws: (status?: WithdrawStatus) =>
     apiRequest<{ withdraws: WithdrawDto[] }>("/api/super-admin/withdraws", { query: { status } }),
-  approveWithdraw: (id: number) =>
-    apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/approve`, { method: "PUT" }),
-  onboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/agent/onboarding/videos"),
+  approveWithdraw: (id: number, transferProof?: File) => {
+    if (transferProof) {
+      const formData = new FormData();
+      formData.set("transfer_proof", transferProof);
+      return apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/approve`, {
+        method: "POST",
+        body: formData,
+      });
+    }
+
+    return apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/approve`, { method: "PUT" });
+  },
+  uploadWithdrawProof: (id: number, transferProof: File | string) => {
+    const body = transferProof instanceof File
+      ? (() => {
+          const formData = new FormData();
+          formData.set("transfer_proof", transferProof);
+          return formData;
+        })()
+      : JSON.stringify({ transfer_proof: transferProof });
+
+    return apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/proof`, {
+      method: "POST",
+      body,
+    });
+  },
+  customerCareInvoices: () => apiRequest<{ data: CustomerCareInvoiceDto[] }>("/api/customer-care/invoices"),
+  customerCareCategories: () => apiRequest<{ data: string[] }>("/api/customer-care/categories"),
+  customerCareTickets: (query?: { status?: CustomerCareTicketStatus; type?: CustomerCareTicketType; category?: string }) =>
+    apiRequest<{ data: CustomerCareTicketDto[] }>("/api/customer-care/tickets", { query }),
+  customerCareTicketDetail: (id: number) =>
+    apiRequest<{ data: CustomerCareTicketDto }>(`/api/customer-care/tickets/${id}`),
+  createCustomerCareTicket: (payload: CustomerCareTicketPayload) =>
+    apiRequest<{ message: string; data: CustomerCareTicketDto }>("/api/customer-care/tickets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  uploadCustomerCareAttachments: (ticketId: number, files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files[]", file));
+
+    return apiRequest<{ message: string; data: CustomerCareAttachmentDto[] }>(`/api/customer-care/tickets/${ticketId}/attachments`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+  customerCareMessages: (ticketId: number) =>
+    apiRequest<{ data: CustomerCareMessageDto[] }>(`/api/customer-care/tickets/${ticketId}/messages`),
+  sendCustomerCareMessage: (ticketId: number, message: string) =>
+    apiRequest<{ message: string; data: CustomerCareMessageDto }>(`/api/customer-care/tickets/${ticketId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+  rateCustomerCareTicket: (ticketId: number, payload: { rating: number; feedback?: string }) =>
+    apiRequest<{ message: string }>(`/api/customer-care/tickets/${ticketId}/rating`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  adminCustomerCareTickets: (query?: { status?: CustomerCareTicketStatus; category?: string; type?: CustomerCareTicketType; pic_id?: number; overdue?: number }) =>
+    apiRequest<{ data: CustomerCareTicketDto[] }>("/api/admin/customer-care/tickets", { query }),
+  adminUpdateCustomerCareTicketStatus: (ticketId: number, payload: { status: CustomerCareTicketStatus; note?: string }) =>
+    apiRequest<{ message: string }>(`/api/admin/customer-care/tickets/${ticketId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  adminAssignCustomerCareTicket: (ticketId: number, picId: number) =>
+    apiRequest<{ message: string }>(`/api/admin/customer-care/tickets/${ticketId}/assign`, {
+      method: "PATCH",
+      body: JSON.stringify({ pic_id: picId }),
+    }),
+  adminCreateCustomerCareInternalNote: (ticketId: number, note: string) =>
+    apiRequest<{ message: string; data: unknown }>(`/api/admin/customer-care/tickets/${ticketId}/internal-notes`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),  onboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/agent/onboarding/videos"),
   onboardingProgress: () => apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress"),
   saveOnboardingProgress: (payload: {
     video_id: number;
@@ -1097,3 +1282,7 @@ export const api = {
       query: { type },
     }),
 };
+
+
+
+

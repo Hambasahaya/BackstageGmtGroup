@@ -39,7 +39,7 @@ type PurchaseOrderItem = {
 type PurchaseOrder = {
   id: number;
   poNumber: string;
-  status: "draft" | "in_review" | "approve" | "invalid";
+  status: "draft" | "in_review" | "approve" | "shipped" | "barang_sudah_terkirim" | "invalid";
   customerName: string;
   customerCompany: string;
   customerEmail: string;
@@ -79,6 +79,27 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function parseDiscountTierKey(key: string) {
+  const match = key.match(/\d+(?:\.\d+)?/);
+  if (!match) return null;
+
+  const value = Number(match[0]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function getDiscountOptions(product: Product) {
+  if (!product.commissionTiers) {
+    return discountOptions;
+  }
+
+  const tierDiscounts = Object.keys(product.commissionTiers)
+    .map(parseDiscountTierKey)
+    .filter((value): value is number => value !== null)
+    .map((value) => Math.max(0, value));
+
+  const uniqueDiscounts = Array.from(new Set(tierDiscounts));
+  return uniqueDiscounts.length ? uniqueDiscounts.sort((a, b) => a - b) : discountOptions;
+}
 const defaultProducts: Product[] = [
   {
     id: 1,
@@ -285,6 +306,8 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     remainingProof: preorder.remaining_proof ?? undefined,
     lastPaymentStage: preorder.last_payment_stage ?? undefined,
     createdAt: preorder.created_at ?? new Date().toISOString(),
+    invoiceReceived: Boolean(preorder.invoice_received),
+    invoiceReceivedAt: preorder.invoice_received_at ?? null,
   };
 }
 
@@ -437,6 +460,7 @@ export function AgentPurchaseOrder() {
   const [paymentMode, setPaymentMode] = useState<"100%" | "50%">("100%");
   const [mobilePoStep, setMobilePoStep] = useState<"cart" | "details">("cart");
   const [expandedMobilePoId, setExpandedMobilePoId] = useState<number | null>(null);
+  const [touchedCustomerFields, setTouchedCustomerFields] = useState<Record<string, boolean>>({});
 
   const isDeletingPo = (poId: number) => actionLoading?.type === "delete" && actionLoading.poId === poId;
   const isPrintingPo = (poId: number) => actionLoading?.type === "print" && actionLoading.poId === poId;
@@ -491,6 +515,40 @@ export function AgentPurchaseOrder() {
   const submittedCount = purchaseOrders.filter((po) => po.status === "in_review").length;
   const draftCount = purchaseOrders.filter((po) => po.status === "draft").length;
   const canAddMoreProducts = items.length < products.length;
+  const customerFieldErrors = useMemo(() => {
+    const normalizedEmail = normalizeEmail(customerEmail);
+    const phone = customerPhone.trim();
+
+    return {
+      customerName: customerName.trim() ? "" : "Nama customer wajib diisi.",
+      customerCompany: customerCompany.trim() ? "" : "Nama perusahaan wajib diisi.",
+      customerEmail: !normalizedEmail
+        ? "Email customer wajib diisi."
+        : emailPattern.test(normalizedEmail)
+          ? ""
+          : "Format email customer tidak valid.",
+      customerPhone: !phone
+        ? "No HP wajib diisi."
+        : phone.startsWith("+62") || phone.startsWith("08")
+          ? ""
+          : "Nomor HP harus diawali dengan +62 atau 08.",
+      customerAddress: customerAddress.trim() ? "" : "Alamat wajib diisi.",
+    };
+  }, [customerAddress, customerCompany, customerEmail, customerName, customerPhone]);
+
+  const markCustomerFieldTouched = (field: keyof typeof customerFieldErrors) => {
+    setTouchedCustomerFields((current) => ({ ...current, [field]: true }));
+  };
+
+  const getCustomerFieldError = (field: keyof typeof customerFieldErrors) =>
+    touchedCustomerFields[field] ? customerFieldErrors[field] : "";
+
+  const getCustomerInputClass = (field: keyof typeof customerFieldErrors) =>
+    `w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2 ${
+      getCustomerFieldError(field)
+        ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
+        : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+    }`;
 
   const resetForm = () => {
     setCustomerName("");
@@ -505,6 +563,7 @@ export function AgentPurchaseOrder() {
     setEditingPoId(null);
     setPaymentMode("100%");
     setMobilePoStep("cart");
+    setTouchedCustomerFields({});
   };
 
   const closeModal = () => {
@@ -531,7 +590,7 @@ export function AgentPurchaseOrder() {
         if (changes.productId !== undefined && changes.productId !== item.productId) {
           const newProduct = getProduct(products, changes.productId);
           if (newProduct.commissionTiers) {
-            const tiers = Object.keys(newProduct.commissionTiers).map((k) => parseInt(k.replace("%", ""), 10));
+            const tiers = getDiscountOptions(newProduct);
             if (!tiers.includes(newDiscountPercent)) {
               newDiscountPercent = tiers.includes(0) ? 0 : (tiers[0] ?? 0);
             }
@@ -595,6 +654,7 @@ export function AgentPurchaseOrder() {
     setFormError("");
     setPdfMessage("");
     setPaymentMode(po.paymentMode || "100%");
+    setTouchedCustomerFields({});
     setIsModalOpen(true);
   };
 
@@ -1108,6 +1168,7 @@ export function AgentPurchaseOrder() {
                 onClick={() => {
                   if (mobilePoStep === "details") {
                     setMobilePoStep("cart");
+    setTouchedCustomerFields({});
                     return;
                   }
                   closeModal();
@@ -1137,47 +1198,93 @@ export function AgentPurchaseOrder() {
                   <span className="mb-2 block text-sm font-medium text-slate-700">Nama customer</span>
                   <input
                     value={customerName}
-                    onChange={(event) => setCustomerName(event.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    onBlur={() => markCustomerFieldTouched("customerName")}
+                    onChange={(event) => {
+                      setCustomerName(event.target.value);
+                      markCustomerFieldTouched("customerName");
+                    }}
+                    className={getCustomerInputClass("customerName")}
                     placeholder="Nama customer"
+                    aria-invalid={Boolean(getCustomerFieldError("customerName"))}
                   />
+                  {getCustomerFieldError("customerName") && (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerName")}</p>
+                  )}
                 </label>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Nama perusahaan</span>
                   <input
                     value={customerCompany}
-                    onChange={(event) => setCustomerCompany(event.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    onBlur={() => markCustomerFieldTouched("customerCompany")}
+                    onChange={(event) => {
+                      setCustomerCompany(event.target.value);
+                      markCustomerFieldTouched("customerCompany");
+                    }}
+                    className={getCustomerInputClass("customerCompany")}
                     placeholder="Nama perusahaan"
+                    aria-invalid={Boolean(getCustomerFieldError("customerCompany"))}
                   />
+                  {getCustomerFieldError("customerCompany") && (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerCompany")}</p>
+                  )}
+                  <p className="mt-1.5 text-xs font-medium text-slate-500">
+                    Jika perorangan, isi dengan nama customer.
+                  </p>
                 </label>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Email customer</span>
                   <input
                     value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
+                    onBlur={() => markCustomerFieldTouched("customerEmail")}
+                    onChange={(event) => {
+                      setCustomerEmail(event.target.value);
+                      markCustomerFieldTouched("customerEmail");
+                    }}
                     type="email"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    className={getCustomerInputClass("customerEmail")}
                     placeholder="customer@email.com"
+                    aria-invalid={Boolean(getCustomerFieldError("customerEmail"))}
                   />
+                  {getCustomerFieldError("customerEmail") && (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerEmail")}</p>
+                  )}
                 </label>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">No HP</span>
                   <input
                     value={customerPhone}
-                    onChange={(event) => setCustomerPhone(event.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    onBlur={() => markCustomerFieldTouched("customerPhone")}
+                    onChange={(event) => {
+                      setCustomerPhone(event.target.value);
+                      markCustomerFieldTouched("customerPhone");
+                    }}
+                    className={getCustomerInputClass("customerPhone")}
                     placeholder="081234567890"
+                    aria-invalid={Boolean(getCustomerFieldError("customerPhone"))}
                   />
+                  {getCustomerFieldError("customerPhone") && (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerPhone")}</p>
+                  )}
                 </label>
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Alamat</span>
                   <input
                     value={customerAddress}
-                    onChange={(event) => setCustomerAddress(event.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    onBlur={() => markCustomerFieldTouched("customerAddress")}
+                    onChange={(event) => {
+                      setCustomerAddress(event.target.value);
+                      markCustomerFieldTouched("customerAddress");
+                    }}
+                    className={getCustomerInputClass("customerAddress")}
                     placeholder="Alamat customer"
+                    aria-invalid={Boolean(getCustomerFieldError("customerAddress"))}
                   />
+                  {getCustomerFieldError("customerAddress") && (
+                    <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerAddress")}</p>
+                  )}
+                  <p className="mt-1.5 text-xs font-medium text-slate-500">
+                    Alamat dapat diisi atau ditentukan melalui pin Google Maps.
+                  </p>
                 </label>
               </div>
 
@@ -1281,12 +1388,7 @@ export function AgentPurchaseOrder() {
                               onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
                               className="w-[90px] rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                             >
-                              {(calculated.product.commissionTiers
-                                ? Object.keys(calculated.product.commissionTiers)
-                                    .map((k) => parseInt(k.replace("%", ""), 10))
-                                    .sort((a, b) => a - b)
-                                : discountOptions
-                              ).map((discount) => (
+                              {getDiscountOptions(calculated.product).map((discount) => (
                                 <option key={discount} value={discount}>
                                   Disc {discount}%
                                 </option>
@@ -1415,12 +1517,7 @@ export function AgentPurchaseOrder() {
                               onChange={(event) => updateItem(item.id, { discountPercent: Number(event.target.value) })}
                               className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:text-sm"
                             >
-                              {(calculated.product.commissionTiers
-                                ? Object.keys(calculated.product.commissionTiers)
-                                    .map((k) => parseInt(k.replace("%", ""), 10))
-                                    .sort((a, b) => a - b)
-                                : discountOptions
-                              ).map((discount) => (
+                              {getDiscountOptions(calculated.product).map((discount) => (
                                 <option key={discount} value={discount}>
                                   {discount}%
                                 </option>
@@ -1688,7 +1785,18 @@ export function AgentPurchaseOrder() {
                   </p>
                 </div>
               </section>
-
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status penerimaan invoice/barang</p>
+                {previewPo.invoiceReceived ? (
+                  <p className="mt-1 text-sm font-semibold text-emerald-700">
+                    Sudah diterima customer{previewPo.invoiceReceivedAt ? ` pada ${dateFormatter.format(new Date(previewPo.invoiceReceivedAt))}` : ""}.
+                  </p>
+                ) : previewPo.status === "shipped" || previewPo.status === "barang_sudah_terkirim" ? (
+                  <p className="mt-1 text-sm text-slate-600">Barang sudah terkirim. Menunggu konfirmasi penerimaan dari sales.</p>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">Status penerimaan akan tampil setelah barang terkirim dan dikonfirmasi sales.</p>
+                )}
+              </section>
               {/* Proof of Payment Display */}
               {(previewPo.dpProof || previewPo.remainingProof || previewPo.paymentProof) && (
                 <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -1942,3 +2050,15 @@ export function AgentPurchaseOrder() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+

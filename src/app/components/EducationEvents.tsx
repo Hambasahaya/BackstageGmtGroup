@@ -564,26 +564,26 @@ export function EducationEvents() {
             <StatCard label="Corporate Category" value={String(bookingStats.corporateCount)} detail="Kategori Corporate" />
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-5 xl:flex-row xl:items-center xl:justify-between">
+          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 border-b border-slate-200 p-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">Daftar Bookings</h2>
-                <p className="mt-1 text-sm text-slate-500">Data booking dari endpoint `/api/bookings`</p>
+                <h2 className="text-xl font-bold text-slate-950">Daftar Bookings</h2>
+                <p className="mt-1 text-sm text-slate-500">Data booking dari endpoint /api/bookings</p>
               </div>
-              <div className="flex flex-col gap-2 lg:flex-row">
+              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_180px_auto] xl:w-auto">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Cari booking (nama, email, produk)..."
-                    className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 lg:w-64"
+                    className="h-11 w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 xl:w-80"
                   />
                 </div>
                 <select
                   value={bookingTypeFilter}
                   onChange={(e) => setBookingTypeFilter(e.target.value)}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                  className="h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
                 >
                   <option value="">Semua Type</option>
                   <option value="demo">Demo (?type=demo)</option>
@@ -591,7 +591,7 @@ export function EducationEvents() {
                 </select>
                 <button
                   onClick={() => void loadBookings()}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Refresh
@@ -600,22 +600,25 @@ export function EducationEvents() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px]">
+              <table className="w-full min-w-[1280px] table-fixed">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
-                    <th className="px-4 py-3 font-semibold">ID Booking</th>
-                    <th className="px-4 py-3 font-semibold">Tipe</th>
-                    <th className="px-4 py-3 font-semibold">Nama / Email</th>
-                    <th className="px-4 py-3 font-semibold">Jabatan / Kategori</th>
-                    <th className="px-4 py-3 font-semibold">Produk / Deck</th>
-                    <th className="px-4 py-3 font-semibold">Tanggal Preferred</th>
-                    <th className="px-4 py-3 font-semibold">Action</th>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="w-[170px] px-5 py-3">ID Booking</th>
+                    <th className="w-[110px] px-5 py-3">Tipe</th>
+                    <th className="w-[170px] px-5 py-3">Nama</th>
+                    <th className="w-[210px] px-5 py-3">Email</th>
+                    <th className="w-[180px] px-5 py-3">Jabatan</th>
+                    <th className="w-[170px] px-5 py-3">Kategori</th>
+                    <th className="w-[180px] px-5 py-3">Produk</th>
+                    <th className="w-[160px] px-5 py-3">Deck</th>
+                    <th className="w-[210px] px-5 py-3">Tanggal Preferred</th>
+                    <th className="w-[130px] px-5 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isBookingsLoading ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
+                      <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">
                         Memuat data bookings...
                       </td>
                     </tr>
@@ -627,51 +630,39 @@ export function EducationEvents() {
                       const desc = b.description ?? b.eventDescription;
 
                       return (
-                        <tr key={b.id} className="border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-mono font-medium text-slate-900">{b.id}</td>
-                          <td className="px-4 py-3">
-                            <BookingTypeBadge type={b.type} />
+                        <tr key={b.id} className="border-b border-slate-100 text-sm last:border-0 hover:bg-slate-50/60">
+                          <td className="px-5 py-4 align-top"><p className="truncate font-mono text-xs font-semibold text-slate-900" title={String(b.id)}>{b.id}</p></td>
+                          <td className="px-5 py-4 align-top"><BookingTypeBadge type={b.type} /></td>
+                          <td className="px-5 py-4 align-top"><p className="truncate font-semibold text-slate-950" title={b.name}>{b.name}</p></td>
+                          <td className="px-5 py-4 align-top"><p className="truncate text-xs font-medium text-slate-600" title={b.email}>{b.email}</p></td>
+                          <td className="px-5 py-4 align-top text-slate-700"><p className="truncate font-medium text-slate-800" title={b.position || "-"}>{b.position || "-"}</p></td>
+                          <td className="px-5 py-4 align-top text-slate-700">
+                            <p className="truncate text-sm text-slate-700" title={b.category || "-"}>{b.category || "-"}</p>
+                            {isEvt && cap !== undefined && <p className="mt-1 text-xs font-semibold text-purple-700">Kapasitas: {cap} peserta</p>}
                           </td>
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-950">{b.name}</p>
-                            <p className="text-xs text-slate-500">{b.email}</p>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">
-                            <p>{b.position || "-"}</p>
-                            <p className="text-xs text-slate-500">{b.category || "-"}</p>
-                            {isEvt && cap !== undefined && (
-                              <p className="mt-1 text-xs font-semibold text-purple-700">
-                                Kapasitas: {cap} peserta
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">
-                            <p className="font-medium text-[#0F766E]">{b.interestedProduct || "-"}</p>
-                            {isEvt && deck && (
-                              <a
-                                href={resolveApiAssetUrl(String(deck))}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-1 inline-flex items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition"
-                              >
+                          <td className="px-5 py-4 align-top text-slate-700"><p className="truncate font-semibold text-[#0F766E]" title={b.interestedProduct || "-"}>{b.interestedProduct || "-"}</p></td>
+                          <td className="px-5 py-4 align-top text-slate-700">
+                            {isEvt && deck ? (
+                              <a href={resolveApiAssetUrl(String(deck))} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-800 transition hover:bg-teal-100">
                                 <FileText className="h-3 w-3 text-teal-600" />
-                                Deck Document
+                                <span className="truncate">Deck Document</span>
                                 <ExternalLink className="h-2.5 w-2.5 opacity-70" />
                               </a>
+                            ) : (
+                              <span className="text-xs text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-slate-700">
-                            <p>{b.preferredDate || "-"}</p>
+                          <td className="px-5 py-4 align-top text-slate-700">
+                            <p className="font-medium text-slate-800">{b.preferredDate || "-"}</p>
                             {isEvt && desc && (
-                              <p className="mt-1 line-clamp-1 max-w-[200px] text-xs text-slate-500" title={String(desc)}>
+                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500" title={String(desc)}>
                                 {desc}
                               </p>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <button
+                          <td className="px-5 py-4 text-right align-top"><button
                               onClick={() => setSelectedBooking(b)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                             >
                               <Eye className="h-3.5 w-3.5" />
                               Detail
@@ -682,7 +673,7 @@ export function EducationEvents() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">
+                      <td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">
                         Belum ada booking pada filter ini.
                       </td>
                     </tr>
@@ -704,32 +695,32 @@ export function EducationEvents() {
             <StatCard label="Kapasitas" value={String(stats.capacity)} detail="Total slot dari event loaded" />
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-5 xl:flex-row xl:items-center xl:justify-between">
+          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 border-b border-slate-200 p-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Daftar education event</h2>
                 <p className="mt-1 text-sm text-slate-500">Kelola Events</p>
               </div>
-              <div className="flex flex-col gap-2 lg:flex-row">
+              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_180px_auto] xl:w-auto">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input value={searchTerm} onChange={(changeEvent) => setSearchTerm(changeEvent.target.value)} placeholder="Cari event..." className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 lg:w-56" />
                 </div>
                 <input type="month" value={month} onChange={(changeEvent) => { setMonth(changeEvent.target.value); setPage(1); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" />
-                <select value={typeFilter} onChange={(changeEvent) => { setTypeFilter(changeEvent.target.value); setPage(1); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
+                <select value={typeFilter} onChange={(changeEvent) => { setTypeFilter(changeEvent.target.value); setPage(1); }} className="h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
                   <option value="">Semua tipe</option>
                   <option value="Offline">Offline</option>
                   <option value="Online">Online</option>
                   <option value="Hybrid">Hybrid</option>
                 </select>
-                <select value={statusFilter} onChange={(changeEvent) => { setStatusFilter(changeEvent.target.value); setPage(1); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
+                <select value={statusFilter} onChange={(changeEvent) => { setStatusFilter(changeEvent.target.value); setPage(1); }} className="h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100">
                   <option value="">Semua status</option>
                   <option value="Available">Available</option>
                   <option value="Full">Full</option>
                   <option value="Closed">Closed</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
-                <button onClick={() => void loadEvents()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <button onClick={() => void loadEvents()} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   <RefreshCw className="h-4 w-4" />
                   Refresh
                 </button>
@@ -737,7 +728,7 @@ export function EducationEvents() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px]">
+              <table className="w-full min-w-[1280px] table-fixed">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
                     <th className="px-4 py-3 font-semibold">Event</th>
@@ -751,7 +742,7 @@ export function EducationEvents() {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">Memuat education event...</td></tr>
+                    <tr><td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">Memuat education event...</td></tr>
                   ) : filteredEvents.length ? (
                     filteredEvents.map((event) => (
                       <tr key={event.id} className="border-b border-slate-100 text-sm last:border-0">
@@ -759,19 +750,19 @@ export function EducationEvents() {
                           <p className="font-semibold text-slate-950">{event.title}</p>
                           <p className="mt-1 line-clamp-1 max-w-[340px] text-xs text-slate-500">{event.description || event.id}</p>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">
+                        <td className="px-5 py-4 align-top text-slate-700">
                           <div className="inline-flex items-center gap-2">
                             <CalendarDays className="h-4 w-4 text-slate-400" />
                             {event.date ? dateFormatter.format(new Date(event.date)) : "-"} {event.time || ""}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">{event.type}</td>
+                        <td className="px-5 py-4 align-top text-slate-700">{event.type}</td>
                         <td className="px-4 py-3"><StatusBadge status={event.status} /></td>
-                        <td className="px-4 py-3 text-slate-700">{Number(event.current_attendees ?? 0)} / {Number(event.max_attendees ?? 0)}</td>
-                        <td className="px-4 py-3 text-slate-700">{event.venue || event.location || "-"}</td>
+                        <td className="px-5 py-4 align-top text-slate-700">{Number(event.current_attendees ?? 0)} / {Number(event.max_attendees ?? 0)}</td>
+                        <td className="px-5 py-4 align-top text-slate-700">{event.venue || event.location || "-"}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-2">
-                            <button onClick={() => void openDetail(event)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"><Eye className="h-3.5 w-3.5" />Detail</button>
+                            <button onClick={() => void openDetail(event)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Eye className="h-3.5 w-3.5" />Detail</button>
                             <button onClick={() => { setEditingEvent(event); setIsFormOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-50"><Edit3 className="h-3.5 w-3.5" />Edit</button>
                             <button onClick={() => void deleteEvent(event)} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"><Trash2 className="h-3.5 w-3.5" />Hapus</button>
                           </div>
@@ -779,7 +770,7 @@ export function EducationEvents() {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-slate-500">Belum ada event pada filter ini.</td></tr>
+                    <tr><td colSpan={10} className="px-4 py-6 text-center text-sm text-slate-500">Belum ada event pada filter ini.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -852,9 +843,9 @@ export function EducationEvents() {
                       getParticipants(selectedEvent).map((participant, index) => (
                         <tr key={String(participant.registration_id ?? participant.id ?? index)} className="border-b border-slate-100 text-sm last:border-0">
                           <td className="px-4 py-3 font-semibold text-slate-950">{getParticipantName(participant)}</td>
-                          <td className="px-4 py-3 text-slate-700"><p>{participant.email || "-"}</p><p className="text-xs text-slate-500">{participant.phone_mobile || participant.phone_landline || "-"}</p></td>
-                          <td className="px-4 py-3 text-slate-700"><p>{participant.company || "-"}</p><p className="text-xs text-slate-500">{participant.position || "-"}</p></td>
-                          <td className="px-4 py-3 text-slate-700">{participant.meal_preference || "-"}</td>
+                          <td className="px-5 py-4 align-top text-slate-700"><p>{participant.email || "-"}</p><p className="text-xs text-slate-500">{participant.phone_mobile || participant.phone_landline || "-"}</p></td>
+                          <td className="px-5 py-4 align-top text-slate-700"><p>{participant.company || "-"}</p><p className="text-xs text-slate-500">{participant.position || "-"}</p></td>
+                          <td className="px-5 py-4 align-top text-slate-700">{participant.meal_preference || "-"}</td>
                           <td className="px-4 py-3"><StatusBadge status={participant.status || "Registered"} /></td>
                         </tr>
                       ))
@@ -873,3 +864,9 @@ export function EducationEvents() {
     </div>
   );
 }
+
+
+
+
+
+

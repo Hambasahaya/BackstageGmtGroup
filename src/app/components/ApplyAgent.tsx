@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Clock3, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -13,6 +13,17 @@ import {
 import { Suspense, lazy } from "react";
 
 const WebcamCapture = lazy(() => import("./WebcamCapture").then(module => ({ default: module.WebcamCapture })));
+
+type SocialMediaField = "instagram" | "tiktok" | "facebook";
+
+const agentMode = import.meta.env.MODE_Agent ?? "1";
+const isSplitAgentMode = agentMode === "2";
+
+const socialMediaOptions: { value: SocialMediaField; label: string; placeholder: string }[] = [
+  { value: "instagram", label: "Instagram", placeholder: "user.ig" },
+  { value: "tiktok", label: "TikTok", placeholder: "user.tt" },
+  { value: "facebook", label: "Facebook", placeholder: "User FB" },
+];
 
 const applyInitial: ApplyAgentPayload = {
   job: "",
@@ -44,6 +55,35 @@ type FeedbackDialog = {
   message: string;
 };
 
+type RequiredFieldKey =
+  | "job"
+  | "photo"
+  | "ktp_photo"
+  | "bank_name"
+  | "account_number"
+  | "tempat_lahir"
+  | "tanggal_lahir"
+  | "full_address"
+  | "agent_motivation"
+  | "referral_name"
+  | "referral_other"
+  | "target_product";
+
+const requiredFieldMessages: Record<RequiredFieldKey, string> = {
+  job: "Pekerjaan wajib diisi.",
+  photo: "Foto diri wajib diambil.",
+  ktp_photo: "Foto KTP wajib diambil.",
+  bank_name: "Nama bank wajib diisi.",
+  account_number: "Nomor rekening wajib diisi.",
+  tempat_lahir: "Tempat lahir wajib diisi.",
+  tanggal_lahir: "Tanggal lahir wajib diisi.",
+  full_address: "Alamat lengkap wajib diisi.",
+  agent_motivation: "Alasan menjadi agent wajib diisi.",
+  referral_name: "Nama teman/kerabat wajib diisi.",
+  referral_other: "Sumber informasi wajib diisi.",
+  target_product: "Target produk wajib diisi.",
+};
+
 const verificationInitial: VerificationForm = {
   photo: null,
   ktp_photo: null,
@@ -55,22 +95,169 @@ const verificationInitial: VerificationForm = {
   domicile: "",
 };
 
-const TERMS_PDF_URL = encodeURI("/nda/NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE.pdf");
+const indonesiaBanks = [
+  "BCA",
+  "Mandiri",
+  "BRI",
+  "BNI",
+  "BSI",
+  "CIMB Niaga",
+  "Danamon",
+  "Permata Bank",
+  "OCBC",
+  "Panin Bank",
+  "Maybank Indonesia",
+  "Bank Mega",
+  "Bank BTN",
+  "Bank BTPN",
+  "Jenius",
+  "Bank Jago",
+  "SeaBank",
+  "Allo Bank",
+  "Blu by BCA Digital",
+  "Bank Raya",
+  "Bank Neo Commerce",
+  "Bank Muamalat",
+  "Bank Sinarmas",
+  "Bank Bukopin",
+  "KB Bank",
+  "UOB Indonesia",
+  "HSBC Indonesia",
+  "Standard Chartered",
+  "Citibank",
+  "DBS Indonesia",
+  "Bank Commonwealth",
+  "Bank Capital Indonesia",
+  "Bank Victoria",
+  "Bank Mayapada",
+  "Bank Mestika",
+  "Bank Maspion",
+  "Bank Ganesha",
+  "Bank Woori Saudara",
+  "Bank KEB Hana Indonesia",
+  "Bank SBI Indonesia",
+  "Bank MNC Internasional",
+  "Bank QNB Indonesia",
+  "Bank Ina Perdana",
+  "Bank Oke Indonesia",
+  "Bank BJB",
+  "Bank DKI",
+  "Bank Jateng",
+  "Bank Jatim",
+  "Bank Sumut",
+  "Bank Nagari",
+  "Bank Riau Kepri Syariah",
+  "Bank Sumsel Babel",
+  "Bank Lampung",
+  "Bank Kalsel",
+  "Bank Kalbar",
+  "Bank Kaltimtara",
+  "Bank Kalteng",
+  "Bank Sulselbar",
+  "Bank SulutGo",
+  "Bank NTB Syariah",
+  "Bank NTT",
+  "Bank Maluku Malut",
+  "Bank Papua",
+  "Bank Bengkulu",
+  "Bank Jambi",
+  "Bank Aceh Syariah",
+  "Bank Banten",
+];
+const ndaSections = [
+  {
+    title: "1. PURPOSE",
+    body: [
+      "GMT Suite is a digital ecosystem developed by GMT Group to provide access to product information, business tools, marketing materials, training resources, technical documents, and other resources related to GMT Group and its affiliated brands.",
+      "Through access to GMT Suite, the Recipient may receive confidential information owned by GMT Group. This Agreement is intended to protect such information from unauthorized use, distribution, or disclosure.",
+    ],
+  },
+  {
+    title: "2. CONFIDENTIAL INFORMATION",
+    body: ["Confidential Information includes but is not limited to:"],
+    bullets: [
+      "Product data, specifications, pricing, and commercial information",
+      "Sales materials, marketing strategies, and business plans",
+      "Training materials, presentations, and internal documents",
+      "Technical information, manuals, system designs, and development plans",
+      "Partner, customer, vendor, and business information",
+      "Platform features, concepts, and future development plans",
+      "Any other information available inside GMT Suite that is not publicly accessible",
+    ],
+  },
+  {
+    title: "3. CONFIDENTIALITY OBLIGATION",
+    body: ["The Recipient agrees to:"],
+    bullets: [
+      "Keep all Confidential Information strictly confidential",
+      "Use the information only for authorized business purposes related to GMT Group",
+      "Not copy, share, publish, distribute, sell, or disclose any Confidential Information without written approval from GMT Group",
+      "Protect all information using reasonable security measures",
+    ],
+  },
+  {
+    title: "4. ACCESS & ACCOUNT RESPONSIBILITY",
+    body: [
+      "Access to GMT Suite is granted individually and must not be transferred, shared, or used by unauthorized parties.",
+      "The Recipient is responsible for all activities conducted through their account and must immediately inform GMT Group if unauthorized access occurs.",
+    ],
+  },
+  {
+    title: "5. OWNERSHIP OF INFORMATION",
+    body: [
+      "All materials, documents, content, data, intellectual property, and information available within GMT Suite remain the exclusive property of GMT Group or its respective brand principals.",
+      "Access to GMT Suite does not provide ownership rights, license rights, or permission to use materials outside the approved purpose.",
+    ],
+  },
+  {
+    title: "6. RESTRICTION OF USE",
+    body: ["The Recipient shall not:"],
+    bullets: [
+      "Use GMT Suite information for personal commercial purposes without authorization",
+      "Share information with competitors or unauthorized third parties",
+      "Modify, reproduce, or distribute GMT Suite materials without permission",
+      "Use confidential information in a way that may harm GMT Group's business interests",
+    ],
+  },
+  {
+    title: "7. DURATION OF CONFIDENTIALITY",
+    body: ["The confidentiality obligations remain effective during the Recipient's access period to GMT Suite and continue after access termination for as long as the information remains confidential."],
+  },
+  {
+    title: "8. TERMINATION OF ACCESS",
+    body: [
+      "GMT Group reserves the right to suspend or revoke GMT Suite access if the Recipient violates this Agreement or misuses any information provided through the platform.",
+      "Upon termination, the Recipient must stop using and delete any confidential materials obtained from GMT Suite if requested.",
+    ],
+  },
+  {
+    title: "9. BREACH OF AGREEMENT",
+    body: ["Any unauthorized disclosure, misuse, or violation of this Agreement may result in access termination and further action in accordance with applicable regulations."],
+  },
+  {
+    title: "10. ACKNOWLEDGEMENT",
+    body: ["By accessing, registering, or using GMT Suite, the Recipient acknowledges that they have read, understood, and agreed to comply with the terms of this Agreement."],
+  },
+];
 
 function TextField({
   label,
   value,
   onChange,
+  onBlur,
   placeholder,
   list,
   required = true,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   list?: string;
   required?: boolean;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -78,26 +265,74 @@ function TextField({
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+        onBlur={onBlur}
+        aria-invalid={Boolean(error)}
+        className={`w-full rounded-lg border px-3 py-3 text-sm outline-none transition focus:ring-2 ${
+          error
+            ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
+            : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+        }`}
         placeholder={placeholder}
         required={required}
         list={list}
       />
+      {error && <span className="mt-1.5 block text-xs font-medium text-rose-600">{error}</span>}
     </label>
   
   );
 }
 
+function BankSelect({
+  value,
+  onChange,
+  onBlur,
+  error,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  error?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-700">Nama bank</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        aria-invalid={Boolean(error)}
+        required
+        className={`w-full rounded-lg border bg-white px-3 py-3 text-sm outline-none transition focus:ring-2 ${
+          error
+            ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
+            : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+        }`}
+      >
+        <option value="">Pilih bank</option>
+        {indonesiaBanks.map((bank) => (
+          <option key={bank} value={bank}>
+            {bank}
+          </option>
+        ))}
+      </select>
+      {error && <span className="mt-1.5 block text-xs font-medium text-rose-600">{error}</span>}
+    </label>
+  );
+}
 function TextArea({
   label,
   value,
   onChange,
+  onBlur,
   placeholder,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -105,10 +340,17 @@ function TextArea({
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-28 w-full resize-y rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+        onBlur={onBlur}
+        aria-invalid={Boolean(error)}
+        className={`min-h-28 w-full resize-y rounded-lg border px-3 py-3 text-sm outline-none transition focus:ring-2 ${
+          error
+            ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
+            : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+        }`}
         placeholder={placeholder}
         required
       />
+      {error && <span className="mt-1.5 block text-xs font-medium text-rose-600">{error}</span>}
     </label>
   );
 }
@@ -120,6 +362,7 @@ function FileField({
   icon: Icon = Camera,
   livePhotoType,
   onOpenLivePhoto,
+  error,
 }: {
   label: string;
   value: File | null;
@@ -127,6 +370,7 @@ function FileField({
   icon?: any;
   livePhotoType?: "ktp" | "selfie";
   onOpenLivePhoto?: () => void;
+  error?: string;
 }) {
   const previewUrl = value ? URL.createObjectURL(value) : null;
   const Wrapper = livePhotoType ? "div" : "label";
@@ -135,7 +379,7 @@ function FileField({
     <div className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
       <Wrapper 
-        className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-300 p-3 transition hover:bg-slate-50"
+        className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition hover:bg-slate-50 ${error ? "border-rose-300 bg-rose-50/40" : "border-slate-300"}`}
         onClick={livePhotoType ? onOpenLivePhoto : undefined}
       >
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
@@ -146,8 +390,8 @@ function FileField({
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
-          <span className="rounded-md bg-[#0F766E] px-3 py-1.5 text-sm font-semibold text-white">
-            Ambil Foto
+          <span className="text-sm font-semibold text-[#0F766E]">
+            {value ? "Foto sudah tersimpan" : "Ketuk area ini untuk membuka kamera"}
           </span>
           <span className="w-full truncate text-xs text-slate-500">
             {value ? value.name : "Belum ada file terpilih"}
@@ -163,6 +407,7 @@ function FileField({
           />
         )}
       </Wrapper>
+      {error && <span className="mt-1.5 block text-xs font-medium text-rose-600">{error}</span>}
     </div>
   );
 }
@@ -246,45 +491,48 @@ export function ApplyAgent() {
   const [feedbackDialog, setFeedbackDialog] = useState<FeedbackDialog | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [regions, setRegions] = useState<{ id: string; regency: string }[]>([]);
+  const [selectedSocialMedia, setSelectedSocialMedia] = useState<SocialMediaField>("instagram");
 
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsReadCompleted, setTermsReadCompleted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsTimeLeft, setTermsTimeLeft] = useState(30);
 
-  useEffect(() => {
-    let timer: number;
-    if (showTermsModal) {
-      setTermsTimeLeft(30);
-      timer = window.setInterval(() => {
-        setTermsTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
-  }, [showTermsModal]);
+  const [touchedFields, setTouchedFields] = useState<Partial<Record<RequiredFieldKey, boolean>>>({});
 
-  const isFormIncomplete = !applyForm.job.trim() ||
-    !verificationForm.photo ||
-    !verificationForm.ktp_photo ||
-    !verificationForm.bank_name.trim() ||
-    !verificationForm.account_number.trim() ||
-    !verificationForm.tempat_lahir.trim() ||
-    !verificationForm.tanggal_lahir.trim() ||
-    !verificationForm.full_address.trim() ||
-    !applyForm.agent_motivation.trim() ||
-    (applyForm.referral_source === "teman_kerabat" && !applyForm.referral_name?.trim()) ||
-    (applyForm.referral_source === "lainnya" && !applyForm.referral_other?.trim()) ||
-    !applyForm.target_product.trim();
+  const markFieldTouched = (field: RequiredFieldKey) => {
+    setTouchedFields((current) => ({ ...current, [field]: true }));
+  };
+
+  const markFieldsTouched = (fields: RequiredFieldKey[]) => {
+    setTouchedFields((current) => fields.reduce((next, field) => ({ ...next, [field]: true }), current));
+  };
+
+  const getMissingFields = (includeApplyFields = true, includeVerificationFields = true): RequiredFieldKey[] => {
+    const missingFields: RequiredFieldKey[] = [];
+
+    if (includeApplyFields && !applyForm.job.trim()) missingFields.push("job");
+    if (includeVerificationFields && !verificationForm.photo) missingFields.push("photo");
+    if (includeVerificationFields && !verificationForm.ktp_photo) missingFields.push("ktp_photo");
+    if (includeVerificationFields && !verificationForm.bank_name.trim()) missingFields.push("bank_name");
+    if (includeVerificationFields && !verificationForm.account_number.trim()) missingFields.push("account_number");
+    if (includeVerificationFields && !verificationForm.tempat_lahir.trim()) missingFields.push("tempat_lahir");
+    if (includeVerificationFields && !verificationForm.tanggal_lahir.trim()) missingFields.push("tanggal_lahir");
+    if (includeVerificationFields && !verificationForm.full_address.trim()) missingFields.push("full_address");
+    if (includeApplyFields && !applyForm.agent_motivation.trim()) missingFields.push("agent_motivation");
+    if (includeApplyFields && applyForm.referral_source === "teman_kerabat" && !applyForm.referral_name?.trim()) missingFields.push("referral_name");
+    if (includeApplyFields && applyForm.referral_source === "lainnya" && !applyForm.referral_other?.trim()) missingFields.push("referral_other");
+    if (includeApplyFields && !applyForm.target_product.trim()) missingFields.push("target_product");
+
+    return missingFields;
+  };
+
+  const getFieldError = (field: RequiredFieldKey, includeApplyFields = true) => {
+    if (!touchedFields[field]) return "";
+    return getMissingFields(includeApplyFields).includes(field) ? requiredFieldMessages[field] : "";
+  };
+
+  const isFormIncomplete = getMissingFields(true, !isSplitAgentMode).length > 0;
 
   useEffect(() => {
     fetch("https://raw.githubusercontent.com/Caknoooo/provinces-cities-indonesia/master/json/regencies.json")
@@ -326,38 +574,59 @@ export function ApplyAgent() {
     event.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
+    const missingFields = getMissingFields(true, !isSplitAgentMode);
+    if (missingFields.length > 0) {
+      markFieldsTouched(missingFields);
+      setErrorMessage("Lengkapi semua field wajib sebelum mengirim pengajuan.");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
-      if (!verificationForm.photo || !verificationForm.ktp_photo) {
-        throw new Error("Foto diri dan foto KTP wajib diupload.");
-      }
-
       const response = await api.applyAgent(applyForm);
-      const verificationResponse = await api.completeAgentVerification({
-        photo: verificationForm.photo,
-        ktp_photo: verificationForm.ktp_photo,
-        bank_name: verificationForm.bank_name,
-        account_number: verificationForm.account_number,
-        full_address: verificationForm.full_address,
-        domicile: verificationForm.domicile,
-        ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
-      });
 
-      if (verificationResponse?.user) {
-        saveAuthSession(getAuthToken() ?? "", verificationResponse.user);
-        setStatus(verificationResponse.user.detail_user?.status ?? "verif");
-        setIsVerificationCompleted(hasCompletedVerification(verificationResponse.user.detail_user));
+      if (isSplitAgentMode) {
+        setApplyForm(applyInitial);
+        setTouchedFields({});
+        setStatus("not_verif");
+        const message = response.message || "Pengajuan agent berhasil dikirim.";
+        setSuccessMessage(message);
+        setFeedbackDialog({
+          type: "success",
+          title: "Pengajuan berhasil",
+          message: "Pengajuan agent berhasil dikirim. Data verifikasi bisa dilengkapi setelah status pengajuan menjadi verif.",
+        });
+      } else {
+        if (!verificationForm.photo || !verificationForm.ktp_photo) {
+          throw new Error("Foto diri dan foto KTP wajib diupload.");
+        }
+
+        const verificationResponse = await api.completeAgentVerification({
+          photo: verificationForm.photo,
+          ktp_photo: verificationForm.ktp_photo,
+          bank_name: verificationForm.bank_name,
+          account_number: verificationForm.account_number,
+          full_address: verificationForm.full_address,
+          domicile: verificationForm.domicile,
+          ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
+        });
+
+        if (verificationResponse?.user) {
+          saveAuthSession(getAuthToken() ?? "", verificationResponse.user);
+          setStatus(verificationResponse.user.detail_user?.status ?? "verif");
+          setIsVerificationCompleted(hasCompletedVerification(verificationResponse.user.detail_user));
+        }
+        setApplyForm(applyInitial);
+        setVerificationForm(verificationInitial);
+        setTouchedFields({});
+        const message = response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.";
+        setSuccessMessage(message);
+        setFeedbackDialog({
+          type: "success",
+          title: "Upload berhasil",
+          message: "Pengajuan dan data verifikasi berhasil dikirim.",
+        });
       }
-      setApplyForm(applyInitial);
-      setVerificationForm(verificationInitial);
-      const message = response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.";
-      setSuccessMessage(message);
-      setFeedbackDialog({
-        type: "success",
-        title: "Upload berhasil",
-        message: `Pengajuan dan data verifikasi berhasil dikirim.`,
-      });
       void syncLatestStatus();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal mengirim pengajuan agent.";
@@ -372,12 +641,15 @@ export function ApplyAgent() {
     event.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
+    const missingFields = getMissingFields(false, true);
+    if (missingFields.length > 0) {
+      markFieldsTouched(missingFields);
+      setErrorMessage("Lengkapi semua field wajib sebelum menyimpan data verifikasi.");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
-      if (!verificationForm.photo || !verificationForm.ktp_photo) {
-        throw new Error("Foto dan KTP wajib diupload.");
-      }
       const response = await api.completeAgentVerification({
         photo: verificationForm.photo,
         ktp_photo: verificationForm.ktp_photo,
@@ -401,6 +673,7 @@ export function ApplyAgent() {
         message: `${message} Status halaman sudah diperbarui.`,
       });
       setVerificationForm(verificationInitial);
+      setTouchedFields({});
       void syncLatestStatus();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal melengkapi data verifikasi.";
@@ -455,18 +728,31 @@ export function ApplyAgent() {
             </div>
             <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
-                <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
-                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => { markFieldTouched("photo"); setVerificationForm((current) => ({ ...current, photo: value })); }} error={getFieldError("photo")} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
+                <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
+                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" />
+                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
-                  <input type="date" required value={verificationForm.tanggal_lahir} onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" />
+                  <input
+                    type="date"
+                    required
+                    value={verificationForm.tanggal_lahir}
+                    onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))}
+                    onBlur={() => markFieldTouched("tanggal_lahir")}
+                    aria-invalid={Boolean(getFieldError("tanggal_lahir"))}
+                    className={`w-full rounded-lg border px-3 py-3 text-sm outline-none transition focus:ring-2 ${
+                      getFieldError("tanggal_lahir")
+                        ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
+                        : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+                    }`}
+                  />
+                  {getFieldError("tanggal_lahir") && <span className="mt-1.5 block text-xs font-medium text-rose-600">{getFieldError("tanggal_lahir")}</span>}
                 </label>
                 <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
               </div>
-              <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
+              <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} onBlur={() => markFieldTouched("full_address")} error={getFieldError("full_address")} placeholder="Jl. Contoh No. 10" />
               <div className="flex justify-end border-t border-slate-200 pt-5">
                 <button type="submit" disabled={isSubmitting} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
                   <FileImage className="h-4 w-4" />
@@ -490,31 +776,66 @@ export function ApplyAgent() {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data pengajuan</h3>
               <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} placeholder="Sales Executive" />
-                <TextField label="Instagram" value={applyForm.instagram} onChange={(value) => setApplyForm((current) => ({ ...current, instagram: value }))} placeholder="user.ig" required={false} />
-                <TextField label="TikTok" value={applyForm.tiktok} onChange={(value) => setApplyForm((current) => ({ ...current, tiktok: value }))} placeholder="user.tt" required={false} />
-                <TextField label="Facebook" value={applyForm.facebook} onChange={(value) => setApplyForm((current) => ({ ...current, facebook: value }))} placeholder="User FB" required={false} />
+                <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} onBlur={() => markFieldTouched("job")} error={getFieldError("job")} placeholder="Sales Executive" />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(10rem,0.45fr)_1fr] lg:col-span-1">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Sosmed</span>
+                    <select
+                      value={selectedSocialMedia}
+                      onChange={(event) => setSelectedSocialMedia(event.target.value as SocialMediaField)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    >
+                      {socialMediaOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <TextField
+                    label={`${socialMediaOptions.find((option) => option.value === selectedSocialMedia)?.label ?? "Sosmed"}`}
+                    value={applyForm[selectedSocialMedia] ?? ""}
+                    onChange={(value) => setApplyForm((current) => ({ ...current, [selectedSocialMedia]: value }))}
+                    placeholder={socialMediaOptions.find((option) => option.value === selectedSocialMedia)?.placeholder}
+                    required={false}
+                  />
+                </div>
               </div>
             </div>
 
+            {!isSplitAgentMode && (
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data verifikasi</h3>
               <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => setVerificationForm((current) => ({ ...current, photo: value }))} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => setVerificationForm((current) => ({ ...current, ktp_photo: value }))} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
-                <TextField label="Nama bank" value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} placeholder="BCA" />
-                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} placeholder="1234567890" />
-                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} placeholder="Jakarta" list="indonesia-regions" />
+                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => { markFieldTouched("photo"); setVerificationForm((current) => ({ ...current, photo: value })); }} error={getFieldError("photo")} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
+                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
+                <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
+                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" />
+                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
-                  <input type="date" required value={verificationForm.tanggal_lahir} onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100" />
+                  <input
+                    type="date"
+                    required
+                    value={verificationForm.tanggal_lahir}
+                    onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))}
+                    onBlur={() => markFieldTouched("tanggal_lahir")}
+                    aria-invalid={Boolean(getFieldError("tanggal_lahir"))}
+                    className={`w-full rounded-lg border px-3 py-3 text-sm outline-none transition focus:ring-2 ${
+                      getFieldError("tanggal_lahir")
+                        ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
+                        : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+                    }`}
+                  />
+                  {getFieldError("tanggal_lahir") && <span className="mt-1.5 block text-xs font-medium text-rose-600">{getFieldError("tanggal_lahir")}</span>}
                 </label>
                 <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
               </div>
               <div className="mt-4">
-                <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} placeholder="Jl. Contoh No. 10" />
+                <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} onBlur={() => markFieldTouched("full_address")} error={getFieldError("full_address")} placeholder="Jl. Contoh No. 10" />
               </div>
             </div>
+            )}
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-semibold text-slate-950">Program ini sebagai</p>
@@ -531,7 +852,7 @@ export function ApplyAgent() {
               </div>
             </div>
 
-            <TextArea label="Alasan ingin menjadi Moxlite Agent" value={applyForm.agent_motivation} onChange={(value) => setApplyForm((current) => ({ ...current, agent_motivation: value }))} placeholder="Ceritakan alasan kamu..." />
+            <TextArea label="Alasan ingin menjadi Moxlite Agent" value={applyForm.agent_motivation} onChange={(value) => setApplyForm((current) => ({ ...current, agent_motivation: value }))} onBlur={() => markFieldTouched("agent_motivation")} error={getFieldError("agent_motivation")} placeholder="Ceritakan alasan kamu..." />
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <label className="block">
@@ -544,11 +865,11 @@ export function ApplyAgent() {
                   <option value="lainnya">Lainnya</option>
                 </select>
               </label>
-              {applyForm.referral_source === "teman_kerabat" && <TextField label="Nama teman/kerabat" value={applyForm.referral_name ?? ""} onChange={(value) => setApplyForm((current) => ({ ...current, referral_name: value }))} placeholder="Nama referensi" />}
-              {applyForm.referral_source === "lainnya" && <TextField label="Sumber lainnya" value={applyForm.referral_other ?? ""} onChange={(value) => setApplyForm((current) => ({ ...current, referral_other: value }))} placeholder="Isi sumber informasi" />}
+              {applyForm.referral_source === "teman_kerabat" && <TextField label="Nama teman/kerabat" value={applyForm.referral_name ?? ""} onChange={(value) => setApplyForm((current) => ({ ...current, referral_name: value }))} onBlur={() => markFieldTouched("referral_name")} error={getFieldError("referral_name")} placeholder="Nama referensi" />}
+              {applyForm.referral_source === "lainnya" && <TextField label="Sumber lainnya" value={applyForm.referral_other ?? ""} onChange={(value) => setApplyForm((current) => ({ ...current, referral_other: value }))} onBlur={() => markFieldTouched("referral_other")} error={getFieldError("referral_other")} placeholder="Isi sumber informasi" />}
             </div>
 
-            <TextField label="Produk apa yang anda targetkan?" value={applyForm.target_product} onChange={(value) => setApplyForm((current) => ({ ...current, target_product: value }))} placeholder="Contoh: lighting, sound system, event equipment" />
+            <TextField label="Produk apa yang anda targetkan?" value={applyForm.target_product} onChange={(value) => setApplyForm((current) => ({ ...current, target_product: value }))} onBlur={() => markFieldTouched("target_product")} error={getFieldError("target_product")} placeholder="Contoh: lighting, sound system, event equipment" />
 
             <div className="border-t border-slate-200 pt-5">
               <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-4 transition-colors hover:bg-slate-100/80">
@@ -581,7 +902,7 @@ export function ApplyAgent() {
             <div className="flex justify-end border-t border-slate-200 pt-5">
               <button type="submit" disabled={isSubmitting || !termsAccepted || isFormIncomplete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
                 <Send className="h-4 w-4" />
-                {isSubmitting ? "Mengirim..." : "Kirim pengajuan"}
+                {isSubmitting ? "Mengirim..." : isSplitAgentMode ? "Kirim pengajuan" : "Kirim pengajuan dan verifikasi"}
               </button>
             </div>
           </form>
@@ -602,8 +923,10 @@ export function ApplyAgent() {
             onClose={() => setActiveCamera(null)}
             onCapture={(file) => {
               if (activeCamera === "ktp") {
+                markFieldTouched("ktp_photo");
                 setVerificationForm((current) => ({ ...current, ktp_photo: file }));
               } else if (activeCamera === "selfie") {
+                markFieldTouched("photo");
                 setVerificationForm((current) => ({ ...current, photo: file }));
               }
               setActiveCamera(null);
@@ -614,10 +937,9 @@ export function ApplyAgent() {
 
       {showTermsModal && (
         <div className="fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col overflow-hidden bg-white animate-fade-in">
-          {/* Modal Header */}
           <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex items-center gap-2 text-[#0F766E]">
-              <Clock3 className="h-5 w-5 shrink-0 animate-pulse" />
+              <FileImage className="h-5 w-5 shrink-0" />
               <h2 className="text-base font-bold text-slate-950 sm:text-lg">NON-DISCLOSURE AGREEMENT (NDA) GMT SUITE</h2>
             </div>
             <button
@@ -631,22 +953,57 @@ export function ApplyAgent() {
             </button>
           </div>
 
-          {/* Modal Content - Scrollable wrapper around the PDF iframe */}
-          <div className="min-h-0 flex-1 overflow-hidden bg-white">
-            <iframe
-              src={`${TERMS_PDF_URL}#toolbar=0&navpanes=0&scrollbar=0`}
-              className="block h-full w-full border-none"
-              title="Terms of Use PDF"
-            />
+          <div
+            className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-6 sm:px-8"
+            onScroll={(event) => {
+              const target = event.currentTarget;
+              const isScrolledToBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 12;
+              if (isScrolledToBottom) {
+                setTermsReadCompleted(true);
+              }
+            }}
+          >
+            <article className="mx-auto max-w-3xl space-y-6 text-sm leading-7 text-slate-700">
+              <header className="space-y-3 border-b border-slate-200 pb-5 text-center">
+                <p className="text-xl font-bold text-slate-950 sm:text-2xl">NON-DISCLOSURE AGREEMENT (NDA)</p>
+                <p className="text-lg font-semibold text-[#0F766E]">GMT SUITE</p>
+              </header>
+
+              <section className="space-y-3">
+                <p>This Non-Disclosure Agreement ("Agreement") is entered into by and between:</p>
+                <p><strong>PT Global Multipro Technology ("GMT Group")</strong>, as the owner and operator of GMT Suite,</p>
+                <p>and</p>
+                <p>The registered user, partner, affiliate, vendor, or any party who has been granted access to GMT Suite ("Recipient").</p>
+                <p>Collectively referred to as "Parties".</p>
+              </section>
+
+              {ndaSections.map((section) => (
+                <section key={section.title} className="space-y-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-slate-950">{section.title}</h3>
+                  {section.body.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                  {section.bullets && (
+                    <ul className="list-disc space-y-2 pl-5">
+                      {section.bullets.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              ))}
+
+              <footer className="border-t border-slate-200 pt-5 font-bold text-slate-950">
+                PT GLOBAL MULTIPRO TECHNOLOGY
+              </footer>
+            </article>
           </div>
 
-          {/* Modal Footer / Progress indicators */}
           <div className="flex shrink-0 justify-end border-t border-slate-200 bg-slate-50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
             <button
               type="button"
-              disabled={termsTimeLeft > 0}
+              disabled={!termsReadCompleted}
               onClick={() => {
-                setTermsReadCompleted(true);
                 setTermsAccepted(true);
                 setShowTermsModal(false);
               }}

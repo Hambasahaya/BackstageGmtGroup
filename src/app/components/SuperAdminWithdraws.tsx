@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Search, ShieldCheck, Wallet } from "lucide-react";
+import { CheckCircle2, Clock3, Search, ShieldCheck, Upload, Wallet } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type WithdrawDto, type WithdrawStatus } from "../services/api";
 import Swal from "sweetalert2";
@@ -16,6 +16,19 @@ const dateFormatter = new Intl.DateTimeFormat("id-ID", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+function getWithdrawTransferDetail(withdraw: WithdrawDto) {
+  const detailUser = withdraw.user?.detail_user ?? withdraw.agent?.detail_user;
+
+  return {
+    recipientName: withdraw.nama_penerima ?? withdraw.recipient_name ?? withdraw.account_holder ?? withdraw.agent_name ?? withdraw.user_name ?? withdraw.agent?.name ?? withdraw.user?.name ?? "-",
+    bankName: withdraw.bank_name ?? withdraw.bank ?? detailUser?.bank_name ?? "-",
+    accountNumber: withdraw.account_number ?? withdraw.nomor_rekening ?? detailUser?.account_number ?? "-",
+  };
+}
+function getWithdrawProofUrl(withdraw: WithdrawDto) {
+  return withdraw.transfer_proof ?? withdraw.payment_proof ?? withdraw.proof_of_transfer ?? withdraw.bukti_transfer ?? "";
+}
 
 function StatusBadge({ status }: { status: WithdrawStatus }) {
   if (status === "approval") {
@@ -64,7 +77,7 @@ export function SuperAdminWithdraws() {
     const normalizedSearch = searchTerm.toLowerCase();
     return withdraws.filter((withdraw) =>
       [withdraw.withdraw_number ?? `WD-${withdraw.id}`, withdraw.status, withdraw.amount]
-        .join(" ")
+        .join(" ") + " " + Object.values(getWithdrawTransferDetail(withdraw)).join(" ")
         .toLowerCase()
         .includes(normalizedSearch),
     );
@@ -75,14 +88,22 @@ export function SuperAdminWithdraws() {
       return;
     }
 
+    const transferDetail = getWithdrawTransferDetail(withdraw);
+
     const result = await Swal.fire({
       title: "Approve Pengajuan?",
-      text: `Apakah Anda yakin ingin menyetujui pengajuan withdraw ${withdraw.withdraw_number ?? `WD-${withdraw.id}`} senilai ${currencyFormatter.format(withdraw.amount)}?`,
+      html: `<div style="text-align:left;font-size:14px;line-height:1.6"><p>Apakah Anda yakin ingin menyetujui pengajuan withdraw ${withdraw.withdraw_number ?? `WD-${withdraw.id}`} senilai <strong>${currencyFormatter.format(withdraw.amount)}</strong>?</p><div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden"><div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0"><span style="color:#64748b">Nama penerima</span><strong>${transferDetail.recipientName}</strong></div><div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0"><span style="color:#64748b">Bank</span><strong>${transferDetail.bankName}</strong></div><div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px"><span style="color:#64748b">Nomor rekening</span><strong>${transferDetail.accountNumber}</strong></div></div></div>`,
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#0F766E",
       cancelButtonColor: "#64748B",
-      confirmButtonText: "Ya, Setujui",
+      input: "file",
+      inputAttributes: {
+        accept: "image/*,application/pdf",
+        "aria-label": "Upload bukti transfer",
+      },
+      inputValidator: (value) => value ? null : "Bukti transfer wajib diupload.",
+      confirmButtonText: "Upload & Setujui",
       cancelButtonText: "Batal",
     });
 
@@ -91,7 +112,11 @@ export function SuperAdminWithdraws() {
     }
 
     try {
-      await api.approveWithdraw(withdraw.id);
+      const transferProof = result.value instanceof File ? result.value : undefined;
+      if (!transferProof) {
+        return;
+      }
+      await api.approveWithdraw(withdraw.id, transferProof);
       await loadWithdraws();
       await Swal.fire({
         icon: "success",
@@ -186,6 +211,8 @@ export function SuperAdminWithdraws() {
                 <th className="px-4 py-3 font-semibold">Withdraw</th>
                 <th className="px-4 py-3 font-semibold">Tanggal</th>
                 <th className="px-4 py-3 font-semibold">Nominal</th>
+                <th className="px-4 py-3 font-semibold">Detail transfer</th>
+                <th className="px-4 py-3 font-semibold">Bukti transfer</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold">Action</th>
               </tr>
@@ -196,6 +223,28 @@ export function SuperAdminWithdraws() {
                   <td className="px-4 py-3 font-semibold text-slate-950">{withdraw.withdraw_number ?? `WD-${withdraw.id}`}</td>
                   <td className="px-4 py-3 text-slate-600">{dateFormatter.format(new Date(withdraw.created_at))}</td>
                   <td className="px-4 py-3 font-semibold text-slate-900">{currencyFormatter.format(withdraw.amount)}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {(() => {
+                      const transferDetail = getWithdrawTransferDetail(withdraw);
+                      return (
+                        <div className="min-w-[180px] space-y-0.5">
+                          <p className="font-semibold text-slate-950">{transferDetail.recipientName}</p>
+                          <p className="text-xs text-slate-500">{transferDetail.bankName}</p>
+                          <p className="text-xs font-medium text-slate-700">{transferDetail.accountNumber}</p>
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-4 py-3">
+                    {getWithdrawProofUrl(withdraw) ? (
+                      <a href={getWithdrawProofUrl(withdraw)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0F766E] hover:underline">
+                        <Upload className="h-3.5 w-3.5" />
+                        Lihat bukti
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-400">Belum ada</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={withdraw.status} />
                   </td>
@@ -219,3 +268,4 @@ export function SuperAdminWithdraws() {
     </div>
   );
 }
+

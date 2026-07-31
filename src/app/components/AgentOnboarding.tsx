@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock3, Lock, PlayCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactPlayer from "react-player";
+import Swal from "sweetalert2";
 import { api, onboardingProgressUpdatedEvent, type OnboardingProgressDto, type OnboardingSummaryDto, type OnboardingVideoDto } from "../services/api";
 
 const emptySummary: OnboardingSummaryDto = {
@@ -79,6 +80,8 @@ export function AgentOnboarding() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const completedAlertVideoIdsRef = useRef<Set<number>>(new Set());
+  const allCompletedAlertShownRef = useRef(false);
 
   const loadOnboarding = async () => {
     setIsLoading(true);
@@ -178,6 +181,28 @@ export function AgentOnboarding() {
       window.dispatchEvent(new CustomEvent(onboardingProgressUpdatedEvent, { detail: resolvedSummary }));
 
       if (status === "completed") {
+        if (!completedAlertVideoIdsRef.current.has(video.id)) {
+          completedAlertVideoIdsRef.current.add(video.id);
+          await Swal.fire({
+            icon: "success",
+            title: "Video selesai ditonton",
+            text: `${video.title} berhasil ditandai selesai.`,
+            confirmButtonColor: "#0F766E",
+          });
+        }
+
+        if (resolvedSummary.is_completed && !allCompletedAlertShownRef.current) {
+          allCompletedAlertShownRef.current = true;
+          await Swal.fire({
+            icon: "success",
+            title: "Onboarding selesai",
+            text: "Semua video onboarding sudah selesai ditonton. Halaman akan diperbarui.",
+            confirmButtonColor: "#0F766E",
+          });
+          window.location.reload();
+          return;
+        }
+
         setTimeout(() => {
           if (scrollContainerRef.current) {
             const cards = scrollContainerRef.current.querySelectorAll("article");
@@ -212,7 +237,7 @@ export function AgentOnboarding() {
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">Agent Onboarding</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Video Training Wajib Moxlite Agent</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Materi onboarding untuk pengetahuan produk dan sistem agent.
+            Materi onboarding untuk pengetahuan produk dan sistem moxlite agent.
           </p>
         </div>
       </div>

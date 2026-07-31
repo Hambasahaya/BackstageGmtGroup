@@ -1,4 +1,4 @@
-import { Camera, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as blazeface from "@tensorflow-models/blazeface";
@@ -22,6 +22,7 @@ export function WebcamCapture({
   const [isValid, setIsValid] = useState<boolean>(false);
   const [validationMessage, setValidationMessage] = useState<string>("Memuat AI...");
   const validationLoopRef = useRef<number>(undefined);
+  const hasCapturedRef = useRef(false);
 
   const getGuideBoundsInVideo = useCallback(() => {
     const video = videoRef.current;
@@ -140,8 +141,8 @@ export function WebcamCapture({
               const guideBottom = guideBounds ? guideBounds.bottom : video.videoHeight * 0.75;
 
               // Validasi mengikuti oval yang benar-benar tampil, termasuk crop object-cover di mobile Safari.
-              const centerPaddingX = guideWidth * 0.12;
-              const centerPaddingY = guideHeight * 0.12;
+              const centerPaddingX = guideWidth * 0.08;
+              const centerPaddingY = guideHeight * 0.08;
               const faceWidthRatio = faceWidth / guideWidth;
               const faceHeightRatio = faceHeight / guideHeight;
               const isCentered =
@@ -150,18 +151,18 @@ export function WebcamCapture({
                 faceCenterY > guideTop + centerPaddingY &&
                 faceCenterY < guideBottom - centerPaddingY;
               const isGoodSize =
-                faceWidthRatio >= 0.32 &&
-                faceWidthRatio <= 0.88 &&
-                faceHeightRatio >= 0.32 &&
-                faceHeightRatio <= 0.92;
+                faceWidthRatio >= 0.24 &&
+                faceWidthRatio <= 1.18 &&
+                faceHeightRatio >= 0.24 &&
+                faceHeightRatio <= 1.18;
 
               if (isCentered && isGoodSize) {
                 setIsValid(true);
                 setValidationMessage("Posisi wajah sudah pas");
-              } else if (faceWidthRatio > 0.88 || faceHeightRatio > 0.92) {
+              } else if (faceWidthRatio > 1.18 || faceHeightRatio > 1.18) {
                 setIsValid(false);
                 setValidationMessage("Jauhkan wajah sedikit dari kamera");
-              } else if (faceWidthRatio < 0.32 || faceHeightRatio < 0.32) {
+              } else if (faceWidthRatio < 0.24 || faceHeightRatio < 0.24) {
                 setIsValid(false);
                 setValidationMessage("Dekatkan wajah ke dalam oval");
               } else {
@@ -198,7 +199,11 @@ export function WebcamCapture({
     const startCamera = async () => {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: overlayType === "ktp" ? "environment" : "user" },
+          video: {
+            facingMode: overlayType === "ktp" ? "environment" : "user",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
         setStream(mediaStream);
@@ -221,16 +226,19 @@ export function WebcamCapture({
   }, [overlayType]);
 
   const handleCapture = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (hasCapturedRef.current || !videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    // Set canvas dimensions to match video intrinsic size for max resolution
+    hasCapturedRef.current = true;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      hasCapturedRef.current = false;
+      return;
+    }
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -238,10 +246,21 @@ export function WebcamCapture({
       if (blob) {
         const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
         onCapture(file);
+      } else {
+        hasCapturedRef.current = false;
       }
     }, "image/jpeg", 0.9);
   }, [onCapture]);
 
+  useEffect(() => {
+    if (!stream || !isValid || hasCapturedRef.current) return;
+
+    const captureTimeout = window.setTimeout(() => {
+      handleCapture();
+    }, 600);
+
+    return () => window.clearTimeout(captureTimeout);
+  }, [handleCapture, isValid, stream]);
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-slate-950">
       <div className="relative z-10 flex h-16 shrink-0 items-center justify-between bg-black/60 px-4 text-white">
@@ -266,9 +285,9 @@ export function WebcamCapture({
               className="absolute inset-0 h-full w-full object-cover"
             />
 
-            <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden p-6">
+            <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden p-4 sm:p-6">
               {overlayType === "ktp" && (
-                <div ref={guideRef} className={`relative aspect-[856/540] w-full max-w-md rounded-xl border-2 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                <div ref={guideRef} className={`relative aspect-[856/540] w-full max-w-[min(92vw,46rem)] rounded-xl border-2 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   {/* Corners */}
                   <div className={`absolute -left-1 -top-1 h-8 w-8 border-l-4 border-t-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
                   <div className={`absolute -right-1 -top-1 h-8 w-8 border-r-4 border-t-4 transition-colors ${isValid ? "border-emerald-400" : "border-teal-400"}`}></div>
@@ -281,7 +300,7 @@ export function WebcamCapture({
               )}
 
               {overlayType === "selfie" && (
-                <div ref={guideRef} className={`relative aspect-[7/9] h-[min(58vh,22rem)] max-w-[68vw] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                <div ref={guideRef} className={`relative aspect-[7/9] h-[min(68vh,32rem)] max-w-[82vw] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <p className="px-4 text-center text-sm font-bold text-white/80 drop-shadow-md">
                       Posisikan wajah Anda di dalam oval ini
@@ -307,14 +326,8 @@ export function WebcamCapture({
         )}
       </div>
 
-      <div className="flex h-32 shrink-0 items-center justify-center bg-black pb-8 pt-4">
-        <button
-          onClick={handleCapture}
-          disabled={!stream || !isValid}
-          className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-teal-500 text-white transition active:scale-95 disabled:opacity-50 disabled:bg-slate-500"
-        >
-          <Camera className="h-8 w-8" />
-        </button>
+      <div className="shrink-0 bg-black px-4 py-4 text-center text-xs font-semibold text-white/70">
+        Foto akan otomatis diambil saat posisi sudah terdeteksi pas.
       </div>
 
       <canvas ref={canvasRef} className="hidden" />

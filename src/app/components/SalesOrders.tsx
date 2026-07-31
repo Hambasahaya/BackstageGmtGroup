@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
 import Swal from "sweetalert2";
 
-type PurchaseOrderStatus = "draft" | "in_review" | "approve" | "invalid";
+type PurchaseOrderStatus = "draft" | "in_review" | "approve" | "shipped" | "barang_sudah_terkirim" | "invalid";
 
 type PurchaseOrderItem = {
   id: string;
@@ -21,6 +21,7 @@ type PurchaseOrder = {
   agentName: string;
   agentEmail: string;
   customerName: string;
+  customerCompany: string;
   customerEmail: string;
   customerPhone: string;
   customerAddress: string;
@@ -41,11 +42,14 @@ type PurchaseOrder = {
   lastPaymentStage?: string;
   createdAt: string;
   invalidReason?: string;
+  invoiceReceived: boolean;
+  invoiceReceivedAt?: string | null;
 };
 
 type SalesActionLoading =
   | { type: "approve"; poId: number }
   | { type: "invalid"; poId: number }
+  | { type: "shipped"; poId: number }
   | { type: "upload"; poId: number; stage: "full" | "dp" | "remaining" }
   | { type: "quotation"; poId: number }
   | null;
@@ -137,6 +141,7 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     agentName: agent.agentName,
     agentEmail: agent.agentEmail,
     customerName: preorder.nama_customer,
+    customerCompany: preorder.nama_perusahaan ?? "",
     customerEmail: preorder.email,
     customerPhone: preorder.no_hp,
     customerAddress: preorder.alamat,
@@ -164,6 +169,8 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     lastPaymentStage: preorder.last_payment_stage ?? undefined,
     createdAt: preorder.created_at ?? new Date().toISOString(),
     invalidReason: preorder.invalid_reason ?? undefined,
+    invoiceReceived: Boolean(preorder.invoice_received),
+    invoiceReceivedAt: preorder.invoice_received_at ?? null,
   };
 }
 
@@ -188,6 +195,8 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
     unpaid: { label: "Unpaid", className: "bg-slate-100 text-slate-700 ring-slate-200" },
     pending: { label: "Pending", className: "bg-amber-50 text-amber-700 ring-amber-200" },
     paid: { label: "Paid", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    shipped: { label: "Shipped", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    barang_sudah_terkirim: { label: "Shipped", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
     expired: { label: "Expired", className: "bg-slate-100 text-slate-600 ring-slate-200" },
     failed: { label: "Failed", className: "bg-rose-50 text-rose-700 ring-rose-200" },
     refund: { label: "Refund", className: "bg-violet-50 text-violet-700 ring-violet-200" },
@@ -352,6 +361,7 @@ export function SalesOrders() {
   const pendingCount = purchaseOrders.filter((po) => po.status === "in_review").length;
   const approvedCount = purchaseOrders.filter((po) => po.status === "approve").length;
   const invalidCount = purchaseOrders.filter((po) => po.status === "invalid").length;
+  const shippedCount = purchaseOrders.filter((po) => po.status === "shipped" || po.status === "barang_sudah_terkirim").length;
 
   const approvePo = async (po: PurchaseOrder) => {
     if (po.status !== "in_review" || actionLoading) {
@@ -385,6 +395,90 @@ export function SalesOrders() {
     }
   };
 
+
+  const markPoShipped = async (po: PurchaseOrder) => {
+    if ((po.status !== "approve" && po.paymentStatus !== "paid") || actionLoading) {
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: "Tandai barang terkirim?",
+      text: `${po.poNumber} akan ditandai sebagai barang terkirim.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#0F766E",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Ya, terkirim",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    setActionLoading({ type: "shipped", poId: po.id });
+    openProcessingAlert("Menyimpan status terkirim", "Mohon tunggu sampai status PO diperbarui.");
+
+    try {
+      await api.salesUpdatePreorderStatus(po.id, { status: "shipped", payment_status: "shipped" });
+      await loadOrders(true);
+      await refreshPreviewPo(po.id);
+      await Swal.fire({
+        title: "Status diperbarui",
+        text: "PO berhasil ditandai barang terkirim.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
+    } catch (error) {
+      Swal.close();
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menandai barang terkirim.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const confirmInvoiceReceived = async (po: PurchaseOrder) => {
+    const isShipped = po.status === "shipped" || po.status === "barang_sudah_terkirim";
+
+    if (!isShipped || po.invoiceReceived || actionLoading) {
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: "Konfirmasi invoice diterima?",
+      text: `${po.poNumber} akan ditandai sudah diterima oleh customer.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#0F766E",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: "Ya, sudah diterima",
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    setActionLoading({ type: "confirm-invoice", poId: po.id });
+    openProcessingAlert("Menyimpan konfirmasi", "Mohon tunggu sampai status penerimaan invoice tersimpan.");
+
+    try {
+      await api.confirmInvoiceReceived(po.id);
+      await loadOrders(true);
+      await refreshPreviewPo(po.id);
+      await Swal.fire({
+        title: "Konfirmasi tersimpan",
+        text: "Invoice/barang sudah ditandai diterima customer.",
+        icon: "success",
+        confirmButtonColor: "#0F766E",
+      });
+    } catch (error) {
+      Swal.close();
+      setErrorMessage(error instanceof Error ? error.message : "Gagal menyimpan konfirmasi invoice diterima.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
   const handleUploadProof = async (po: PurchaseOrder, stage: "full" | "dp" | "remaining", file: File) => {
     if (actionLoading) {
       return;
@@ -629,6 +723,7 @@ export function SalesOrders() {
         <StatCard label="In review" value={String(pendingCount)} detail="Menunggu keputusan sales" />
         <StatCard label="Approved" value={String(approvedCount)} detail="Komisi agent masuk wallet" />
         <StatCard label="Invalid" value={String(invalidCount)} detail="Ditolak dengan alasan" />
+        <StatCard label="Terkirim" value={String(shippedCount)} detail="Barang sudah terkirim" />
       </section>
 
       {errorMessage && (
@@ -661,6 +756,7 @@ export function SalesOrders() {
               <option value="in_review">In review</option>
               <option value="approve">Approved</option>
               <option value="invalid">Invalid</option>
+              <option value="shipped">Barang terkirim</option>
               <option value="draft">Draft</option>
               <option value="all">Semua status</option>
             </select>
@@ -688,6 +784,7 @@ export function SalesOrders() {
               {filteredOrders.map((po) => {
                 const isApproving = isActionLoading(po.id, "approve");
                 const isInvalidating = isActionLoading(po.id, "invalid");
+                const isShipping = isActionLoading(po.id, "shipped");
 
                 return (
                 <tr key={po.id} className="border-b border-slate-100 text-sm last:border-0">
@@ -787,13 +884,23 @@ export function SalesOrders() {
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer</p>
                   <p className="mt-2 font-semibold text-slate-950">{previewPo.customerName}</p>
+                  {previewPo.customerCompany && (
+                    <p className="mt-1 text-sm font-medium text-slate-700">{previewPo.customerCompany}</p>
+                  )}
+                  <p className="mt-1 text-xs font-medium text-slate-500">Jika perorangan, isi dengan nama customer.</p>
                   <p className="mt-1 text-sm text-slate-600">{previewPo.customerEmail}</p>
                   <p className="text-sm text-slate-600">{previewPo.customerPhone}</p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Alamat dan catatan</p>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Alamat dapat diisi atau ditentukan melalui pin Google Maps.</p>
                   <p className="mt-2 text-sm text-slate-700">{previewPo.customerAddress}</p>
                   <p className="mt-2 text-sm text-slate-500">{previewPo.notes || "Tidak ada catatan."}</p>
+                  {previewPo.invoiceReceived && (
+                    <p className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                      Invoice/barang diterima customer{previewPo.invoiceReceivedAt ? ` pada ${dateFormatter.format(new Date(previewPo.invoiceReceivedAt))}` : ""}.
+                    </p>
+                  )}
                   {previewPo.invalidReason && (
                     <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
                       Alasan invalid: {previewPo.invalidReason}
@@ -1070,6 +1177,19 @@ export function SalesOrders() {
                 </div>
               )}
 
+              {previewPo.status === "approve" && previewPo.paymentStatus === "paid" && (
+                <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+                  <button
+                    onClick={() => void markPoShipped(previewPo)}
+                    disabled={Boolean(actionLoading)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {isActionLoading(previewPo.id, "shipped") ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {isActionLoading(previewPo.id, "shipped") ? "Memproses..." : "Tandai barang terkirim"}
+                  </button>
+                </div>
+              )}
+
               {previewPo.status === "approve" && (previewPo.paymentMode === "split" || previewPo.paymentMode === "50%") && previewPo.paymentStatus === "partial" && (
                 <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                   <button
@@ -1157,3 +1277,11 @@ export function SalesOrders() {
     </div>
   );
 }
+
+
+
+
+
+
+
+

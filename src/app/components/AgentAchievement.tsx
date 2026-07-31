@@ -362,11 +362,11 @@ export function AgentAchievement() {
                 {/* Milestones Label bottom */}
                 <div className="mt-2 w-full flex justify-between text-[8px] sm:text-[9px] text-slate-400 select-none">
                   <span className="opacity-0 sm:opacity-100">Start</span>
-                  <span className="absolute" style={{ left: "7%" }}>Bronze<span className="hidden sm:inline"> Tier</span></span>
-                  <span className="absolute hidden sm:block" style={{ left: "23.5%" }}>Silver Tier</span>
-                  <span className="absolute" style={{ left: "48.5%" }}>Gold<span className="hidden sm:inline"> Tier</span></span>
-                  <span className="absolute hidden sm:block" style={{ left: "73.5%" }}>Platinum Tier</span>
-                  <span className="font-semibold text-[#0F766E]">Trip Bali</span>
+                  <span className="absolute" style={{ left: "7%" }}>100JT</span>
+                  <span className="absolute hidden sm:block" style={{ left: "23.5%" }}>300JT</span>
+                  <span className="absolute" style={{ left: "48.5%" }}>600JT</span>
+                  <span className="absolute hidden sm:block" style={{ left: "73.5%" }}>900JT</span>
+                  <span className="font-semibold text-[#0F766E]">1.2M</span>
                 </div>
               </div>
             </div>
@@ -379,15 +379,15 @@ export function AgentAchievement() {
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-slate-900">
-                    {nextTier ? `Sisa target Anda ke ${nextTier.name}:` : "Luar Biasa! Target Terpenuhi!"}
+                    {nextTier ? "Sisa target menuju milestone berikutnya:" : "Luar Biasa! Target Terpenuhi!"}
                   </h4>
                   <p className="mt-1 text-lg font-bold text-[#0F766E]">
                     {nextTier ? formatCurrencyFull(remainingToNextTier) : "Anda telah menaklukkan target tertinggi Agent!"}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {nextTier
-                      ? `Raih tier ini untuk membuka reward: ${nextTier.reward}`
-                      : "Semua reward bonus dan trip liburan Bali eksklusif telah berhasil Anda kunci!"
+                      ? "Terus tingkatkan penjualan untuk mencapai target program tahun ini."
+                      : "Target penjualan tahunan sudah berhasil tercapai."
                     }
                   </p>
                 </div>
@@ -529,3 +529,5 @@ export function AgentAchievement() {
     </div>
   );
 }
+
+

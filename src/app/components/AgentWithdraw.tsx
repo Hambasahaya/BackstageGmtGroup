@@ -1,6 +1,7 @@
-import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, Plus, Wallet, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, FileText, Plus, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api, type PreorderDto, type WalletDto, type WithdrawDto } from "../services/api";
+import Swal from "sweetalert2";
+import { api, getStoredUser, type PreorderDto, type WalletDto, type WithdrawDto } from "../services/api";
 
 const defaultWallet: WalletDto = {
   total_commission: 12500000,
@@ -58,6 +59,10 @@ const timeFormatter = new Intl.DateTimeFormat("id-ID", {
   hour: "2-digit",
   minute: "2-digit",
 });
+
+function getWithdrawProofUrl(withdraw: WithdrawDto) {
+  return withdraw.transfer_proof ?? withdraw.payment_proof ?? withdraw.proof_of_transfer ?? withdraw.bukti_transfer ?? "";
+}
 
 function StatusBadge({ status }: { status: WithdrawDto["status"] }) {
   if (status === "approval") {
@@ -186,6 +191,10 @@ function MobileTransactionItem({
 }
 
 export function AgentWithdraw() {
+  const storedUser = getStoredUser();
+  const recipientName = storedUser?.name ?? "-";
+  const bankName = storedUser?.detail_user?.bank_name ?? "-";
+  const accountNumber = storedUser?.detail_user?.account_number ?? "-";
   const [wallet, setWallet] = useState<WalletDto>(defaultWallet);
   const [withdraws, setWithdraws] = useState<WithdrawDto[]>(defaultWithdraws);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -282,6 +291,38 @@ export function AgentWithdraw() {
       return;
     }
 
+    const confirmation = await Swal.fire({
+      icon: "question",
+      title: "Konfirmasi rekening penerima",
+      html: `
+        <div style="text-align:left;font-size:14px;line-height:1.6">
+          <p>Pastikan data rekening tujuan withdraw sudah benar sebelum pengajuan dikirim.</p>
+          <div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0">
+              <span style="color:#64748b">Nama penerima</span><strong>${recipientName}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0">
+              <span style="color:#64748b">Bank</span><strong>${bankName}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0">
+              <span style="color:#64748b">Nomor rekening</span><strong>${accountNumber}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px">
+              <span style="color:#64748b">Nominal withdraw</span><strong>${currencyFormatter.format(parsedAmount)}</strong>
+            </div>
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Kirim pengajuan",
+      cancelButtonText: "Periksa lagi",
+      confirmButtonColor: "#0F766E",
+    });
+
+    if (!confirmation.isConfirmed) {
+      return;
+    }
+
     try {
       await api.createAgentWithdraw(parsedAmount);
       closeModal();
@@ -310,13 +351,23 @@ export function AgentWithdraw() {
         </button>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:gap-4 lg:max-w-sm">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard
           label="Total komisi"
           value={currencyFormatter.format(wallet.total_commission)}
           detail="Akumulasi komisi approve"
           featuredMobile
           pendingValue={currencyFormatter.format(wallet.pending_withdraw)}
+        />
+        <StatCard
+          label="Sudah ditarik"
+          value={currencyFormatter.format(wallet.withdrawn_balance)}
+          detail="Total withdraw yang sudah approval"
+        />
+        <StatCard
+          label="Sisa komisi"
+          value={currencyFormatter.format(wallet.available_balance)}
+          detail="Saldo komisi yang tersedia"
         />
       </section>
 
@@ -368,6 +419,7 @@ export function AgentWithdraw() {
                 <th className="px-4 py-3 font-semibold">Tanggal</th>
                 <th className="px-4 py-3 font-semibold">Nominal</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Bukti transfer</th>
               </tr>
             </thead>
             <tbody>
@@ -378,6 +430,16 @@ export function AgentWithdraw() {
                   <td className="px-4 py-3 font-semibold text-slate-900">{currencyFormatter.format(withdraw.amount)}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={withdraw.status} />
+                  </td>
+                  <td className="px-4 py-3">
+                    {getWithdrawProofUrl(withdraw) ? (
+                      <a href={getWithdrawProofUrl(withdraw)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0F766E] hover:underline">
+                        <FileText className="h-3.5 w-3.5" />
+                        Lihat bukti
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-400">Belum ada</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -400,6 +462,9 @@ export function AgentWithdraw() {
             </div>
 
             <form onSubmit={submitWithdraw} className="space-y-4 p-5">
+              <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium leading-6 text-[#0F766E]">
+                Pencairan komisi akan diproses oleh tim Finance dan masuk ke rekening maksimal 1x24 jam setelah pengajuan withdraw dikonfirmasi.
+              </div>
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Nominal withdraw</span>
                 <div className="relative">
@@ -443,3 +508,4 @@ export function AgentWithdraw() {
     </div>
   );
 }
+
