@@ -1,4 +1,4 @@
-export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
+﻿export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
 export type PreorderStatus = "draft" | "in_review" | "approve" | "shipped" | "barang_sudah_terkirim" | "invalid";
 export type PaymentStatus = "unpaid" | "pending" | "partial" | "paid" | "shipped" | "barang_sudah_terkirim" | "expired" | "failed" | "refund";
 export type PaymentMode = "full" | "split" | "50%" | "100%" | "50" | "100";
@@ -1129,10 +1129,10 @@ export const api = {
     apiRequest<{ message: string }>("/api/notifications/read-all", { method: "PUT" }),
   agentWallet: () => apiRequest<{ wallet: WalletDto }>("/api/agent/wallet"),
   agentWithdraws: () => apiRequest<{ withdraws: WithdrawDto[] }>("/api/agent/withdraws"),
-  createAgentWithdraw: (amount: number) =>
+  createAgentWithdraw: (payload: { amount: number; recipient_name?: string; bank_name?: string; account_number?: string }) =>
     apiRequest<{ message: string; withdraw: WithdrawDto }>("/api/agent/withdraws", {
       method: "POST",
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify(payload),
     }),
   superAdminDashboard: () => apiRequest<{ message: string }>("/api/super-admin/dashboard"),
   superAdminWithdraws: (status?: WithdrawStatus) =>
@@ -1282,6 +1282,7 @@ export const api = {
       query: { type },
     }),
 };
+
 
 
 

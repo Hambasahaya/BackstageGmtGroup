@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+﻿import { Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as tf from "@tensorflow/tfjs";
 import * as blazeface from "@tensorflow-models/blazeface";
@@ -38,18 +38,32 @@ export function WebcamCapture({
     const previewAspect = previewRect.width / previewRect.height;
     const renderedVideo =
       videoAspect > previewAspect
-        ? {
-            width: previewRect.height * videoAspect,
-            height: previewRect.height,
-            x: (previewRect.width - previewRect.height * videoAspect) / 2,
-            y: 0,
-          }
-        : {
-            width: previewRect.width,
-            height: previewRect.width / videoAspect,
-            x: 0,
-            y: (previewRect.height - previewRect.width / videoAspect) / 2,
-          };
+        ? overlayType === "selfie"
+          ? {
+              width: previewRect.width,
+              height: previewRect.width / videoAspect,
+              x: 0,
+              y: (previewRect.height - previewRect.width / videoAspect) / 2,
+            }
+          : {
+              width: previewRect.height * videoAspect,
+              height: previewRect.height,
+              x: (previewRect.width - previewRect.height * videoAspect) / 2,
+              y: 0,
+            }
+        : overlayType === "selfie"
+          ? {
+              width: previewRect.height * videoAspect,
+              height: previewRect.height,
+              x: (previewRect.width - previewRect.height * videoAspect) / 2,
+              y: 0,
+            }
+          : {
+              width: previewRect.width,
+              height: previewRect.width / videoAspect,
+              x: 0,
+              y: (previewRect.height - previewRect.width / videoAspect) / 2,
+            };
 
     const left = ((guideRect.left - previewRect.left - renderedVideo.x) / renderedVideo.width) * video.videoWidth;
     const top = ((guideRect.top - previewRect.top - renderedVideo.y) / renderedVideo.height) * video.videoHeight;
@@ -62,7 +76,7 @@ export function WebcamCapture({
       right: Math.max(0, Math.min(video.videoWidth, right)),
       bottom: Math.max(0, Math.min(video.videoHeight, bottom)),
     };
-  }, []);
+  }, [overlayType]);
 
   useEffect(() => {
     let isMounted = true;
@@ -82,7 +96,7 @@ export function WebcamCapture({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [overlayType]);
 
   useEffect(() => {
     if (!model || !videoRef.current || !stream) return;
@@ -282,7 +296,7 @@ export function WebcamCapture({
               autoPlay
               playsInline
               muted
-              className="absolute inset-0 h-full w-full object-cover"
+              className={`absolute inset-0 h-full w-full ${overlayType === "selfie" ? "object-contain" : "object-cover"}`}
             />
 
             <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden p-4 sm:p-6">
@@ -300,7 +314,7 @@ export function WebcamCapture({
               )}
 
               {overlayType === "selfie" && (
-                <div ref={guideRef} className={`relative aspect-[7/9] h-[min(68vh,32rem)] max-w-[82vw] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
+                <div ref={guideRef} className={`relative aspect-[7/9] h-[min(62vh,28rem)] max-w-[76vw] md:h-[min(56vh,25rem)] lg:h-[min(52vh,24rem)] rounded-[999px] border-4 transition-colors duration-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] ${isValid ? "border-emerald-400" : "border-white/20"}`}>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <p className="px-4 text-center text-sm font-bold text-white/80 drop-shadow-md">
                       Posisikan wajah Anda di dalam oval ini
@@ -334,3 +348,4 @@ export function WebcamCapture({
     </div>
   );
 }
+

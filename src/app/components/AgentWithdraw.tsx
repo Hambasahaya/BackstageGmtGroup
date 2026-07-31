@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, FileText, Plus, Wallet, X } from "lucide-react";
+﻿import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, FileText, Plus, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { api, getStoredUser, type PreorderDto, type WalletDto, type WithdrawDto } from "../services/api";
@@ -199,6 +199,9 @@ export function AgentWithdraw() {
   const [withdraws, setWithdraws] = useState<WithdrawDto[]>(defaultWithdraws);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  const [transferRecipientName, setTransferRecipientName] = useState(recipientName === "-" ? "" : recipientName);
+  const [transferBankName, setTransferBankName] = useState(bankName === "-" ? "" : bankName);
+  const [transferAccountNumber, setTransferAccountNumber] = useState(accountNumber === "-" ? "" : accountNumber);
   const [commissionPreorders, setCommissionPreorders] = useState<PreorderDto[]>([]);
   const [expandedMobileTransactionId, setExpandedMobileTransactionId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
@@ -268,6 +271,9 @@ export function AgentWithdraw() {
 
   const openWithdrawModal = () => {
     setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
+    setTransferRecipientName(recipientName === "-" ? "" : recipientName);
+    setTransferBankName(bankName === "-" ? "" : bankName);
+    setTransferAccountNumber(accountNumber === "-" ? "" : accountNumber);
     setFormError("");
     setIsModalOpen(true);
   };
@@ -291,6 +297,20 @@ export function AgentWithdraw() {
       return;
     }
 
+    const finalRecipientName = transferRecipientName.trim();
+    const finalBankName = transferBankName.trim();
+    const finalAccountNumber = transferAccountNumber.trim();
+
+    if (!finalRecipientName || !finalBankName || !finalAccountNumber) {
+      setFormError("Lengkapi nama penerima, bank, dan nomor rekening tujuan transfer.");
+      return;
+    }
+
+    if (/\D/.test(finalAccountNumber)) {
+      setFormError("Nomor rekening hanya boleh berisi angka.");
+      return;
+    }
+
     const confirmation = await Swal.fire({
       icon: "question",
       title: "Konfirmasi rekening penerima",
@@ -299,13 +319,13 @@ export function AgentWithdraw() {
           <p>Pastikan data rekening tujuan withdraw sudah benar sebelum pengajuan dikirim.</p>
           <div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
             <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0">
-              <span style="color:#64748b">Nama penerima</span><strong>${recipientName}</strong>
+              <span style="color:#64748b">Nama penerima</span><strong>${finalRecipientName}</strong>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0">
-              <span style="color:#64748b">Bank</span><strong>${bankName}</strong>
+              <span style="color:#64748b">Bank</span><strong>${finalBankName}</strong>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e2e8f0">
-              <span style="color:#64748b">Nomor rekening</span><strong>${accountNumber}</strong>
+              <span style="color:#64748b">Nomor rekening</span><strong>${finalAccountNumber}</strong>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px;padding:10px 12px">
               <span style="color:#64748b">Nominal withdraw</span><strong>${currencyFormatter.format(parsedAmount)}</strong>
@@ -324,7 +344,12 @@ export function AgentWithdraw() {
     }
 
     try {
-      await api.createAgentWithdraw(parsedAmount);
+      await api.createAgentWithdraw({
+        amount: parsedAmount,
+        recipient_name: finalRecipientName,
+        bank_name: finalBankName,
+        account_number: finalAccountNumber,
+      });
       closeModal();
       await loadWithdrawData();
     } catch (error) {
@@ -450,7 +475,7 @@ export function AgentWithdraw() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+          <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Buat pengajuan withdraw</h2>
@@ -465,6 +490,48 @@ export function AgentWithdraw() {
               <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-medium leading-6 text-[#0F766E]">
                 Pencairan komisi akan diproses oleh tim Finance dan masuk ke rekening maksimal 1x24 jam setelah pengajuan withdraw dikonfirmasi.
               </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-slate-950">Rekening tujuan transfer</p>
+                  <p className="mt-1 text-xs text-slate-500">Data diambil dari profil agent. Ubah jika pencairan ingin dikirim ke rekening lain.</p>
+                </div>
+                <div className="space-y-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nama penerima</span>
+                    <input
+                      value={transferRecipientName}
+                      onChange={(event) => setTransferRecipientName(event.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                      placeholder="Nama penerima"
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Bank</span>
+                    <input
+                      value={transferBankName}
+                      onChange={(event) => setTransferBankName(event.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                      placeholder="Nama bank"
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-slate-600">Nomor rekening</span>
+                    <input
+                      value={transferAccountNumber}
+                      onChange={(event) => setTransferAccountNumber(event.target.value)}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 ${/\D/.test(transferAccountNumber) ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100" : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"}`}
+                      placeholder="Nomor rekening"
+                      required
+                    />
+                    {/\D/.test(transferAccountNumber) && <p className="mt-1.5 text-xs font-medium text-rose-600">Nomor rekening hanya boleh berisi angka.</p>}
+                  </label>
+                </div>
+              </div>
+
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700">Nominal withdraw</span>
                 <div className="relative">
@@ -496,7 +563,8 @@ export function AgentWithdraw() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+                  disabled={!transferRecipientName.trim() || !transferBankName.trim() || !transferAccountNumber.trim() || /\D/.test(transferAccountNumber)}
+                  className="rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
                   Ajukan withdraw
                 </button>
@@ -508,4 +576,7 @@ export function AgentWithdraw() {
     </div>
   );
 }
+
+
+
 

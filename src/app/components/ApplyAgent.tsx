@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
+﻿import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -293,12 +293,30 @@ function BankSelect({
   onBlur?: () => void;
   error?: string;
 }) {
+  const isListedBank = indonesiaBanks.includes(value);
+  const isOtherBank = Boolean(value && !isListedBank);
+  const [useOtherBank, setUseOtherBank] = useState(isOtherBank);
+  const selectValue = useOtherBank || isOtherBank ? "__other__" : value;
+
+  useEffect(() => {
+    if (isOtherBank) setUseOtherBank(true);
+  }, [isOtherBank]);
+
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-2 block text-sm font-medium text-slate-700">Nama bank</span>
       <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+        value={selectValue}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (nextValue === "__other__") {
+            setUseOtherBank(true);
+            onChange("");
+          } else {
+            setUseOtherBank(false);
+            onChange(nextValue);
+          }
+        }}
         onBlur={onBlur}
         aria-invalid={Boolean(error)}
         required
@@ -314,9 +332,24 @@ function BankSelect({
             {bank}
           </option>
         ))}
+        <option value="__other__">Bank lainnya</option>
       </select>
+      {useOtherBank && (
+        <input
+          value={isOtherBank ? value : ""}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          className={`mt-2 w-full rounded-lg border bg-white px-3 py-3 text-sm outline-none transition focus:ring-2 ${
+            error
+              ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
+              : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
+          }`}
+          placeholder="Tulis nama bank"
+          required
+        />
+      )}
       {error && <span className="mt-1.5 block text-xs font-medium text-rose-600">{error}</span>}
-    </label>
+    </div>
   );
 }
 function TextArea({
@@ -397,7 +430,20 @@ function FileField({
             {value ? value.name : "Belum ada file terpilih"}
           </span>
         </div>
-        {!livePhotoType && (
+        {livePhotoType ? (
+          <label
+            className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Upload gambar
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+              className="sr-only"
+            />
+          </label>
+        ) : (
           <input
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
@@ -511,11 +557,11 @@ export function ApplyAgent() {
   const getMissingFields = (includeApplyFields = true, includeVerificationFields = true): RequiredFieldKey[] => {
     const missingFields: RequiredFieldKey[] = [];
 
-    if (includeApplyFields && !applyForm.job.trim()) missingFields.push("job");
+    if (includeApplyFields && (!applyForm.job.trim() || !/[A-Za-zÀ-ÿ]/.test(applyForm.job))) missingFields.push("job");
     if (includeVerificationFields && !verificationForm.photo) missingFields.push("photo");
     if (includeVerificationFields && !verificationForm.ktp_photo) missingFields.push("ktp_photo");
     if (includeVerificationFields && !verificationForm.bank_name.trim()) missingFields.push("bank_name");
-    if (includeVerificationFields && !verificationForm.account_number.trim()) missingFields.push("account_number");
+    if (includeVerificationFields && (!verificationForm.account_number.trim() || /\D/.test(verificationForm.account_number))) missingFields.push("account_number");
     if (includeVerificationFields && !verificationForm.tempat_lahir.trim()) missingFields.push("tempat_lahir");
     if (includeVerificationFields && !verificationForm.tanggal_lahir.trim()) missingFields.push("tanggal_lahir");
     if (includeVerificationFields && !verificationForm.full_address.trim()) missingFields.push("full_address");
@@ -731,7 +777,7 @@ export function ApplyAgent() {
                 <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => { markFieldTouched("photo"); setVerificationForm((current) => ({ ...current, photo: value })); }} error={getFieldError("photo")} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
-                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" />
+                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
@@ -776,7 +822,7 @@ export function ApplyAgent() {
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Data pengajuan</h3>
               <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => setApplyForm((current) => ({ ...current, job: value }))} onBlur={() => markFieldTouched("job")} error={getFieldError("job")} placeholder="Sales Executive" />
+                <TextField label="Pekerjaan" value={applyForm.job} onChange={(value) => { markFieldTouched("job"); setApplyForm((current) => ({ ...current, job: value })); }} onBlur={() => markFieldTouched("job")} error={getFieldError("job")} placeholder="Sales Executive" />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(10rem,0.45fr)_1fr] lg:col-span-1">
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-slate-700">Sosmed</span>
@@ -810,7 +856,7 @@ export function ApplyAgent() {
                 <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => { markFieldTouched("photo"); setVerificationForm((current) => ({ ...current, photo: value })); }} error={getFieldError("photo")} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
-                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => setVerificationForm((current) => ({ ...current, account_number: value }))} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" />
+                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
@@ -1018,3 +1064,8 @@ export function ApplyAgent() {
     </div>
   );
 }
+
+
+
+
+

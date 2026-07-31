@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+﻿import { createBrowserRouter, Navigate } from "react-router";
 import type { ReactNode } from "react";
 import { AuthGate } from "./auth/AuthGate";
 import { canAccessRole, getCurrentAgentStatus, getCurrentRole, roleHomePaths, roleLabels, type AppRole } from "./auth/roles";
@@ -284,6 +284,16 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "agent-customer-care",
+        element: (
+          <RoleGate allowedRoles={agentOnly}>
+            <OfficialAgentGate>
+              <AgentCustomerCareHub />
+            </OfficialAgentGate>
+          </RoleGate>
+        ),
+      },
+      {
         path: "sales-orders",
         element: (
           <RoleGate allowedRoles={salesOnly}>
@@ -334,6 +344,7 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+
 
 
 
