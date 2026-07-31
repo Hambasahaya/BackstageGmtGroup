@@ -11,6 +11,7 @@ import {
   type DetailUserDto,
 } from "../services/api";
 import { Suspense, lazy } from "react";
+import { useNavigate } from "react-router";
 
 const WebcamCapture = lazy(() => import("./WebcamCapture").then(module => ({ default: module.WebcamCapture })));
 
@@ -471,13 +472,30 @@ function hasCompletedVerification(detailUser: DetailUserDto | undefined) {
 }
 
 function WaitingCta() {
+  const navigate = useNavigate();
+
   return (
-    <section className="flex justify-center py-8 sm:py-12">
+    <section className="flex flex-col items-center gap-5 py-8 sm:py-12">
       <img
         src="/imgloading/loadinganimation.png"
         alt="Menunggu verifikasi"
         className="w-full max-w-3xl object-contain"
       />
+      <div className="w-full max-w-3xl rounded-lg border border-teal-200 bg-teal-50 px-4 py-4 text-center shadow-sm">
+        <p className="text-sm leading-6 text-slate-700">
+          Status pendaftaran kamu akan dikirimkan melalui <strong>WhatsApp atau email</strong> setelah proses verifikasi selesai.
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          Sambil menunggu, yuk kenali lebih jauh program <strong>Moxlite Authorized Agent</strong> melalui video onboarding kami.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate("/agent-onboarding")}
+          className="mt-4 inline-flex items-center justify-center rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59]"
+        >
+          Tonton Video Onboarding
+        </button>
+      </div>
     </section>
   );
 }
@@ -1077,6 +1095,8 @@ export function ApplyAgent() {
     </div>
   );
 }
+
+
 
 
 
