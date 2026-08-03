@@ -201,7 +201,8 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
 
   useEffect(() => {
     const searchQuery = query.trim();
-    if (searchQuery.length < 3) {
+    const isCoordinateAddress = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(searchQuery);
+    if (searchQuery.length < 3 || isCoordinateAddress) {
       markerLayerRef.current?.clearLayers();
       setPlaces([]);
       onResultsChange([]);
@@ -310,7 +311,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
 
     if (!destinationPoint) return;
 
-    L.marker(destinationPoint, { icon: destinationMarkerIcon }).bindPopup("Titik akhir").addTo(routeLayer);
+    L.marker(destinationPoint, { icon: destinationMarkerIcon }).bindPopup(selectedAddress || "Titik akhir").addTo(routeLayer);
 
     const abortController = new AbortController();
     const [startLat, startLon] = defaultMapCenter;
@@ -363,7 +364,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
       });
 
     return () => abortController.abort();
-  }, [destinationPoint]);
+  }, [destinationPoint, selectedAddress]);
   const resetMapView = () => {
     setDestinationPoint(null);
     setRouteMessage("");
@@ -405,7 +406,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
                     ? "Titik akhir sudah dipilih."
                     : query.trim().length >= 3
                       ? "Lokasi belum ditemukan. Coba kata kunci lebih spesifik."
-                      : "Ketik minimal 3 huruf, pilih list, klik marker, atau tap peta."}
+                      : "Ketik alamat untuk mencari lokasi, atau tap peta untuk pakai titik tersebut."}
       </div>
     </div>
   );
