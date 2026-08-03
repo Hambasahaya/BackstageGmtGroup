@@ -139,6 +139,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
   const [places, setPlaces] = useState<LeafletPlace[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isRouting, setIsRouting] = useState(false);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const [routeMessage, setRouteMessage] = useState("");
   const [searchError, setSearchError] = useState("");
 
@@ -190,7 +191,36 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
       const nextPoint: [number, number] = [event.latlng.lat, event.latlng.lng];
       setDestinationPoint(nextPoint);
       setSearchError("");
-      onSelectAddress(`${nextPoint[0].toFixed(6)}, ${nextPoint[1].toFixed(6)}`, nextPoint);
+      setIsReverseGeocoding(true);
+
+      const params = new URLSearchParams({
+        format: "jsonv2",
+        lat: String(nextPoint[0]),
+        lon: String(nextPoint[1]),
+        zoom: "18",
+        addressdetails: "1",
+      });
+
+      fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Alamat titik peta tidak bisa dibaca.");
+          return response.json() as Promise<{ display_name?: string }>;
+        })
+        .then((result) => {
+          onSelectAddress(result.display_name || `${nextPoint[0].toFixed(6)}, ${nextPoint[1].toFixed(6)}`, nextPoint);
+        })
+        .catch(() => {
+          setSearchError("Hmmm sorry, sepertinya tidak dapat menemukan alamat.");
+          void Swal.fire({
+            icon: "warning",
+            title: "Alamat tidak ditemukan",
+            text: "Hmmm sorry, sepertinya tidak dapat menemukan alamat.",
+            confirmButtonColor: "#0F766E",
+          });
+        })
+        .finally(() => setIsReverseGeocoding(false));
     };
 
     map.on("click", handleMapClick);
@@ -392,7 +422,9 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
         </button>
       </div>
       <div className="border-t border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
-        {isSearching
+        {isReverseGeocoding
+          ? "Membaca alamat dari titik peta..."
+          : isSearching
           ? "Mencari lokasi..."
           : searchError
             ? searchError
