@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  RotateCcw,
   Send,
   ShoppingCart,
   Trash2,
@@ -149,6 +150,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
       zoom: 11,
       zoomControl: true,
       attributionControl: true,
+      tap: true,
     });
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -160,6 +162,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
     routeLayerRef.current = L.layerGroup().addTo(map);
     L.marker(defaultMapCenter, { icon: startPointIcon }).bindPopup("Titik awal: Rukan Crown, Green Lake City").addTo(routeLayerRef.current);
     mapRef.current = map;
+    window.setTimeout(() => map.invalidateSize(), 150);
 
     return () => {
       map.remove();
@@ -168,6 +171,33 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
       routeLayerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = mapContainerRef.current;
+    if (!map || !container) return;
+
+    const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const handleMapClick = (event: L.LeafletMouseEvent) => {
+      const nextPoint: [number, number] = [event.latlng.lat, event.latlng.lng];
+      setDestinationPoint(nextPoint);
+      setSearchError("");
+      onSelectAddress(`${nextPoint[0].toFixed(6)}, ${nextPoint[1].toFixed(6)}`, nextPoint);
+    };
+
+    map.on("click", handleMapClick);
+    return () => {
+      map.off("click", handleMapClick);
+    };
+  }, [onSelectAddress]);
 
   useEffect(() => {
     const searchQuery = query.trim();
@@ -334,9 +364,32 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
 
     return () => abortController.abort();
   }, [destinationPoint]);
+  const resetMapView = () => {
+    setDestinationPoint(null);
+    setRouteMessage("");
+    setSearchError("");
+    markerLayerRef.current?.clearLayers();
+    routeLayerRef.current?.clearLayers();
+    if (routeLayerRef.current) {
+      L.marker(defaultMapCenter, { icon: startPointIcon }).bindPopup("Titik awal: Rukan Crown, Green Lake City").addTo(routeLayerRef.current);
+    }
+    mapRef.current?.setView(defaultMapCenter, 12);
+  };
+
   return (
     <div>
-      <div ref={mapContainerRef} className="h-56 w-full" />
+      <div className="relative">
+        <div ref={mapContainerRef} className="h-[180px] max-h-[28svh] min-h-[150px] w-full touch-pan-x touch-pan-y sm:h-56 sm:max-h-none md:h-72" />
+        <button
+          type="button"
+          onClick={resetMapView}
+          className="absolute right-3 top-3 z-[500] inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+          aria-label="Reset tampilan peta"
+          title="Reset tampilan peta"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+      </div>
       <div className="border-t border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
         {isSearching
           ? "Mencari lokasi..."
@@ -352,7 +405,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
                     ? "Titik akhir sudah dipilih."
                     : query.trim().length >= 3
                       ? "Lokasi belum ditemukan. Coba kata kunci lebih spesifik."
-                      : "Ketik minimal 3 huruf untuk menampilkan list dan marker lokasi."}
+                      : "Ketik minimal 3 huruf, pilih list, klik marker, atau tap peta."}
       </div>
     </div>
   );
@@ -1939,7 +1992,7 @@ export function AgentPurchaseOrder() {
                 </div>
               )}
 
-              <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:static md:flex md:flex-row md:justify-end md:border-t md:p-0 md:pt-5 md:shadow-none">
+              <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-[1fr_auto_auto] items-center gap-2 border-t border-slate-200 bg-white px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] md:static md:flex md:flex-row md:justify-end md:border-t md:p-0 md:pt-5 md:shadow-none">
                 {mobilePoStep === "cart" ? (
                   <button
                     type="button"

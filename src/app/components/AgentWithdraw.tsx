@@ -482,6 +482,45 @@ export function AgentWithdraw() {
         </div>
       </section>
 
+      <section className="hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:block">
+        <div className="flex flex-col gap-2 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Komisi masuk</h2>
+            <p className="mt-1 text-sm text-slate-500">Riwayat komisi dari PO yang sudah approve.</p>
+          </div>
+          <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
+            <ArrowDownLeft className="h-4 w-4" />
+            {isLoading ? "Memuat" : `${commissionPreorders.length} komisi`}
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {commissionPreorders.length > 0 ? (
+            commissionPreorders.map((preorder) => (
+              <div key={preorder.id} className="grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                      <ArrowDownLeft className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-950">{preorder.po_number ?? `PO-${preorder.id}`}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">{dateFormatter.format(new Date(preorder.created_at ?? new Date().toISOString()))}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-emerald-600">+{currencyFormatter.format(preorder.total_komisi)}</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-500">Success</p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-5 py-6 text-sm font-medium text-slate-500">Belum ada komisi masuk.</div>
+          )}
+        </div>
+      </section>
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
           <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
