@@ -3,6 +3,7 @@ import {
   Eye,
   FileDown,
   FileText,
+  MapPinned,
   Loader2,
   Minus,
   MoreHorizontal,
@@ -77,6 +78,20 @@ const discountOptions = [0, 5, 10, 15, 20, 25, 28];
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function getGoogleMapsQuery(address: string, mapsQuery: string) {
+  return (mapsQuery || address).trim();
+}
+
+function getGoogleMapsEmbedUrl(address: string, mapsQuery: string) {
+  const query = getGoogleMapsQuery(address, mapsQuery);
+  return query ? `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed` : "";
+}
+
+function getGoogleMapsSearchUrl(address: string, mapsQuery: string) {
+  const query = getGoogleMapsQuery(address, mapsQuery);
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : "https://www.google.com/maps";
 }
 
 function parseDiscountTierKey(key: string) {
@@ -444,6 +459,7 @@ export function AgentPurchaseOrder() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [customerMapsQuery, setCustomerMapsQuery] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<PurchaseOrderItem[]>([newItem()]);
   const [formError, setFormError] = useState("");
@@ -505,6 +521,8 @@ export function AgentPurchaseOrder() {
   }, []);
 
   const orderSummary = useMemo(() => calculateOrder(products, items), [items, products]);
+  const googleMapsEmbedUrl = useMemo(() => getGoogleMapsEmbedUrl(customerAddress, customerMapsQuery), [customerAddress, customerMapsQuery]);
+  const googleMapsSearchUrl = useMemo(() => getGoogleMapsSearchUrl(customerAddress, customerMapsQuery), [customerAddress, customerMapsQuery]);
 
   useEffect(() => {
     if (orderSummary.total <= 100000000 && paymentMode === "50%") {
@@ -556,6 +574,7 @@ export function AgentPurchaseOrder() {
     setCustomerEmail("");
     setCustomerPhone("");
     setCustomerAddress("");
+    setCustomerMapsQuery("");
     setNotes("");
     setItems([newItem()]);
     setFormError("");
@@ -649,6 +668,7 @@ export function AgentPurchaseOrder() {
     setCustomerEmail(po.customerEmail);
     setCustomerPhone(po.customerPhone);
     setCustomerAddress(po.customerAddress);
+    setCustomerMapsQuery(po.customerAddress);
     setNotes(po.notes);
     setItems(po.items);
     setFormError("");
@@ -1266,26 +1286,81 @@ export function AgentPurchaseOrder() {
                     <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerPhone")}</p>
                   )}
                 </label>
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Alamat</span>
-                  <input
-                    value={customerAddress}
-                    onBlur={() => markCustomerFieldTouched("customerAddress")}
-                    onChange={(event) => {
-                      setCustomerAddress(event.target.value);
-                      markCustomerFieldTouched("customerAddress");
-                    }}
-                    className={getCustomerInputClass("customerAddress")}
-                    placeholder="Alamat customer"
-                    aria-invalid={Boolean(getCustomerFieldError("customerAddress"))}
-                  />
-                  {getCustomerFieldError("customerAddress") && (
-                    <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerAddress")}</p>
-                  )}
-                  <p className="mt-1.5 text-xs font-medium text-slate-500">
-                    Alamat dapat diisi atau ditentukan melalui pin Google Maps.
-                  </p>
-                </label>
+                <div className="grid gap-4 lg:col-span-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Alamat</span>
+                    <input
+                      value={customerAddress}
+                      onBlur={() => markCustomerFieldTouched("customerAddress")}
+                      onChange={(event) => {
+                        setCustomerAddress(event.target.value);
+                        markCustomerFieldTouched("customerAddress");
+                      }}
+                      className={getCustomerInputClass("customerAddress")}
+                      placeholder="Alamat customer"
+                      aria-invalid={Boolean(getCustomerFieldError("customerAddress"))}
+                    />
+                    {getCustomerFieldError("customerAddress") && (
+                      <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerAddress")}</p>
+                    )}
+                    <p className="mt-1.5 text-xs font-medium text-slate-500">
+                      Alamat dapat diisi manual atau ditentukan dari pin Google Maps.
+                    </p>
+                  </label>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-[#0F766E]">
+                          <MapPinned className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">Pin Google Maps</p>
+                          <p className="text-xs font-medium text-slate-500">Isi lokasi spesifik atau pakai alamat.</p>
+                        </div>
+                      </div>
+                      <a
+                        href={googleMapsSearchUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-teal-50"
+                      >
+                        <MapPinned className="h-3.5 w-3.5" />
+                        Buka Maps
+                      </a>
+                    </div>
+                    <input
+                      value={customerMapsQuery}
+                      onChange={(event) => setCustomerMapsQuery(event.target.value)}
+                      className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                      placeholder="Cari alamat, koordinat, atau link pin Maps"
+                    />
+                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                      {googleMapsEmbedUrl ? (
+                        <iframe
+                          title="Preview pin Google Maps"
+                          src={googleMapsEmbedUrl}
+                          className="h-44 w-full border-0"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      ) : (
+                        <div className="flex h-44 items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
+                          Isi alamat atau pin Maps untuk menampilkan preview lokasi.
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerMapsQuery(customerAddress)}
+                      disabled={!customerAddress.trim()}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
+                    >
+                      <MapPinned className="h-3.5 w-3.5" />
+                      Gunakan alamat sebagai pin
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className={`${mobilePoStep === "cart" ? "space-y-4" : "hidden"} md:hidden`}>

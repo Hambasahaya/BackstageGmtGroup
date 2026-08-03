@@ -129,6 +129,7 @@ type MobileTransaction = {
   status: "Success" | "On progress";
   poNumber?: string;
   createdAt?: string;
+  proofUrl?: string;
 };
 
 function MobileTransactionItem({
@@ -142,7 +143,7 @@ function MobileTransactionItem({
 }) {
   const isIncoming = transaction.type === "in";
   const Icon = isIncoming ? ArrowDownLeft : ArrowUpRight;
-  const hasDetails = isIncoming && !!transaction.poNumber && !!transaction.createdAt;
+  const hasDetails = (isIncoming && !!transaction.poNumber && !!transaction.createdAt) || (!isIncoming && !!transaction.proofUrl);
 
   return (
     <div className="border-b border-slate-100 py-4 last:border-0">
@@ -176,14 +177,21 @@ function MobileTransactionItem({
 
       {isExpanded && hasDetails && (
         <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-slate-950">{transaction.poNumber}</p>
-              <p className="mt-1 text-xs font-medium text-slate-500">{dayDateFormatter.format(new Date(transaction.createdAt!))}</p>
-              <p className="mt-0.5 text-xs text-slate-400">Jam {timeFormatter.format(new Date(transaction.createdAt!))}</p>
+          {isIncoming ? (
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-950">{transaction.poNumber}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">{dayDateFormatter.format(new Date(transaction.createdAt!))}</p>
+                <p className="mt-0.5 text-xs text-slate-400">Jam {timeFormatter.format(new Date(transaction.createdAt!))}</p>
+              </div>
+              <p className="shrink-0 text-sm font-bold text-emerald-600">+{currencyFormatter.format(transaction.amount)}</p>
             </div>
-            <p className="shrink-0 text-sm font-bold text-emerald-600">+{currencyFormatter.format(transaction.amount)}</p>
-          </div>
+          ) : (
+            <a href={transaction.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0F766E] hover:underline">
+              <FileText className="h-4 w-4" />
+              Lihat bukti transfer
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -258,6 +266,7 @@ export function AgentWithdraw() {
         subtitle: `${withdraw.withdraw_number ?? `WD-${withdraw.id}`} - ${dateFormatter.format(new Date(withdraw.created_at))}`,
         amount: withdraw.amount,
         status: withdraw.status === "approval" ? "Success" : "On progress",
+        proofUrl: getWithdrawProofUrl(withdraw),
       });
     });
 
@@ -576,6 +585,7 @@ export function AgentWithdraw() {
     </div>
   );
 }
+
 
 
 
