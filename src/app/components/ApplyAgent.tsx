@@ -1,4 +1,4 @@
-﻿import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -47,6 +47,7 @@ type VerificationForm = {
   tempat_lahir: string;
   tanggal_lahir: string;
   full_address: string;
+  phone_number: string;
   domicile: string;
 };
 
@@ -65,6 +66,7 @@ type RequiredFieldKey =
   | "tempat_lahir"
   | "tanggal_lahir"
   | "full_address"
+  | "phone_number"
   | "agent_motivation"
   | "referral_name"
   | "referral_other"
@@ -79,6 +81,7 @@ const requiredFieldMessages: Record<RequiredFieldKey, string> = {
   tempat_lahir: "Tempat lahir wajib diisi.",
   tanggal_lahir: "Tanggal lahir wajib diisi.",
   full_address: "Alamat lengkap wajib diisi.",
+  phone_number: "Nomor HP/Telepon wajib diisi.",
   agent_motivation: "Alasan menjadi agent wajib diisi.",
   referral_name: "Nama teman/kerabat wajib diisi.",
   referral_other: "Sumber informasi wajib diisi.",
@@ -86,6 +89,24 @@ const requiredFieldMessages: Record<RequiredFieldKey, string> = {
 };
 
 const hasLetter = (value: string) => /[^\W\d_]/u.test(value);
+const phoneNumberPattern = /^(?:\+62|08)\d+$/;
+
+function normalizePhoneNumberInput(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("+")) {
+    return `+${trimmed.slice(1).replace(/\D/g, "")}`.slice(0, 14);
+  }
+  return trimmed.replace(/\D/g, "").slice(0, 14);
+}
+
+function getPhoneNumberError(value: string) {
+  const phoneNumber = value.trim();
+  if (!phoneNumber) return requiredFieldMessages.phone_number;
+  if (!phoneNumberPattern.test(phoneNumber)) return "Nomor HP/Telepon harus diawali +62 atau 08 dan hanya berisi angka.";
+  if (phoneNumber.length < 11) return "Nomor HP/Telepon minimal 11 karakter.";
+  if (phoneNumber.length > 14) return "Nomor HP/Telepon maksimal 14 karakter.";
+  return "";
+}
 
 const verificationInitial: VerificationForm = {
   photo: null,
@@ -95,6 +116,7 @@ const verificationInitial: VerificationForm = {
   tempat_lahir: "",
   tanggal_lahir: "",
   full_address: "",
+  phone_number: "",
   domicile: "",
 };
 
@@ -252,6 +274,9 @@ function TextField({
   list,
   required = true,
   error,
+  inputMode,
+  pattern,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -261,6 +286,9 @@ function TextField({
   list?: string;
   required?: boolean;
   error?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  pattern?: string;
+  maxLength?: number;
 }) {
   return (
     <label className="block">
@@ -278,6 +306,9 @@ function TextField({
         placeholder={placeholder}
         required={required}
         list={list}
+        inputMode={inputMode}
+        pattern={pattern}
+        maxLength={maxLength}
       />
       {error && <span className="mt-1.5 block text-xs font-medium text-rose-600">{error}</span>}
     </label>
@@ -467,7 +498,8 @@ function hasCompletedVerification(detailUser: DetailUserDto | undefined) {
       detailUser.ktp_photo &&
       detailUser.bank_name &&
       detailUser.account_number &&
-      detailUser.full_address,
+      detailUser.full_address &&
+      detailUser.phone_number,
   );
 }
 
@@ -585,6 +617,7 @@ export function ApplyAgent() {
     if (includeVerificationFields && !verificationForm.tempat_lahir.trim()) missingFields.push("tempat_lahir");
     if (includeVerificationFields && !verificationForm.tanggal_lahir.trim()) missingFields.push("tanggal_lahir");
     if (includeVerificationFields && !verificationForm.full_address.trim()) missingFields.push("full_address");
+    if (includeVerificationFields && getPhoneNumberError(verificationForm.phone_number)) missingFields.push("phone_number");
     if (includeApplyFields && !applyForm.agent_motivation.trim()) missingFields.push("agent_motivation");
     if (includeApplyFields && applyForm.referral_source === "teman_kerabat" && !applyForm.referral_name?.trim()) missingFields.push("referral_name");
     if (includeApplyFields && applyForm.referral_source === "lainnya" && !applyForm.referral_other?.trim()) missingFields.push("referral_other");
@@ -605,6 +638,7 @@ export function ApplyAgent() {
       if (/\D/.test(verificationForm.account_number)) return "Nomor rekening hanya boleh berisi angka.";
       return "";
     }
+    if (field === "phone_number") return getPhoneNumberError(verificationForm.phone_number);
     return getMissingFields(includeApplyFields).includes(field) ? requiredFieldMessages[field] : "";
   };
 
@@ -683,6 +717,7 @@ export function ApplyAgent() {
           ktp_photo: verificationForm.ktp_photo,
           bank_name: verificationForm.bank_name,
           account_number: verificationForm.account_number,
+          phone_number: verificationForm.phone_number,
           full_address: verificationForm.full_address,
           domicile: verificationForm.domicile,
           ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
@@ -732,6 +767,7 @@ export function ApplyAgent() {
         ktp_photo: verificationForm.ktp_photo,
         bank_name: verificationForm.bank_name,
         account_number: verificationForm.account_number,
+        phone_number: verificationForm.phone_number,
         full_address: verificationForm.full_address,
         domicile: verificationForm.domicile,
         ttl: `${verificationForm.tempat_lahir}, ${verificationForm.tanggal_lahir}`,
@@ -809,6 +845,7 @@ export function ApplyAgent() {
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
+                <TextField label="PhoneNumber (Nomor HP/Telepon)" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
@@ -888,6 +925,7 @@ export function ApplyAgent() {
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
+                <TextField label="PhoneNumber (Nomor HP/Telepon)" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>

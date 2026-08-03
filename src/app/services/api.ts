@@ -1,4 +1,4 @@
-﻿export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
+export type ApiRole = "user" | "agent" | "super_admin" | "sales" | "marketing";
 export type PreorderStatus = "draft" | "in_review" | "approve" | "shipped" | "barang_sudah_terkirim" | "invalid";
 export type PaymentStatus = "unpaid" | "pending" | "partial" | "paid" | "shipped" | "barang_sudah_terkirim" | "expired" | "failed" | "refund";
 export type PaymentMode = "full" | "split" | "50%" | "100%" | "50" | "100";
@@ -193,6 +193,7 @@ export type DetailUserDto = {
   photo?: string | null;
   ktp_photo?: string | null;
   full_address?: string | null;
+  phone_number?: string | null;
   bank_name?: string | null;
   bank?: string | null;
   account_number?: string | null;
@@ -265,6 +266,7 @@ export type AgentVerificationPayload = {
   account_number: string;
   ttl: string;
   full_address: string;
+  phone_number: string;
   domicile?: string;
 };
 
@@ -1020,6 +1022,7 @@ export const api = {
     formData.set("account_number", payload.account_number);
     formData.set("ttl", payload.ttl);
     formData.set("full_address", payload.full_address);
+    formData.set("phone_number", payload.phone_number);
     if (payload.domicile) {
       formData.set("domicile", payload.domicile);
     }
