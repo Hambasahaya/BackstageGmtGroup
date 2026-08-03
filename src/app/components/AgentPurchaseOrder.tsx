@@ -82,15 +82,8 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function getMapsQuery(address: string, mapsQuery: string) {
-  return (mapsQuery || address).trim();
-}
 
 
-function getOpenStreetMapSearchUrl(address: string, mapsQuery: string) {
-  const query = getMapsQuery(address, mapsQuery);
-  return query ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}` : "https://www.openstreetmap.org";
-}
 type LeafletPlace = {
   place_id: number;
   display_name: string;
@@ -100,7 +93,10 @@ type LeafletPlace = {
 
 type LeafletAddressPickerProps = {
   query: string;
-  onSelectAddress: (address: string) => void;
+  selectedAddress: string;
+  selectedCoordinates: [number, number] | null;
+  onResultsChange: (places: LeafletPlace[]) => void;
+  onSelectAddress: (address: string, coordinates?: [number, number]) => void;
 };
 
 const defaultMapCenter: [number, number] = [-6.190031, 106.700967];
@@ -133,7 +129,7 @@ const destinationMarkerIcon = L.divIcon({
   iconAnchor: [11, 11],
 });
 
-function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerProps) {
+function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onResultsChange, onSelectAddress }: LeafletAddressPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
@@ -173,9 +169,10 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
 
   useEffect(() => {
     const searchQuery = query.trim();
-    if (!searchQuery) {
+    if (searchQuery.length < 3) {
       markerLayerRef.current?.clearLayers();
       setPlaces([]);
+      onResultsChange([]);
       setSearchError("");
       return;
     }
@@ -201,7 +198,11 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
           if (!response.ok) throw new Error("Lokasi tidak bisa dicari saat ini.");
           return response.json() as Promise<LeafletPlace[]>;
         })
-        .then((results) => setPlaces(Array.isArray(results) ? results : []))
+        .then((results) => {
+          const nextPlaces = Array.isArray(results) ? results : [];
+          setPlaces(nextPlaces);
+          onResultsChange(nextPlaces);
+        })
         .catch((error) => {
           if (abortController.signal.aborted) return;
           setPlaces([]);
@@ -216,7 +217,7 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
       window.clearTimeout(timeoutId);
       abortController.abort();
     };
-  }, [query]);
+  }, [onResultsChange, query]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -236,7 +237,7 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
         .bindPopup(place.display_name)
         .on("click", () => {
           setDestinationPoint([lat, lon]);
-          onSelectAddress(place.display_name);
+          onSelectAddress(place.display_name, [lat, lon]);
         });
       marker.addTo(markerLayer);
       bounds.extend([lat, lon]);
@@ -248,6 +249,24 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
   }, [onSelectAddress, places]);
 
 
+
+
+  useEffect(() => {
+    if (selectedCoordinates) {
+      setDestinationPoint(selectedCoordinates);
+    }
+  }, [selectedCoordinates]);
+  useEffect(() => {
+    if (!selectedAddress || !places.length) return;
+    const selectedPlace = places.find((place) => place.display_name === selectedAddress);
+    if (!selectedPlace) return;
+
+    const lat = Number(selectedPlace.lat);
+    const lon = Number(selectedPlace.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    setDestinationPoint([lat, lon]);
+  }, [places, selectedAddress]);
   useEffect(() => {
     const map = mapRef.current;
     const routeLayer = routeLayerRef.current;
@@ -255,18 +274,63 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
 
     routeLayer.clearLayers();
     L.marker(defaultMapCenter, { icon: startPointIcon }).bindPopup("Titik awal: Rukan Crown, Green Lake City").addTo(routeLayer);
+    setRouteMessage("");
 
     if (!destinationPoint) return;
 
     L.marker(destinationPoint, { icon: destinationMarkerIcon }).bindPopup("Titik akhir").addTo(routeLayer);
-    const routeLine = L.polyline([defaultMapCenter, destinationPoint], {
-      color: "#0F766E",
-      weight: 4,
-      opacity: 0.8,
-      dashArray: "8 8",
-    }).addTo(routeLayer);
 
-    map.fitBounds(routeLine.getBounds(), { padding: [28, 28], maxZoom: 14 });
+    const abortController = new AbortController();
+    const [startLat, startLon] = defaultMapCenter;
+    const [endLat, endLon] = destinationPoint;
+    const routeUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+
+    setIsRouting(true);
+    fetch(routeUrl, { signal: abortController.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Rute mobil tidak tersedia.");
+        return response.json() as Promise<{ routes?: { geometry?: { coordinates?: [number, number][] }; distance?: number; duration?: number }[] }>;
+      })
+      .then((result) => {
+        const route = result.routes?.[0];
+        const coordinates = route?.geometry?.coordinates;
+        if (!coordinates?.length) throw new Error("Rute mobil tidak tersedia.");
+
+        const routePoints = coordinates.map(([lon, lat]) => [lat, lon] as [number, number]);
+        const routeLine = L.polyline(routePoints, {
+          color: "#0F766E",
+          weight: 5,
+          opacity: 0.9,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(routeLayer);
+
+        const distanceKm = route.distance ? route.distance / 1000 : null;
+        const durationMin = route.duration ? Math.round(route.duration / 60) : null;
+        setRouteMessage(
+          distanceKm && durationMin
+            ? `Rute mobil: ${distanceKm.toFixed(1)} km, sekitar ${durationMin} menit.`
+            : "Rute mobil sudah ditampilkan.",
+        );
+        map.fitBounds(routeLine.getBounds(), { padding: [28, 28], maxZoom: 14 });
+      })
+      .catch((error) => {
+        if (abortController.signal.aborted) return;
+        const fallbackLine = L.polyline([defaultMapCenter, destinationPoint], {
+          color: "#0F766E",
+          weight: 5,
+          opacity: 0.85,
+          lineCap: "round",
+          lineJoin: "round",
+        }).addTo(routeLayer);
+        setRouteMessage(error instanceof Error ? `${error.message} Menampilkan garis langsung.` : "Menampilkan garis langsung.");
+        map.fitBounds(fallbackLine.getBounds(), { padding: [28, 28], maxZoom: 14 });
+      })
+      .finally(() => {
+        if (!abortController.signal.aborted) setIsRouting(false);
+      });
+
+    return () => abortController.abort();
   }, [destinationPoint]);
   return (
     <div>
@@ -278,9 +342,15 @@ function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerPr
             ? searchError
             : places.length
               ? "Klik marker merah untuk menjadikannya titik akhir dan alamat."
-              : query.trim()
-                ? "Lokasi belum ditemukan. Coba kata kunci lebih spesifik."
-                : "Isi kata kunci untuk menampilkan marker lokasi."}
+              : isRouting
+                ? "Menghitung rute mobil..."
+                : routeMessage
+                  ? routeMessage
+                  : destinationPoint
+                    ? "Titik akhir sudah dipilih."
+                    : query.trim().length >= 3
+                      ? "Lokasi belum ditemukan. Coba kata kunci lebih spesifik."
+                      : "Ketik minimal 3 huruf untuk menampilkan list dan marker lokasi."}
       </div>
     </div>
   );
@@ -651,7 +721,8 @@ export function AgentPurchaseOrder() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
-  const [customerMapsQuery, setCustomerMapsQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<LeafletPlace[]>([]);
+  const [selectedLocationCoordinates, setSelectedLocationCoordinates] = useState<[number, number] | null>(null);
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<PurchaseOrderItem[]>([newItem()]);
   const [formError, setFormError] = useState("");
@@ -713,7 +784,6 @@ export function AgentPurchaseOrder() {
   }, []);
 
   const orderSummary = useMemo(() => calculateOrder(products, items), [items, products]);
-    const openStreetMapSearchUrl = useMemo(() => getOpenStreetMapSearchUrl(customerAddress, customerMapsQuery), [customerAddress, customerMapsQuery]);
 
   useEffect(() => {
     if (orderSummary.total <= 100000000 && paymentMode === "50%") {
@@ -759,27 +829,20 @@ export function AgentPurchaseOrder() {
         : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
     }`;
 
-  const handleMapsAddressSelect = useCallback((address: string) => {
+  const handleMapsAddressSelect = useCallback((address: string, coordinates?: [number, number]) => {
     setCustomerAddress(address);
-    setCustomerMapsQuery(address);
+    setSelectedLocationCoordinates(coordinates ?? null);
+    setLocationSuggestions([]);
     markCustomerFieldTouched("customerAddress");
   }, []);
-  const useMapsQueryAsAddress = () => {
-    const nextAddress = customerMapsQuery.trim();
-    if (!nextAddress) {
-      return;
-    }
-
-    setCustomerAddress(nextAddress);
-    markCustomerFieldTouched("customerAddress");
-  };
   const resetForm = () => {
     setCustomerName("");
     setCustomerCompany("");
     setCustomerEmail("");
     setCustomerPhone("");
     setCustomerAddress("");
-    setCustomerMapsQuery("");
+    setLocationSuggestions([]);
+    setSelectedLocationCoordinates(null);
     setNotes("");
     setItems([newItem()]);
     setFormError("");
@@ -873,7 +936,6 @@ export function AgentPurchaseOrder() {
     setCustomerEmail(po.customerEmail);
     setCustomerPhone(po.customerPhone);
     setCustomerAddress(po.customerAddress);
-    setCustomerMapsQuery(po.customerAddress);
     setNotes(po.notes);
     setItems(po.items);
     setFormError("");
@@ -1499,6 +1561,8 @@ export function AgentPurchaseOrder() {
                       onBlur={() => markCustomerFieldTouched("customerAddress")}
                       onChange={(event) => {
                         setCustomerAddress(event.target.value);
+                        setSelectedLocationCoordinates(null);
+                        if (event.target.value.trim().length < 3) setLocationSuggestions([]);
                         markCustomerFieldTouched("customerAddress");
                       }}
                       className={getCustomerInputClass("customerAddress")}
@@ -1509,8 +1573,22 @@ export function AgentPurchaseOrder() {
                       <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerAddress")}</p>
                     )}
                     <p className="mt-1.5 text-xs font-medium text-slate-500">
-                      Alamat dapat diisi manual atau ditentukan dari pin Maps.
+                      Ketik minimal 3 huruf, lalu pilih lokasi dari list atau klik marker di peta.
                     </p>
+                    {customerAddress.trim().length >= 3 && locationSuggestions.length > 0 && (
+                      <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                        {locationSuggestions.slice(0, 6).map((place) => (
+                          <button
+                            key={place.place_id}
+                            type="button"
+                            onClick={() => handleMapsAddressSelect(place.display_name, [Number(place.lat), Number(place.lon)])}
+                            className="block w-full border-b border-slate-100 px-3 py-2 text-left text-xs font-medium leading-5 text-slate-700 hover:bg-teal-50 last:border-b-0"
+                          >
+                            {place.display_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </label>
 
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -1521,47 +1599,18 @@ export function AgentPurchaseOrder() {
                         </span>
                         <div>
                           <p className="text-sm font-semibold text-slate-900">Pin Maps</p>
-                          <p className="text-xs font-medium text-slate-500">Isi lokasi spesifik atau pakai alamat.</p>
+                          <p className="text-xs font-medium text-slate-500">Pilih marker untuk mengisi alamat.</p>
                         </div>
                       </div>
-                      <a
-                        href={openStreetMapSearchUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-teal-50"
-                      >
-                        <MapPinned className="h-3.5 w-3.5" />
-                        Buka Maps
-                      </a>
                     </div>
-                    <input
-                      value={customerMapsQuery}
-                      onChange={(event) => setCustomerMapsQuery(event.target.value)}
-                      className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
-                      placeholder="Cari alamat, koordinat, atau link pin Maps"
-                    />
                     <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                      <LeafletAddressPicker query={getMapsQuery(customerAddress, customerMapsQuery)} onSelectAddress={handleMapsAddressSelect} />
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={useMapsQueryAsAddress}
-                        disabled={!customerMapsQuery.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
-                      >
-                        <MapPinned className="h-3.5 w-3.5" />
-                        Jadikan alamat
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCustomerMapsQuery(customerAddress)}
-                        disabled={!customerAddress.trim()}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
-                      >
-                        <MapPinned className="h-3.5 w-3.5" />
-                        Gunakan alamat sebagai pin
-                      </button>
+                      <LeafletAddressPicker
+                        query={customerAddress}
+                        selectedAddress={customerAddress}
+                        selectedCoordinates={selectedLocationCoordinates}
+                        onResultsChange={setLocationSuggestions}
+                        onSelectAddress={handleMapsAddressSelect}
+                      />
                     </div>
                   </div>
                 </div>
