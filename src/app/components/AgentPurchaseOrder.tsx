@@ -14,9 +14,11 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
 import Swal from "sweetalert2";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 type Product = {
   id: number;
@@ -80,18 +82,208 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function getGoogleMapsQuery(address: string, mapsQuery: string) {
+function getMapsQuery(address: string, mapsQuery: string) {
   return (mapsQuery || address).trim();
 }
 
-function getGoogleMapsEmbedUrl(address: string, mapsQuery: string) {
-  const query = getGoogleMapsQuery(address, mapsQuery);
-  return query ? `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed` : "";
-}
 
-function getGoogleMapsSearchUrl(address: string, mapsQuery: string) {
-  const query = getGoogleMapsQuery(address, mapsQuery);
-  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : "https://www.google.com/maps";
+function getOpenStreetMapSearchUrl(address: string, mapsQuery: string) {
+  const query = getMapsQuery(address, mapsQuery);
+  return query ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}` : "https://www.openstreetmap.org";
+}
+type LeafletPlace = {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+};
+
+type LeafletAddressPickerProps = {
+  query: string;
+  onSelectAddress: (address: string) => void;
+};
+
+const defaultMapCenter: [number, number] = [-6.190031, 106.700967];
+const startPointIcon = L.divIcon({
+  className: "",
+  html: `
+    <span style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:9999px;background:#ffffff;border:2px solid #99F6E4;box-shadow:0 8px 18px rgba(15,118,110,.25)">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 11.5C4 9.57 5.57 8 7.5 8H18.5C20.43 8 22 9.57 22 11.5V22H4V11.5Z" fill="#0F766E"/>
+        <path d="M22 14H25.25C26.02 14 26.72 14.44 27.06 15.13L29 19V22H22V14Z" fill="#14B8A6"/>
+        <path d="M24 16H25.05C25.43 16 25.78 16.22 25.94 16.56L26.75 18.25H24V16Z" fill="#CCFBF1"/>
+        <path d="M7 12H17" stroke="#CCFBF1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M7 16H15" stroke="#CCFBF1" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="10" cy="22" r="3" fill="#0F172A"/>
+        <circle cx="10" cy="22" r="1.25" fill="#F8FAFC"/>
+        <circle cx="24" cy="22" r="3" fill="#0F172A"/>
+        <circle cx="24" cy="22" r="1.25" fill="#F8FAFC"/>
+        <path d="M5 25H28" stroke="#0F766E" stroke-width="2" stroke-linecap="round" opacity=".35"/>
+      </svg>
+    </span>
+  `,
+  iconSize: [46, 46],
+  iconAnchor: [23, 38],
+  popupAnchor: [0, -38],
+});
+const destinationMarkerIcon = L.divIcon({
+  className: "",
+  html: '<span style="display:block;width:22px;height:22px;border-radius:9999px;background:#EF4444;border:4px solid #fff;box-shadow:0 2px 12px rgba(239,68,68,.45)"></span>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+});
+
+function LeafletAddressPicker({ query, onSelectAddress }: LeafletAddressPickerProps) {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const [destinationPoint, setDestinationPoint] = useState<[number, number] | null>(null);
+  const [places, setPlaces] = useState<LeafletPlace[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: defaultMapCenter,
+      zoom: 11,
+      zoomControl: true,
+      attributionControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    markerLayerRef.current = L.layerGroup().addTo(map);
+    routeLayerRef.current = L.layerGroup().addTo(map);
+    L.marker(defaultMapCenter, { icon: startPointIcon }).bindPopup("Titik awal: Rukan Crown, Green Lake City").addTo(routeLayerRef.current);
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markerLayerRef.current = null;
+      routeLayerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const searchQuery = query.trim();
+    if (!searchQuery) {
+      markerLayerRef.current?.clearLayers();
+      setPlaces([]);
+      setSearchError("");
+      return;
+    }
+
+    const abortController = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      setIsSearching(true);
+      setSearchError("");
+
+      const params = new URLSearchParams({
+        format: "jsonv2",
+        q: searchQuery,
+        addressdetails: "1",
+        limit: "8",
+        countrycodes: "id",
+      });
+
+      fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+        signal: abortController.signal,
+        headers: { Accept: "application/json" },
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Lokasi tidak bisa dicari saat ini.");
+          return response.json() as Promise<LeafletPlace[]>;
+        })
+        .then((results) => setPlaces(Array.isArray(results) ? results : []))
+        .catch((error) => {
+          if (abortController.signal.aborted) return;
+          setPlaces([]);
+          setSearchError(error instanceof Error ? error.message : "Lokasi tidak bisa dicari saat ini.");
+        })
+        .finally(() => {
+          if (!abortController.signal.aborted) setIsSearching(false);
+        });
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      abortController.abort();
+    };
+  }, [query]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const markerLayer = markerLayerRef.current;
+    if (!map || !markerLayer) return;
+
+    markerLayer.clearLayers();
+    if (!places.length) return;
+
+    const bounds = L.latLngBounds([]);
+    places.forEach((place) => {
+      const lat = Number(place.lat);
+      const lon = Number(place.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      const marker = L.marker([lat, lon], { icon: destinationMarkerIcon })
+        .bindPopup(place.display_name)
+        .on("click", () => {
+          setDestinationPoint([lat, lon]);
+          onSelectAddress(place.display_name);
+        });
+      marker.addTo(markerLayer);
+      bounds.extend([lat, lon]);
+    });
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { maxZoom: places.length === 1 ? 16 : 13, padding: [24, 24] });
+    }
+  }, [onSelectAddress, places]);
+
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const routeLayer = routeLayerRef.current;
+    if (!map || !routeLayer) return;
+
+    routeLayer.clearLayers();
+    L.marker(defaultMapCenter, { icon: startPointIcon }).bindPopup("Titik awal: Rukan Crown, Green Lake City").addTo(routeLayer);
+
+    if (!destinationPoint) return;
+
+    L.marker(destinationPoint, { icon: destinationMarkerIcon }).bindPopup("Titik akhir").addTo(routeLayer);
+    const routeLine = L.polyline([defaultMapCenter, destinationPoint], {
+      color: "#0F766E",
+      weight: 4,
+      opacity: 0.8,
+      dashArray: "8 8",
+    }).addTo(routeLayer);
+
+    map.fitBounds(routeLine.getBounds(), { padding: [28, 28], maxZoom: 14 });
+  }, [destinationPoint]);
+  return (
+    <div>
+      <div ref={mapContainerRef} className="h-56 w-full" />
+      <div className="border-t border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-500">
+        {isSearching
+          ? "Mencari lokasi..."
+          : searchError
+            ? searchError
+            : places.length
+              ? "Klik marker merah untuk menjadikannya titik akhir dan alamat."
+              : query.trim()
+                ? "Lokasi belum ditemukan. Coba kata kunci lebih spesifik."
+                : "Isi kata kunci untuk menampilkan marker lokasi."}
+      </div>
+    </div>
+  );
 }
 
 function parseDiscountTierKey(key: string) {
@@ -521,8 +713,7 @@ export function AgentPurchaseOrder() {
   }, []);
 
   const orderSummary = useMemo(() => calculateOrder(products, items), [items, products]);
-  const googleMapsEmbedUrl = useMemo(() => getGoogleMapsEmbedUrl(customerAddress, customerMapsQuery), [customerAddress, customerMapsQuery]);
-  const googleMapsSearchUrl = useMemo(() => getGoogleMapsSearchUrl(customerAddress, customerMapsQuery), [customerAddress, customerMapsQuery]);
+    const openStreetMapSearchUrl = useMemo(() => getOpenStreetMapSearchUrl(customerAddress, customerMapsQuery), [customerAddress, customerMapsQuery]);
 
   useEffect(() => {
     if (orderSummary.total <= 100000000 && paymentMode === "50%") {
@@ -568,6 +759,11 @@ export function AgentPurchaseOrder() {
         : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
     }`;
 
+  const handleMapsAddressSelect = useCallback((address: string) => {
+    setCustomerAddress(address);
+    setCustomerMapsQuery(address);
+    markCustomerFieldTouched("customerAddress");
+  }, []);
   const useMapsQueryAsAddress = () => {
     const nextAddress = customerMapsQuery.trim();
     if (!nextAddress) {
@@ -1313,7 +1509,7 @@ export function AgentPurchaseOrder() {
                       <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerAddress")}</p>
                     )}
                     <p className="mt-1.5 text-xs font-medium text-slate-500">
-                      Alamat dapat diisi manual atau ditentukan dari pin Google Maps.
+                      Alamat dapat diisi manual atau ditentukan dari pin Maps.
                     </p>
                   </label>
 
@@ -1324,12 +1520,12 @@ export function AgentPurchaseOrder() {
                           <MapPinned className="h-4 w-4" />
                         </span>
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">Pin Google Maps</p>
+                          <p className="text-sm font-semibold text-slate-900">Pin Maps</p>
                           <p className="text-xs font-medium text-slate-500">Isi lokasi spesifik atau pakai alamat.</p>
                         </div>
                       </div>
                       <a
-                        href={googleMapsSearchUrl}
+                        href={openStreetMapSearchUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-teal-50"
@@ -1345,19 +1541,7 @@ export function AgentPurchaseOrder() {
                       placeholder="Cari alamat, koordinat, atau link pin Maps"
                     />
                     <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                      {googleMapsEmbedUrl ? (
-                        <iframe
-                          title="Preview pin Google Maps"
-                          src={googleMapsEmbedUrl}
-                          className="h-44 w-full border-0"
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                        />
-                      ) : (
-                        <div className="flex h-44 items-center justify-center px-4 text-center text-sm font-medium text-slate-500">
-                          Isi alamat atau pin Maps untuk menampilkan preview lokasi.
-                        </div>
-                      )}
+                      <LeafletAddressPicker query={getMapsQuery(customerAddress, customerMapsQuery)} onSelectAddress={handleMapsAddressSelect} />
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
