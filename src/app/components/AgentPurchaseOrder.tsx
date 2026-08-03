@@ -811,6 +811,7 @@ export function AgentPurchaseOrder() {
   const [customerAddress, setCustomerAddress] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<LeafletPlace[]>([]);
   const [selectedLocationCoordinates, setSelectedLocationCoordinates] = useState<[number, number] | null>(null);
+  const [addressInputMode, setAddressInputMode] = useState<"manual" | "map">("manual");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<PurchaseOrderItem[]>([newItem()]);
   const [formError, setFormError] = useState("");
@@ -921,6 +922,7 @@ export function AgentPurchaseOrder() {
     setCustomerAddress(address);
     setSelectedLocationCoordinates(coordinates ?? null);
     setLocationSuggestions([]);
+    setAddressInputMode("map");
     markCustomerFieldTouched("customerAddress");
   }, []);
   const resetForm = () => {
@@ -931,6 +933,7 @@ export function AgentPurchaseOrder() {
     setCustomerAddress("");
     setLocationSuggestions([]);
     setSelectedLocationCoordinates(null);
+    setAddressInputMode("manual");
     setNotes("");
     setItems([newItem()]);
     setFormError("");
@@ -1644,26 +1647,46 @@ export function AgentPurchaseOrder() {
                 <div className="grid gap-4 lg:col-span-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-slate-700">Alamat</span>
+                    <div className="mb-2 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddressInputMode("manual");
+                          setLocationSuggestions([]);
+                          setSelectedLocationCoordinates(null);
+                        }}
+                        className={`${addressInputMode === "manual" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-700"} rounded-md px-3 py-2 text-xs font-bold`}
+                      >
+                        Masukkan alamat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddressInputMode("map")}
+                        className={`${addressInputMode === "map" ? "bg-white text-[#0F766E] shadow-sm" : "text-slate-500 hover:text-slate-700"} rounded-md px-3 py-2 text-xs font-bold`}
+                      >
+                        Pilih lewat peta
+                      </button>
+                    </div>
                     <input
                       value={customerAddress}
                       onBlur={() => markCustomerFieldTouched("customerAddress")}
                       onChange={(event) => {
                         setCustomerAddress(event.target.value);
                         setSelectedLocationCoordinates(null);
-                        if (event.target.value.trim().length < 3) setLocationSuggestions([]);
+                        if (addressInputMode === "manual" || event.target.value.trim().length < 3) setLocationSuggestions([]);
                         markCustomerFieldTouched("customerAddress");
                       }}
                       className={getCustomerInputClass("customerAddress")}
-                      placeholder="Alamat customer"
+                      placeholder={addressInputMode === "map" ? "Cari alamat atau pilih titik di peta" : "Alamat customer"}
                       aria-invalid={Boolean(getCustomerFieldError("customerAddress"))}
                     />
                     {getCustomerFieldError("customerAddress") && (
                       <p className="mt-1.5 text-xs font-medium text-rose-600">{getCustomerFieldError("customerAddress")}</p>
                     )}
                     <p className="mt-1.5 text-xs font-medium text-slate-500">
-                      Ketik minimal 3 huruf, lalu pilih lokasi dari list atau klik marker di peta.
+                      {addressInputMode === "map" ? "Ketik minimal 3 huruf untuk mencari lokasi, atau tap titik di peta." : "Masukkan alamat customer secara manual."}
                     </p>
-                    {customerAddress.trim().length >= 3 && locationSuggestions.length > 0 && (
+                    {addressInputMode === "map" && customerAddress.trim().length >= 3 && locationSuggestions.length > 0 && (
                       <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm">
                         {locationSuggestions.slice(0, 6).map((place) => (
                           <button
@@ -1679,28 +1702,30 @@ export function AgentPurchaseOrder() {
                     )}
                   </label>
 
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-[#0F766E]">
-                          <MapPinned className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">Pin Maps</p>
-                          <p className="text-xs font-medium text-slate-500">Pilih marker untuk mengisi alamat.</p>
+                  {addressInputMode === "map" && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-[#0F766E]">
+                            <MapPinned className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">Pin Maps</p>
+                            <p className="text-xs font-medium text-slate-500">Pilih titik peta untuk mengisi alamat.</p>
+                          </div>
                         </div>
                       </div>
+                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <LeafletAddressPicker
+                          query={customerAddress}
+                          selectedAddress={customerAddress}
+                          selectedCoordinates={selectedLocationCoordinates}
+                          onResultsChange={setLocationSuggestions}
+                          onSelectAddress={handleMapsAddressSelect}
+                        />
+                      </div>
                     </div>
-                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                      <LeafletAddressPicker
-                        query={customerAddress}
-                        selectedAddress={customerAddress}
-                        selectedCoordinates={selectedLocationCoordinates}
-                        onResultsChange={setLocationSuggestions}
-                        onSelectAddress={handleMapsAddressSelect}
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
