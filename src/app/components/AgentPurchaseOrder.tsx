@@ -135,6 +135,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
   const mapRef = useRef<L.Map | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const suppressedSearchQueryRef = useRef("");
   const [destinationPoint, setDestinationPoint] = useState<[number, number] | null>(null);
   const [places, setPlaces] = useState<LeafletPlace[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -209,9 +210,15 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
           return response.json() as Promise<{ display_name?: string }>;
         })
         .then((result) => {
-          onSelectAddress(result.display_name || `${nextPoint[0].toFixed(6)}, ${nextPoint[1].toFixed(6)}`, nextPoint);
+          const nextAddress = result.display_name || `${nextPoint[0].toFixed(6)}, ${nextPoint[1].toFixed(6)}`;
+          suppressedSearchQueryRef.current = nextAddress;
+          setPlaces([]);
+          onResultsChange([]);
+          onSelectAddress(nextAddress, nextPoint);
         })
         .catch(() => {
+          setPlaces([]);
+          onResultsChange([]);
           setSearchError("Hmmm sorry, sepertinya tidak dapat menemukan alamat.");
           void Swal.fire({
             icon: "warning",
@@ -232,6 +239,14 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
   useEffect(() => {
     const searchQuery = query.trim();
     const isCoordinateAddress = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(searchQuery);
+    if (searchQuery && searchQuery === suppressedSearchQueryRef.current) {
+      markerLayerRef.current?.clearLayers();
+      setPlaces([]);
+      onResultsChange([]);
+      setSearchError("");
+      return;
+    }
+
     if (searchQuery.length < 3 || isCoordinateAddress) {
       markerLayerRef.current?.clearLayers();
       setPlaces([]);
@@ -299,6 +314,7 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
       const marker = L.marker([lat, lon], { icon: destinationMarkerIcon })
         .bindPopup(place.display_name)
         .on("click", () => {
+          suppressedSearchQueryRef.current = place.display_name;
           setDestinationPoint([lat, lon]);
           onSelectAddress(place.display_name, [lat, lon]);
         });
