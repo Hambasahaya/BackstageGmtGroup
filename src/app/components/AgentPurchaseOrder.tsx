@@ -568,6 +568,15 @@ export function AgentPurchaseOrder() {
         : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
     }`;
 
+  const useMapsQueryAsAddress = () => {
+    const nextAddress = customerMapsQuery.trim();
+    if (!nextAddress) {
+      return;
+    }
+
+    setCustomerAddress(nextAddress);
+    markCustomerFieldTouched("customerAddress");
+  };
   const resetForm = () => {
     setCustomerName("");
     setCustomerCompany("");
@@ -1350,15 +1359,26 @@ export function AgentPurchaseOrder() {
                         </div>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setCustomerMapsQuery(customerAddress)}
-                      disabled={!customerAddress.trim()}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
-                    >
-                      <MapPinned className="h-3.5 w-3.5" />
-                      Gunakan alamat sebagai pin
-                    </button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={useMapsQueryAsAddress}
+                        disabled={!customerMapsQuery.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+                      >
+                        <MapPinned className="h-3.5 w-3.5" />
+                        Jadikan alamat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerMapsQuery(customerAddress)}
+                        disabled={!customerAddress.trim()}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-300"
+                      >
+                        <MapPinned className="h-3.5 w-3.5" />
+                        Gunakan alamat sebagai pin
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
