@@ -137,6 +137,8 @@ function LeafletAddressPicker({ query, selectedAddress, selectedCoordinates, onR
   const [destinationPoint, setDestinationPoint] = useState<[number, number] | null>(null);
   const [places, setPlaces] = useState<LeafletPlace[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isRouting, setIsRouting] = useState(false);
+  const [routeMessage, setRouteMessage] = useState("");
   const [searchError, setSearchError] = useState("");
 
   useEffect(() => {
