@@ -185,8 +185,10 @@ function StatusBadge({ status }: { status: PurchaseOrderStatus }) {
     in_review: { label: "In review", className: "bg-sky-50 text-sky-700 ring-sky-200" },
     approve: { label: "Approve", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
     invalid: { label: "Invalid", className: "bg-rose-50 text-rose-700 ring-rose-200" },
+    shipped: { label: "Terkirim", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    barang_sudah_terkirim: { label: "Terkirim", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
   };
-  const statusMeta = statusMap[status];
+  const statusMeta = statusMap[status] ?? { label: status ?? "Draft", className: "bg-slate-100 text-slate-700 ring-slate-200" };
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className} whitespace-nowrap`}>

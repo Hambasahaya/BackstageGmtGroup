@@ -763,8 +763,10 @@ function StatusBadge({ status }: { status: PurchaseOrder["status"] }) {
     in_review: { label: "Sent PO", className: "bg-sky-50 text-sky-700 ring-sky-200" },
     approve: { label: "Approve", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
     invalid: { label: "Invalid", className: "bg-rose-50 text-rose-700 ring-rose-200" },
+    shipped: { label: "Terkirim", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    barang_sudah_terkirim: { label: "Terkirim", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
   };
-  const statusMeta = statusMap[status];
+  const statusMeta = statusMap[status] ?? { label: status ?? "Draft", className: "bg-slate-100 text-slate-700 ring-slate-200" };
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
@@ -774,15 +776,17 @@ function StatusBadge({ status }: { status: PurchaseOrder["status"] }) {
 }
 
 function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const statusMap: Record<PaymentStatus, { label: string; className: string }> = {
+  const statusMap: Partial<Record<PaymentStatus, { label: string; className: string }>> = {
     unpaid: { label: "Unpaid", className: "bg-slate-100 text-slate-700 ring-slate-200" },
     pending: { label: "Pending", className: "bg-amber-50 text-amber-700 ring-amber-200" },
     paid: { label: "Paid", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    shipped: { label: "Shipped", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
+    barang_sudah_terkirim: { label: "Shipped", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
     expired: { label: "Expired", className: "bg-slate-100 text-slate-600 ring-slate-200" },
     failed: { label: "Failed", className: "bg-rose-50 text-rose-700 ring-rose-200" },
     refund: { label: "Refund", className: "bg-violet-50 text-violet-700 ring-violet-200" },
   };
-  const statusMeta = statusMap[status];
+  const statusMeta = statusMap[status] ?? { label: status ?? "Unpaid", className: "bg-slate-100 text-slate-700 ring-slate-200" };
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.className}`}>
