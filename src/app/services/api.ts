@@ -80,6 +80,8 @@ export type PreorderDto = {
   dp_proof?: string | null;
   remaining_proof?: string | null;
   last_payment_stage?: string | null;
+  tracking_number?: string | null;
+  estimated_arrival?: string | null;
   created_at?: string;
 };
 
@@ -1105,6 +1107,11 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  salesUpdateShippingStatus: (id: number, payload: { shipping_status: "shipped"; tracking_number: string; estimated_arrival: string }) =>
+    apiRequest<{ message: string; preorder: PreorderDto }>(`/api/sales/preorders/${id}/shipping-status`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   salesSendPaymentQuotation: (id: number, stage: "full" | "dp" | "remaining") =>
     apiRequest<{ message: string; payment?: { payment_mode: string; stage: string; amount: number } }>(
       `/api/sales/preorders/${id}/payment-quotation`,
@@ -1113,6 +1120,11 @@ export const api = {
         body: JSON.stringify({ stage }),
       }
     ),
+  salesVerifyPayment: (id: number, payload: { stage: "full" | "dp" | "remaining", status: "approve" | "reject" }) =>
+    apiRequest<{ message: string; payment?: { payment_status: PaymentStatus; stage: string; commission_credited?: boolean } }>(`/api/sales/preorders/${id}/verify-payment`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   salesUploadPaymentProof: (id: number, stage: "full" | "dp" | "remaining", file: File) => {
     const formData = new FormData();
     formData.set("payment_proof", file);

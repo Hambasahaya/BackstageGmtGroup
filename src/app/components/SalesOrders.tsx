@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, Search, ShoppingCart, X, XCircle, Upload, FileText, Loader2 } from "lucide-react";
+import { CheckCircle2, Eye, Search, ShoppingCart, Truck, X, XCircle, Upload, FileText, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
 import Swal from "sweetalert2";
@@ -44,6 +44,8 @@ type PurchaseOrder = {
   invalidReason?: string;
   invoiceReceived: boolean;
   invoiceReceivedAt?: string | null;
+  trackingNumber?: string;
+  estimatedArrival?: string;
 };
 
 type SalesActionLoading =
@@ -51,6 +53,7 @@ type SalesActionLoading =
   | { type: "invalid"; poId: number }
   | { type: "shipped"; poId: number }
   | { type: "upload"; poId: number; stage: "full" | "dp" | "remaining" }
+  | { type: "verify"; poId: number; stage: "full" | "dp" | "remaining" }
   | { type: "quotation"; poId: number }
   | null;
 
@@ -171,6 +174,8 @@ function mapPreorder(preorder: PreorderDto): PurchaseOrder {
     invalidReason: preorder.invalid_reason ?? undefined,
     invoiceReceived: Boolean(preorder.invoice_received),
     invoiceReceivedAt: preorder.invoice_received_at ?? null,
+    trackingNumber: preorder.tracking_number ?? undefined,
+    estimatedArrival: preorder.estimated_arrival ?? undefined,
   };
 }
 
@@ -284,6 +289,10 @@ export function SalesOrders() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<SalesActionLoading>(null);
+  const [shippingPo, setShippingPo] = useState<PurchaseOrder | null>(null);
+  const [shippingTrackingNumber, setShippingTrackingNumber] = useState("");
+  const [shippingEstimatedArrival, setShippingEstimatedArrival] = useState("");
+  const [shippingFormError, setShippingFormError] = useState("");
 
   const isActionLoading = (poId: number, type?: NonNullable<SalesActionLoading>["type"]) =>
     actionLoading?.poId === poId && (!type || actionLoading.type === type);
@@ -396,33 +405,48 @@ export function SalesOrders() {
   };
 
 
-  const markPoShipped = async (po: PurchaseOrder) => {
+  const openShippingModal = (po: PurchaseOrder) => {
     if ((po.status !== "approve" && po.paymentStatus !== "paid") || actionLoading) {
       return;
     }
+    setShippingPo(po);
+    setShippingTrackingNumber("");
+    setShippingEstimatedArrival("");
+    setShippingFormError("");
+  };
 
-    const result = await Swal.fire({
-      title: "Tandai barang terkirim?",
-      text: `${po.poNumber} akan ditandai sebagai barang terkirim.`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonColor: "#0F766E",
-      cancelButtonColor: "#64748B",
-      confirmButtonText: "Ya, terkirim",
-      cancelButtonText: "Batal",
-    });
+  const submitShipping = async (event: React.FormEvent) => {
+    event.preventDefault();
 
-    if (!result.isConfirmed) {
+    if (!shippingPo || actionLoading) {
       return;
     }
 
-    setActionLoading({ type: "shipped", poId: po.id });
-    openProcessingAlert("Menyimpan status terkirim", "Mohon tunggu sampai status PO diperbarui.");
+    if (!shippingTrackingNumber.trim()) {
+      setShippingFormError("Nomor resi wajib diisi.");
+      return;
+    }
+
+    if (!shippingEstimatedArrival) {
+      setShippingFormError("Estimasi tiba wajib diisi.");
+      return;
+    }
+
+    setActionLoading({ type: "shipped", poId: shippingPo.id });
+    openProcessingAlert("Menyimpan data pengiriman", "Mohon tunggu sampai status PO diperbarui.");
 
     try {
-      await api.salesUpdatePreorderStatus(po.id, { status: "shipped", payment_status: "shipped" });
+      await api.salesUpdateShippingStatus(shippingPo.id, {
+        shipping_status: "shipped",
+        tracking_number: shippingTrackingNumber.trim(),
+        estimated_arrival: shippingEstimatedArrival,
+      });
       await loadOrders(true);
-      await refreshPreviewPo(po.id);
+      await refreshPreviewPo(shippingPo.id);
+      setShippingPo(null);
+      setShippingTrackingNumber("");
+      setShippingEstimatedArrival("");
+      setShippingFormError("");
       await Swal.fire({
         title: "Status diperbarui",
         text: "PO berhasil ditandai barang terkirim.",
@@ -431,7 +455,13 @@ export function SalesOrders() {
       });
     } catch (error) {
       Swal.close();
-      setErrorMessage(error instanceof Error ? error.message : "Gagal menandai barang terkirim.");
+      setShippingFormError(error instanceof Error ? error.message : "Gagal menandai barang terkirim.");
+      await Swal.fire({
+        title: "Gagal",
+        text: error instanceof Error ? error.message : "Gagal menandai barang terkirim.",
+        icon: "error",
+        confirmButtonColor: "#0F766E",
+      });
     } finally {
       setActionLoading(null);
     }
@@ -479,21 +509,38 @@ export function SalesOrders() {
       setActionLoading(null);
     }
   };
-  const handleUploadProof = async (po: PurchaseOrder, stage: "full" | "dp" | "remaining", file: File) => {
+  const handleVerifyPayment = async (po: PurchaseOrder, stage: "full" | "dp" | "remaining", status: "approve" | "reject") => {
     if (actionLoading) {
       return;
     }
 
-    setActionLoading({ type: "upload", poId: po.id, stage });
-    openProcessingAlert("Mengupload bukti pembayaran", "Mohon tunggu sampai file tersimpan dan data PO diperbarui.");
+    const actionText = status === "approve" ? "menyetujui" : "menolak";
+    
+    const result = await Swal.fire({
+      title: `${status === "approve" ? "Setujui" : "Tolak"} Bukti Pembayaran?`,
+      text: `Anda yakin ingin ${actionText} bukti pembayaran ini?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: status === "approve" ? "#0F766E" : "#E11D48",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: `Ya, ${actionText}`,
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    setActionLoading({ type: "verify", poId: po.id, stage });
+    openProcessingAlert("Memverifikasi pembayaran", "Mohon tunggu sampai status pembayaran diperbarui.");
 
     try {
-      await api.salesUploadPaymentProof(po.id, stage, file);
+      await api.salesVerifyPayment(po.id, { stage, status });
       await loadOrders(true);
       await refreshPreviewPo(po.id);
       await Swal.fire({
         title: "Berhasil",
-        text: "Bukti pembayaran berhasil diupload dan data PO sudah diperbarui.",
+        text: `Bukti pembayaran berhasil di${status === "approve" ? "setujui" : "tolak"}.`,
         icon: "success",
         confirmButtonColor: "#0F766E",
       });
@@ -501,7 +548,7 @@ export function SalesOrders() {
       Swal.close();
       await Swal.fire({
         title: "Gagal",
-        text: error instanceof Error ? error.message : "Gagal mengupload bukti pembayaran.",
+        text: error instanceof Error ? error.message : "Gagal memverifikasi bukti pembayaran.",
         icon: "error",
         confirmButtonColor: "#0F766E",
       });
@@ -598,104 +645,131 @@ export function SalesOrders() {
     }
   };
 
-  const renderUploadSection = (po: PurchaseOrder) => {
+  const renderPaymentVerificationSection = (po: PurchaseOrder) => {
     const isDpMode = po.paymentMode === "split" || po.paymentMode === "50%";
-    const isUploadingDp = actionLoading?.type === "upload" && actionLoading.poId === po.id && actionLoading.stage === "dp";
-    const isUploadingRemaining =
-      actionLoading?.type === "upload" && actionLoading.poId === po.id && actionLoading.stage === "remaining";
-    const isUploadingFull =
-      actionLoading?.type === "upload" && actionLoading.poId === po.id && actionLoading.stage === "full";
+    const isVerifyingDp = actionLoading?.type === "verify" && actionLoading.poId === po.id && actionLoading.stage === "dp";
+    const isVerifyingRemaining =
+      actionLoading?.type === "verify" && actionLoading.poId === po.id && actionLoading.stage === "remaining";
+    const isVerifyingFull =
+      actionLoading?.type === "verify" && actionLoading.poId === po.id && actionLoading.stage === "full";
 
     if (isDpMode) {
       if (po.paymentStatus === "unpaid" && po.status === "approve") {
-        return (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-amber-600">
-              * Silakan upload bukti pembayaran DP 50% untuk melanjutkan transaksi.
-            </p>
-            <label
-              className={`inline-flex max-w-xs items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 ${
-                actionLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-              }`}
-            >
-              {isUploadingDp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {isUploadingDp ? "Mengupload..." : "Upload Bukti DP"}
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                disabled={Boolean(actionLoading)}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    void handleUploadProof(po, "dp", file);
-                  }
-                }}
-              />
-            </label>
-          </div>
-        );
+        if (po.dpProof) {
+          return (
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
+              <p className="text-sm font-semibold text-slate-700">Verifikasi Pembayaran DP</p>
+              <p className="text-xs text-slate-500">
+                Customer telah mengupload bukti DP. Silakan verifikasi untuk melanjutkan.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => void handleVerifyPayment(po, "dp", "approve")}
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isVerifyingDp ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Setujui
+                </button>
+                <button
+                  onClick={() => void handleVerifyPayment(po, "dp", "reject")}
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isVerifyingDp ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                  Tolak
+                </button>
+              </div>
+            </div>
+          );
+        } else {
+          return (
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
+              <p className="text-sm font-semibold text-amber-600">
+                * Menunggu customer mengupload bukti DP.
+              </p>
+            </div>
+          );
+        }
       }
 
       if (po.paymentStatus === "partial" && po.status === "approve") {
-        return (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-sky-600">
-              * Silakan upload bukti pelunasan setelah customer membayar sisa 50%.
-            </p>
-            <label
-              className={`inline-flex max-w-xs items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 ${
-                actionLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-              }`}
-            >
-              {isUploadingRemaining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {isUploadingRemaining ? "Mengupload..." : "Upload Bukti Pelunasan"}
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                disabled={Boolean(actionLoading)}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    void handleUploadProof(po, "remaining", file);
-                  }
-                }}
-              />
-            </label>
-          </div>
-        );
+        if (po.remainingProof) {
+          return (
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
+              <p className="text-sm font-semibold text-slate-700">Verifikasi Pelunasan</p>
+              <p className="text-xs text-slate-500">
+                Customer telah mengupload bukti pelunasan. Silakan verifikasi untuk melanjutkan.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => void handleVerifyPayment(po, "remaining", "approve")}
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isVerifyingRemaining ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Setujui
+                </button>
+                <button
+                  onClick={() => void handleVerifyPayment(po, "remaining", "reject")}
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isVerifyingRemaining ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                  Tolak
+                </button>
+              </div>
+            </div>
+          );
+        } else {
+          return (
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
+              <p className="text-sm font-semibold text-sky-600">
+                * Menunggu customer mengupload bukti pelunasan.
+              </p>
+            </div>
+          );
+        }
       }
     } else {
       // Full Payment mode
       if (po.paymentStatus === "unpaid" && po.status === "approve") {
-        return (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-medium text-slate-600">
-              * Silakan upload bukti pembayaran penuh (100%) untuk menyelesaikan transaksi.
-            </p>
-            <label
-              className={`inline-flex max-w-xs items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-[#0F766E] hover:bg-teal-100 ${
-                actionLoading ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-              }`}
-            >
-              {isUploadingFull ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {isUploadingFull ? "Mengupload..." : "Upload Bukti Pembayaran"}
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                disabled={Boolean(actionLoading)}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    void handleUploadProof(po, "full", file);
-                  }
-                }}
-              />
-            </label>
-          </div>
-        );
+        if (po.paymentProof) {
+          return (
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
+              <p className="text-sm font-semibold text-slate-700">Verifikasi Bukti Pembayaran</p>
+              <p className="text-xs text-slate-500">
+                Customer telah mengupload bukti pembayaran penuh. Silakan verifikasi untuk menyelesaikan pesanan.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => void handleVerifyPayment(po, "full", "approve")}
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isVerifyingFull ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Setujui
+                </button>
+                <button
+                  onClick={() => void handleVerifyPayment(po, "full", "reject")}
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isVerifyingFull ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                  Tolak
+                </button>
+              </div>
+            </div>
+          );
+        } else {
+          return (
+            <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
+              <p className="text-sm font-semibold text-slate-600">
+                * Menunggu customer mengupload bukti pembayaran.
+              </p>
+            </div>
+          );
+        }
       }
     }
 
@@ -1098,9 +1172,9 @@ export function SalesOrders() {
                     </div>
                   </div>
                 )}
-                {renderUploadSection(previewPo) && (
-                  <div className="mt-4 border-t border-slate-200 pt-4">
-                    {renderUploadSection(previewPo)}
+                {renderPaymentVerificationSection(previewPo) && (
+                  <div className="border-t border-slate-200 pt-5">
+                    {renderPaymentVerificationSection(previewPo)}
                   </div>
                 )}
               </section>
@@ -1180,13 +1254,25 @@ export function SalesOrders() {
               {previewPo.status === "approve" && previewPo.paymentStatus === "paid" && (
                 <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
                   <button
-                    onClick={() => void markPoShipped(previewPo)}
+                    onClick={() => openShippingModal(previewPo)}
                     disabled={Boolean(actionLoading)}
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    {isActionLoading(previewPo.id, "shipped") ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    {isActionLoading(previewPo.id, "shipped") ? "Memproses..." : "Tandai barang terkirim"}
+                    <Truck className="h-4 w-4" />
+                    Tandai barang terkirim
                   </button>
+                </div>
+              )}
+
+              {(previewPo.status === "shipped" || previewPo.status === "barang_sudah_terkirim") && previewPo.trackingNumber && (
+                <div className="border-t border-slate-200 pt-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Info Pengiriman</p>
+                  <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-1">
+                    <p className="text-sm text-slate-700"><span className="font-semibold">No. Resi:</span> {previewPo.trackingNumber}</p>
+                    {previewPo.estimatedArrival && (
+                      <p className="text-sm text-slate-700"><span className="font-semibold">Estimasi Tiba:</span> {new Date(previewPo.estimatedArrival).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1268,6 +1354,83 @@ export function SalesOrders() {
                 >
                   {isActionLoading(invalidPo.id, "invalid") && <Loader2 className="h-4 w-4 animate-spin" />}
                   {isActionLoading(invalidPo.id, "invalid") ? "Menyimpan..." : "Simpan invalid"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {shippingPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Tandai Barang Terkirim</h2>
+                <p className="mt-1 text-sm text-slate-500">{shippingPo.poNumber} - {shippingPo.customerName}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShippingPo(null);
+                  setShippingTrackingNumber("");
+                  setShippingEstimatedArrival("");
+                  setShippingFormError("");
+                }}
+                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={submitShipping} className="space-y-4 p-5">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Nomor Resi / Tracking Number <span className="text-rose-500">*</span></span>
+                <input
+                  type="text"
+                  value={shippingTrackingNumber}
+                  onChange={(event) => setShippingTrackingNumber(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                  placeholder="Contoh: JNE123456789"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Estimasi Tiba <span className="text-rose-500">*</span></span>
+                <input
+                  type="date"
+                  value={shippingEstimatedArrival}
+                  onChange={(event) => setShippingEstimatedArrival(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                />
+              </label>
+
+              {shippingFormError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                  {shippingFormError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={Boolean(actionLoading)}
+                  onClick={() => {
+                    setShippingPo(null);
+                    setShippingTrackingNumber("");
+                    setShippingEstimatedArrival("");
+                    setShippingFormError("");
+                  }}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={Boolean(actionLoading)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {isActionLoading(shippingPo.id, "shipped") && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isActionLoading(shippingPo.id, "shipped") ? "Menyimpan..." : "Simpan & Kirim"}
                 </button>
               </div>
             </form>

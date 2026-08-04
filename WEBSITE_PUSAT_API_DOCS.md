@@ -777,6 +777,68 @@ Rule:
 - Hanya PO status `in_review`.
 - Jika approve, komisi masuk wallet agent.
 
+### Verify Payment Proof
+
+```text
+POST /api/sales/preorders/:id/verify-payment
+```
+
+Auth: wajib login sebagai `sales`.
+
+Body (Approve / Reject):
+
+```json
+{
+  "stage": "full",
+  "status": "approve"
+}
+```
+
+Response (Approve):
+
+```json
+{
+  "message": "payment verified successfully",
+  "payment": {
+    "payment_status": "paid",
+    "stage": "full",
+    "commission_credited": true
+  }
+}
+```
+
+Response (Reject):
+
+```json
+{
+  "message": "payment proof rejected"
+}
+```
+
+### Update Shipping Status PO
+
+```text
+PUT /api/sales/preorders/:id/shipping-status
+```
+
+Auth: wajib login sebagai `sales`.
+
+Body:
+
+```json
+{
+  "shipping_status": "shipped",
+  "tracking_number": "JNE123456789",
+  "estimated_arrival": "2026-08-10"
+}
+```
+
+Rule:
+
+- Hanya PO status `approve` dan payment sudah `paid`.
+- Sales wajib mengisi `tracking_number` dan `estimated_arrival`.
+- Status PO berubah menjadi `shipped`.
+
 ## Notifications
 
 Semua endpoint notification wajib login.
