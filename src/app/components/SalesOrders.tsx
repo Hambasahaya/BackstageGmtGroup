@@ -218,6 +218,13 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
 function getCustomPaymentBadge(po: PurchaseOrder) {
   const isDpMode = po.paymentMode === "split" || po.paymentMode === "50%";
   if (isDpMode) {
+    if (po.paymentStatus === "pending") {
+      return (
+        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
+          Menunggu Verifikasi Pembayaran
+        </span>
+      );
+    }
     if (po.paymentStatus === "unpaid") {
       return (
         <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
@@ -246,6 +253,13 @@ function getCustomPaymentBadge(po: PurchaseOrder) {
     return (
       <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200 whitespace-nowrap">
         Lunas
+      </span>
+    );
+  }
+  if (po.paymentStatus === "pending") {
+    return (
+      <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
+        Menunggu Verifikasi
       </span>
     );
   }
@@ -654,7 +668,7 @@ export function SalesOrders() {
       actionLoading?.type === "verify" && actionLoading.poId === po.id && actionLoading.stage === "full";
 
     if (isDpMode) {
-      if (po.paymentStatus === "unpaid" && po.status === "approve") {
+      if (po.paymentStatus !== "paid" && po.paymentStatus !== "partial") {
         if (po.dpProof) {
           return (
             <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
@@ -682,7 +696,7 @@ export function SalesOrders() {
               </div>
             </div>
           );
-        } else {
+        } else if (po.status === "approve") {
           return (
             <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
               <p className="text-sm font-semibold text-amber-600">
@@ -693,7 +707,7 @@ export function SalesOrders() {
         }
       }
 
-      if (po.paymentStatus === "partial" && po.status === "approve") {
+      if (po.paymentStatus === "partial" || (po.remainingProof && po.paymentStatus !== "paid")) {
         if (po.remainingProof) {
           return (
             <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
@@ -721,7 +735,7 @@ export function SalesOrders() {
               </div>
             </div>
           );
-        } else {
+        } else if (po.status === "approve") {
           return (
             <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
               <p className="text-sm font-semibold text-sky-600">
@@ -733,7 +747,7 @@ export function SalesOrders() {
       }
     } else {
       // Full Payment mode
-      if (po.paymentStatus === "unpaid" && po.status === "approve") {
+      if (po.paymentStatus !== "paid") {
         if (po.paymentProof) {
           return (
             <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
@@ -761,7 +775,7 @@ export function SalesOrders() {
               </div>
             </div>
           );
-        } else {
+        } else if (po.status === "approve") {
           return (
             <div className="flex flex-col gap-2 border-t border-slate-200 pt-5 mt-5">
               <p className="text-sm font-semibold text-slate-600">
@@ -1172,11 +1186,7 @@ export function SalesOrders() {
                     </div>
                   </div>
                 )}
-                {renderPaymentVerificationSection(previewPo) && (
-                  <div className="border-t border-slate-200 pt-5">
-                    {renderPaymentVerificationSection(previewPo)}
-                  </div>
-                )}
+                {renderPaymentVerificationSection(previewPo)}
               </section>
 
               <div className="overflow-x-auto rounded-lg border border-slate-200">
