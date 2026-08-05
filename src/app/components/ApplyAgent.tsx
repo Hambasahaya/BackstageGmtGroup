@@ -17,7 +17,7 @@ const WebcamCapture = lazy(() => import("./WebcamCapture").then(module => ({ def
 
 type SocialMediaField = "instagram" | "tiktok" | "facebook";
 
-const agentMode = import.meta.env.MODE_Agent ?? "1";
+const agentMode = import.meta.env.MODE_Agent ?? import.meta.env.VITE_MODE_AGENT ?? "1";
 const isSplitAgentMode = agentMode === "2";
 
 const socialMediaOptions: { value: SocialMediaField; label: string; placeholder: string }[] = [
@@ -655,8 +655,11 @@ export function ApplyAgent() {
   const syncLatestStatus = useCallback(async () => {
     try {
       const latestUser = await refreshStoredUser();
-      setStatus(latestUser?.detail_user?.status ?? null);
-      setIsVerificationCompleted(hasCompletedVerification(latestUser?.detail_user));
+      const latestStatus = latestUser?.detail_user?.status;
+      if (latestStatus !== undefined) {
+        setStatus(latestStatus ?? null);
+        setIsVerificationCompleted(hasCompletedVerification(latestUser?.detail_user));
+      }
     } catch {
     }
   }, []);
@@ -700,6 +703,16 @@ export function ApplyAgent() {
         setApplyForm(applyInitial);
         setTouchedFields({});
         setStatus("not_verif");
+        const currentUser = getStoredUser();
+        if (currentUser) {
+          saveAuthSession(getAuthToken() ?? "", {
+            ...currentUser,
+            detail_user: {
+              ...currentUser.detail_user,
+              status: "not_verif",
+            },
+          });
+        }
         const message = response.message || "Pengajuan agent berhasil dikirim.";
         setSuccessMessage(message);
         setFeedbackDialog({
@@ -812,7 +825,9 @@ export function ApplyAgent() {
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">User</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Apply menjadi Moxlite Agent</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            Isi data pengajuan dan verifikasi dalam satu langkah agar admin bisa langsung meninjau kelengkapan agent.
+            {isSplitAgentMode
+              ? "Isi data pengajuan agent untuk ditinjau oleh admin."
+              : "Isi data pengajuan dan verifikasi dalam satu langkah agar admin bisa langsung meninjau kelengkapan agent."}
           </p>
         </div>
         <div className="inline-flex w-fit items-center gap-2 rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-[#0F766E] ring-1 ring-teal-200">

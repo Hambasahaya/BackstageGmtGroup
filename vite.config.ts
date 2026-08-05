@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const agentModeValue = env.MODE_Agent ?? env.VITE_MODE_AGENT ?? env.MODE_AGENT ?? env.VITE_AGENT_MODE ?? '1';
 
   return {
   plugins: [react(), tailwindcss()],
@@ -18,7 +19,8 @@ export default defineConfig(({ mode }) => {
     chunkSizeWarningLimit: 800,
   },
   define: {
-    'import.meta.env.MODE_Agent': JSON.stringify(env.MODE_Agent ?? '1'),
+    'import.meta.env.MODE_Agent': JSON.stringify(agentModeValue),
+    'import.meta.env.VITE_MODE_AGENT': JSON.stringify(agentModeValue),
   },
   }
 })
