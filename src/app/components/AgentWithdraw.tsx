@@ -209,7 +209,7 @@ export function AgentWithdraw() {
   const recipientName = storedUser?.name ?? "-";
   const bankName = storedUser?.detail_user?.bank_name ?? "-";
   const accountNumber = storedUser?.detail_user?.account_number ?? "-";
-  const [wallet, setWallet] = useState<WalletDto>(defaultWallet);
+  const [rawWallet, setRawWallet] = useState<WalletDto>(defaultWallet);
   const [withdraws, setWithdraws] = useState<WithdrawDto[]>(defaultWithdraws);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -217,6 +217,7 @@ export function AgentWithdraw() {
   const [transferBankName, setTransferBankName] = useState(bankName === "-" ? "" : bankName);
   const [transferAccountNumber, setTransferAccountNumber] = useState(accountNumber === "-" ? "" : accountNumber);
   const [commissions, setCommissions] = useState<AgentCommissionDto[]>([]);
+  const [allCommissions, setAllCommissions] = useState<AgentCommissionDto[]>([]);
   const [commissionTotalAmount, setCommissionTotalAmount] = useState<number | null>(null);
   const [commissionTotalCount, setCommissionTotalCount] = useState<number | null>(null);
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"" | "partial" | "paid">("");
@@ -227,6 +228,34 @@ export function AgentWithdraw() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isCommissionLoading, setIsCommissionLoading] = useState(false);
+
+  const wallet = useMemo<WalletDto>(() => {
+    const sumFromAllCommissions = allCommissions.reduce(
+      (acc, c) => acc + (c.commission_amount ?? c.total_komisi ?? 0),
+      0,
+    );
+    const sumFromFilteredCommissions = commissions.reduce(
+      (acc, c) => acc + (c.commission_amount ?? c.total_komisi ?? 0),
+      0,
+    );
+    const effectiveTotalCommission = Math.max(
+      rawWallet.total_commission || 0,
+      sumFromAllCommissions,
+      sumFromFilteredCommissions,
+      commissionTotalAmount || 0,
+    );
+
+    const withdrawn = rawWallet.withdrawn_balance || 0;
+    const pending = rawWallet.pending_withdraw || 0;
+    const computedAvailable = Math.max(0, effectiveTotalCommission - withdrawn - pending);
+
+    return {
+      total_commission: effectiveTotalCommission,
+      available_balance: Math.max(rawWallet.available_balance || 0, computedAvailable),
+      pending_withdraw: pending,
+      withdrawn_balance: withdrawn,
+    };
+  }, [rawWallet, allCommissions, commissions, commissionTotalAmount]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -244,7 +273,7 @@ export function AgentWithdraw() {
         api.agentWallet(),
         api.agentWithdraws(),
       ]);
-      setWallet(walletResponse.wallet ?? emptyWallet);
+      setRawWallet(walletResponse.wallet ?? emptyWallet);
       setWithdraws(Array.isArray(withdrawResponse.withdraws) ? withdrawResponse.withdraws : []);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal memuat data withdraw agent.");
@@ -256,14 +285,28 @@ export function AgentWithdraw() {
   const loadCommissionsData = async (statusFilter?: string, search?: string) => {
     setIsCommissionLoading(true);
     try {
-      const response = await api.agentCommissions({
-        payment_status: statusFilter || undefined,
-        search: search || undefined,
-      });
-      const list = Array.isArray(response?.commissions) ? response.commissions : [];
-      setCommissions(list);
-      setCommissionTotalAmount(typeof response?.total_commission === "number" ? response.total_commission : null);
-      setCommissionTotalCount(typeof response?.total_count === "number" ? response.total_count : null);
+      let fullList = allCommissions;
+      if (allCommissions.length === 0 || (!statusFilter && !search)) {
+        const fullResponse = await api.agentCommissions();
+        fullList = Array.isArray(fullResponse?.commissions) ? fullResponse.commissions : [];
+        setAllCommissions(fullList);
+      }
+
+      if (!statusFilter && !search) {
+        setCommissions(fullList);
+        const fullSum = fullList.reduce((acc, c) => acc + (c.commission_amount ?? c.total_komisi ?? 0), 0);
+        setCommissionTotalAmount(fullSum);
+        setCommissionTotalCount(fullList.length);
+      } else {
+        const response = await api.agentCommissions({
+          payment_status: statusFilter || undefined,
+          search: search || undefined,
+        });
+        const list = Array.isArray(response?.commissions) ? response.commissions : [];
+        setCommissions(list);
+        setCommissionTotalAmount(typeof response?.total_commission === "number" ? response.total_commission : null);
+        setCommissionTotalCount(typeof response?.total_count === "number" ? response.total_count : null);
+      }
     } catch (error) {
       console.error("Failed to load agent commissions:", error);
       setCommissions([]);
