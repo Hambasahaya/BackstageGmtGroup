@@ -101,6 +101,32 @@ export type WalletDto = {
   withdrawn_balance: number;
 };
 
+export type AgentCommissionDto = {
+  id: number;
+  po_number?: string;
+  nama_customer?: string;
+  nama_perusahaan?: string | null;
+  product_name?: string;
+  total?: number;
+  total_komisi?: number;
+  commission_amount?: number;
+  payment_status?: PaymentStatus | string;
+  payment_stage?: string;
+  payment_mode?: PaymentMode | string;
+  created_at?: string;
+};
+
+export type GetAgentCommissionsParams = {
+  payment_status?: string;
+  search?: string;
+};
+
+export type AgentCommissionsResponse = {
+  total_commission?: number;
+  total_count?: number;
+  commissions: AgentCommissionDto[];
+};
+
 export type WithdrawDto = {
   id: number;
   withdraw_number?: string;
@@ -1179,6 +1205,16 @@ export const api = {
   markAllNotificationsRead: () =>
     apiRequest<{ message: string }>("/api/notifications/read-all", { method: "PUT" }),
   agentWallet: () => apiRequest<{ wallet: WalletDto }>("/api/agent/wallet"),
+  agentCommissions: async (params?: GetAgentCommissionsParams) => {
+    try {
+      return await apiRequest<AgentCommissionsResponse>("/api/agent/commissions", { query: params });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("404")) {
+        return await apiRequest<AgentCommissionsResponse>("/api/agent/commissions/history", { query: params });
+      }
+      throw err;
+    }
+  },
   agentWithdraws: () => apiRequest<{ withdraws: WithdrawDto[] }>("/api/agent/withdraws"),
   createAgentWithdraw: (payload: { amount: number; recipient_name?: string; bank_name?: string; account_number?: string }) =>
     apiRequest<{ message: string; withdraw: WithdrawDto }>("/api/agent/withdraws", {

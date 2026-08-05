@@ -1,7 +1,13 @@
-﻿import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, FileText, Plus, Wallet, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle2, Clock3, FileText, Plus, Search, Wallet, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { api, getStoredUser, type PreorderDto, type WalletDto, type WithdrawDto } from "../services/api";
+import {
+  api,
+  getStoredUser,
+  type AgentCommissionDto,
+  type WalletDto,
+  type WithdrawDto,
+} from "../services/api";
 
 const defaultWallet: WalletDto = {
   total_commission: 12500000,
@@ -210,29 +216,36 @@ export function AgentWithdraw() {
   const [transferRecipientName, setTransferRecipientName] = useState(recipientName === "-" ? "" : recipientName);
   const [transferBankName, setTransferBankName] = useState(bankName === "-" ? "" : bankName);
   const [transferAccountNumber, setTransferAccountNumber] = useState(accountNumber === "-" ? "" : accountNumber);
-  const [commissionPreorders, setCommissionPreorders] = useState<PreorderDto[]>([]);
+  const [commissions, setCommissions] = useState<AgentCommissionDto[]>([]);
+  const [commissionTotalAmount, setCommissionTotalAmount] = useState<number | null>(null);
+  const [commissionTotalCount, setCommissionTotalCount] = useState<number | null>(null);
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"" | "partial" | "paid">("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [expandedMobileTransactionId, setExpandedMobileTransactionId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isCommissionLoading, setIsCommissionLoading] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const loadWithdrawData = async () => {
     setIsLoading(true);
     setErrorMessage("");
 
     try {
-      const [walletResponse, withdrawResponse, preorderResponse] = await Promise.all([
+      const [walletResponse, withdrawResponse] = await Promise.all([
         api.agentWallet(),
         api.agentWithdraws(),
-        api.agentPreorders("approve"),
       ]);
       setWallet(walletResponse.wallet ?? emptyWallet);
       setWithdraws(Array.isArray(withdrawResponse.withdraws) ? withdrawResponse.withdraws : []);
-      setCommissionPreorders(
-        Array.isArray(preorderResponse.preorders)
-          ? preorderResponse.preorders.filter((preorder) => preorder.status === "approve" && preorder.total_komisi > 0)
-          : [],
-      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal memuat data withdraw agent.");
     } finally {
@@ -240,23 +253,46 @@ export function AgentWithdraw() {
     }
   };
 
+  const loadCommissionsData = async (statusFilter?: string, search?: string) => {
+    setIsCommissionLoading(true);
+    try {
+      const response = await api.agentCommissions({
+        payment_status: statusFilter || undefined,
+        search: search || undefined,
+      });
+      const list = Array.isArray(response?.commissions) ? response.commissions : [];
+      setCommissions(list);
+      setCommissionTotalAmount(typeof response?.total_commission === "number" ? response.total_commission : null);
+      setCommissionTotalCount(typeof response?.total_count === "number" ? response.total_count : null);
+    } catch (error) {
+      console.error("Failed to load agent commissions:", error);
+      setCommissions([]);
+    } finally {
+      setIsCommissionLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadWithdrawData();
   }, []);
 
+  useEffect(() => {
+    void loadCommissionsData(paymentStatusFilter, debouncedSearch);
+  }, [paymentStatusFilter, debouncedSearch]);
+
   const parsedAmount = useMemo(() => Number(amount), [amount]);
   const formattedAmount = amount ? currencyFormatter.format(parsedAmount) : "";
   const mobileTransactions = useMemo<MobileTransaction[]>(() => {
-    const transactions: MobileTransaction[] = commissionPreorders.map((preorder) => ({
-        id: `commission-${preorder.id}`,
-        type: "in",
-        title: "Komisi masuk",
-        subtitle: preorder.po_number ?? `PO-${preorder.id}`,
-        amount: preorder.total_komisi,
-        status: "Success",
-        poNumber: preorder.po_number ?? `PO-${preorder.id}`,
-        createdAt: preorder.created_at ?? new Date().toISOString(),
-      }));
+    const transactions: MobileTransaction[] = commissions.map((comm) => ({
+      id: `commission-${comm.id}`,
+      type: "in",
+      title: "Komisi masuk",
+      subtitle: comm.po_number ?? (comm.nama_customer ? `PO ${comm.nama_customer}` : `PO-#${comm.id}`),
+      amount: comm.commission_amount ?? comm.total_komisi ?? 0,
+      status: "Success",
+      poNumber: comm.po_number ?? `PO-#${comm.id}`,
+      createdAt: comm.created_at ?? new Date().toISOString(),
+    }));
 
     withdraws.forEach((withdraw) => {
       transactions.push({
@@ -276,7 +312,7 @@ export function AgentWithdraw() {
 
       return new Date(secondDate).getTime() - new Date(firstDate).getTime();
     });
-  }, [commissionPreorders, withdraws]);
+  }, [commissions, withdraws]);
 
   const openWithdrawModal = () => {
     setAmount(wallet.available_balance > 0 ? String(wallet.available_balance) : "");
@@ -483,42 +519,152 @@ export function AgentWithdraw() {
       </section>
 
       <section className="hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:block">
-        <div className="flex flex-col gap-2 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Komisi masuk</h2>
-            <p className="mt-1 text-sm text-slate-500">Riwayat komisi dari PO yang sudah approve.</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-slate-950">Komisi masuk</h2>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                <ArrowDownLeft className="h-3.5 w-3.5" />
+                {isCommissionLoading ? "Memuat..." : `${commissionTotalCount ?? commissions.length} komisi`}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Riwayat komisi dari PO yang sudah cair (Lunas / DP 50%).
+            </p>
           </div>
-          <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-200">
-            <ArrowDownLeft className="h-4 w-4" />
-            {isLoading ? "Memuat" : `${commissionPreorders.length} komisi`}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold text-slate-600">
+              <button
+                type="button"
+                onClick={() => setPaymentStatusFilter("")}
+                className={`rounded-md px-3 py-1.5 transition-colors ${
+                  paymentStatusFilter === "" ? "bg-white text-slate-950 shadow-xs" : "hover:text-slate-900"
+                }`}
+              >
+                Semua
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentStatusFilter("partial")}
+                className={`rounded-md px-3 py-1.5 transition-colors ${
+                  paymentStatusFilter === "partial" ? "bg-white text-emerald-700 shadow-xs" : "hover:text-slate-900"
+                }`}
+              >
+                DP 50%
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentStatusFilter("paid")}
+                className={`rounded-md px-3 py-1.5 transition-colors ${
+                  paymentStatusFilter === "paid" ? "bg-white text-emerald-700 shadow-xs" : "hover:text-slate-900"
+                }`}
+              >
+                Lunas
+              </button>
+            </div>
+
+            <div className="relative min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari No PO / Customer..."
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs outline-none focus:border-[#0F766E] focus:ring-1 focus:ring-teal-200"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="divide-y divide-slate-100">
-          {commissionPreorders.length > 0 ? (
-            commissionPreorders.map((preorder) => (
-              <div key={preorder.id} className="grid grid-cols-[1fr_auto] items-center gap-4 px-5 py-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                      <ArrowDownLeft className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-slate-950">{preorder.po_number ?? `PO-${preorder.id}`}</p>
-                      <p className="mt-1 text-xs font-medium text-slate-500">{dateFormatter.format(new Date(preorder.created_at ?? new Date().toISOString()))}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-emerald-600">+{currencyFormatter.format(preorder.total_komisi)}</p>
-                  <p className="mt-1 text-xs font-semibold text-emerald-500">Success</p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="px-5 py-6 text-sm font-medium text-slate-500">Belum ada komisi masuk.</div>
-          )}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-600">
+                <th className="px-4 py-3">No. PO / Produk</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Status Pembayaran</th>
+                <th className="px-4 py-3 text-right">Total PO</th>
+                <th className="px-4 py-3 text-right">Komisi Cair</th>
+                <th className="px-4 py-3">Tanggal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {isCommissionLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500 font-medium">
+                    Memuat data komisi...
+                  </td>
+                </tr>
+              ) : commissions.length > 0 ? (
+                commissions.map((comm) => {
+                  const komisiAmt = comm.commission_amount ?? comm.total_komisi ?? 0;
+                  const isDp = comm.payment_status === "partial" || comm.payment_stage?.toLowerCase().includes("dp");
+                  const stageText = comm.payment_stage || (isDp ? "DP 50%" : "Lunas");
+
+                  return (
+                    <tr key={comm.id} className="hover:bg-slate-50/75 transition-colors">
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-slate-950">{comm.po_number || `PO-#${comm.id}`}</p>
+                        <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{comm.product_name || "Preorder Produk"}</p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="font-medium text-slate-900">{comm.nama_customer || "-"}</p>
+                        {comm.nama_perusahaan && (
+                          <p className="mt-0.5 text-xs text-slate-500">{comm.nama_perusahaan}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            isDp
+                              ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                              : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                          }`}
+                        >
+                          {stageText}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-medium text-slate-700">
+                        {comm.total ? currencyFormatter.format(comm.total) : "-"}
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-bold text-emerald-600">
+                        +{currencyFormatter.format(komisiAmt)}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-slate-500">
+                        {comm.created_at ? dateFormatter.format(new Date(comm.created_at)) : "-"}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500 font-medium">
+                    Belum ada riwayat komisi masuk.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {commissionTotalAmount !== null && (
+          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs font-medium text-slate-600">
+            <span>Total Komisi Riwayat</span>
+            <span className="text-sm font-bold text-emerald-600">
+              {currencyFormatter.format(commissionTotalAmount)}
+            </span>
+          </div>
+        )}
       </section>
 
       {isModalOpen && (
