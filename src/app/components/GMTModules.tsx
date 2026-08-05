@@ -72,6 +72,7 @@ import {
   syncAndFetchSocialAgent,
   type SocialAgentBundle,
 } from "../services/socialMediaAgent";
+import { UserManagement } from "./UserManagement";
 
 type StatusTone = "green" | "yellow" | "red" | "blue" | "slate" | "teal";
 
@@ -3507,30 +3508,7 @@ export function NotificationCenter() {
 }
 
 export function UserRoleManagement() {
-  return (
-    <ModuleShell
-      title="User & Role Management"
-      description="RBAC untuk Super Admin, SEO Team, Content Team, HR, dan Manager dengan hak akses berbeda per modul dan per website."
-      action="Tambah user"
-      stats={[
-        { label: "Users", value: "64", detail: "Aktif di dashboard" },
-        { label: "Roles", value: "5", detail: "Super Admin sampai HR" },
-        { label: "Website access", value: "56", detail: "Permission per domain" },
-        { label: "Approval owners", value: "9", detail: "Manager dan SEO lead" },
-      ]}
-    >
-      <DataTable
-        columns={["Role", "Website", "SEO", "Artikel", "Event", "User"]}
-        rows={[
-          ["Super Admin", "Full", "Full", "Full", "Full", "Manage"],
-          ["SEO Team", "Assigned", "Full", "Review", "Read", "Read"],
-          ["Content Team", "Assigned", "Checklist", "Create/Edit", "Read", "Read"],
-          ["HR", "Training site", "Read", "Read", "Full", "Read"],
-          ["Manager", "Assigned", "Approve", "Approve", "Approve", "Read"],
-        ]}
-      />
-    </ModuleShell>
-  );
+  return <UserManagement />;
 }
 
 export function MediaLibrary() {

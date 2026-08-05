@@ -5,6 +5,22 @@
       "destination": "/api/meta/index.js"
     },
     {
+      "source": "/api/super-admin/users/:id/suspend",
+      "destination": "/api/super-admin/users.js?id=:id&action=suspend"
+    },
+    {
+      "source": "/api/super-admin/users/:id/role",
+      "destination": "/api/super-admin/users.js?id=:id&action=role"
+    },
+    {
+      "source": "/api/super-admin/users/:id",
+      "destination": "/api/super-admin/users.js?id=:id"
+    },
+    {
+      "source": "/api/super-admin/users",
+      "destination": "/api/super-admin/users.js"
+    },
+    {
       "source": "/api/super-admin/onboarding/videos/:id",
       "destination": "/api/super-admin/onboarding/videos.js?id=:id"
     },

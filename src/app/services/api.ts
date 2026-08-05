@@ -358,6 +358,42 @@ export type AgentApplicationDto = UserSession & {
   detail_user?: DetailUserDto;
 };
 
+export type UserManagementDto = {
+  id: number;
+  name: string;
+  ttl?: string | null;
+  phone_number?: string | null;
+  gender?: string | null;
+  email: string;
+  domicile?: string | null;
+  role: ApiRole;
+  is_suspended: boolean;
+  detail_user?: DetailUserDto | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type UserPaginationDto = {
+  current_page: number;
+  limit: number;
+  total_items: number;
+  total_pages: number;
+};
+
+export type GetUsersParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  is_suspended?: boolean;
+};
+
+export type GetUsersResponse = {
+  users: UserManagementDto[];
+  pagination: UserPaginationDto;
+};
+
+
 export type NotificationDto = {
   id?: number;
   role?: ApiRole;
@@ -1152,6 +1188,30 @@ export const api = {
   superAdminDashboard: () => apiRequest<{ message: string }>("/api/super-admin/dashboard"),
   superAdminWithdraws: (status?: WithdrawStatus) =>
     apiRequest<{ withdraws: WithdrawDto[] }>("/api/super-admin/withdraws", { query: { status } }),
+  superAdminUsers: (params?: GetUsersParams) =>
+    apiRequest<GetUsersResponse>("/api/super-admin/users", {
+      query: params
+        ? {
+            page: params.page,
+            limit: params.limit,
+            search: params.search,
+            role: params.role,
+            is_suspended: params.is_suspended !== undefined ? String(params.is_suspended) : undefined,
+          }
+        : undefined,
+    }),
+  superAdminUserDetail: (id: number) =>
+    apiRequest<{ user: UserManagementDto }>(`/api/super-admin/users/${id}`),
+  superAdminSuspendUser: (id: number, is_suspended: boolean) =>
+    apiRequest<{ message: string; user: UserManagementDto }>(`/api/super-admin/users/${id}/suspend`, {
+      method: "PUT",
+      body: JSON.stringify({ is_suspended }),
+    }),
+  superAdminUpdateUserRole: (id: number, role: ApiRole) =>
+    apiRequest<{ message: string; user: UserManagementDto }>(`/api/super-admin/users/${id}/role`, {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    }),
   approveWithdraw: (id: number, transferProof?: File) => {
     if (transferProof) {
       const formData = new FormData();
