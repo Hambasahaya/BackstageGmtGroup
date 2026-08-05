@@ -825,9 +825,11 @@ export function ApplyAgent() {
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">User</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Apply menjadi Moxlite Agent</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            {isSplitAgentMode
-              ? "Isi data pengajuan agent untuk ditinjau oleh admin."
-              : "Isi data pengajuan dan verifikasi dalam satu langkah agar admin bisa langsung meninjau kelengkapan agent."}
+            {status === "verif"
+              ? "Pengajuan akun kamu sudah disetujui admin. Silakan lengkapi data verifikasi berikut."
+              : isSplitAgentMode
+                ? "Isi data pengajuan agent untuk ditinjau oleh admin."
+                : "Isi data pengajuan dan verifikasi dalam satu langkah agar admin bisa langsung meninjau kelengkapan agent."}
           </p>
         </div>
         <div className="inline-flex w-fit items-center gap-2 rounded-full bg-teal-50 px-3 py-1.5 text-sm font-semibold text-[#0F766E] ring-1 ring-teal-200">
@@ -860,7 +862,7 @@ export function ApplyAgent() {
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
-                <TextField label="PhoneNumber (Nomor HP/Telepon)" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
+                <TextField label="Nomor HP/Telepon" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
@@ -940,7 +942,7 @@ export function ApplyAgent() {
                 <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
                 <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
                 <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
-                <TextField label="PhoneNumber (Nomor HP/Telepon)" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
+                <TextField label="Nomor HP/Telepon" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
                 <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
