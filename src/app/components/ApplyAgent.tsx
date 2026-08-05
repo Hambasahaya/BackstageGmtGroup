@@ -825,8 +825,8 @@ export function ApplyAgent() {
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0F766E]">User</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-950 sm:text-3xl">Apply menjadi Moxlite Agent</h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-            {status === "verif"
-              ? "Pengajuan akun kamu sudah disetujui admin. Silakan lengkapi data verifikasi berikut."
+            {status === "verif" || status === "not_verif"
+              ? "Pengajuan agent kamu sedang ditinjau oleh admin."
               : isSplitAgentMode
                 ? "Isi data pengajuan agent untuk ditinjau oleh admin."
                 : "Isi data pengajuan dan verifikasi dalam satu langkah agar admin bisa langsung meninjau kelengkapan agent."}
@@ -845,54 +845,8 @@ export function ApplyAgent() {
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-sm font-medium text-emerald-800">
           Akun kamu sudah menjadi official agent. Fitur agent penuh sudah tersedia di menu.
         </section>
-      ) : status === "not_verif" ? (
+      ) : status === "not_verif" || status === "verif" ? (
         <WaitingCta />
-      ) : status === "verif" ? (
-        isVerificationCompleted ? (
-          <WaitingCta />
-        ) : (
-          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-5">
-              <h2 className="text-lg font-semibold text-slate-950">Lengkapi data verifikasi</h2>
-              <p className="mt-1 text-sm text-slate-500">Isi data ini setelah admin mengubah status pengajuan menjadi verif.</p>
-            </div>
-            <form onSubmit={handleVerificationSubmit} className="space-y-5 p-5">
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <FileField label="Foto diri" value={verificationForm.photo} onChange={(value) => { markFieldTouched("photo"); setVerificationForm((current) => ({ ...current, photo: value })); }} error={getFieldError("photo")} icon={User} livePhotoType="selfie" onOpenLivePhoto={() => setActiveCamera("selfie")} />
-                <FileField label="Foto KTP" value={verificationForm.ktp_photo} onChange={(value) => { markFieldTouched("ktp_photo"); setVerificationForm((current) => ({ ...current, ktp_photo: value })); }} error={getFieldError("ktp_photo")} icon={IdCard} livePhotoType="ktp" onOpenLivePhoto={() => setActiveCamera("ktp")} />
-                <BankSelect value={verificationForm.bank_name} onChange={(value) => setVerificationForm((current) => ({ ...current, bank_name: value }))} onBlur={() => markFieldTouched("bank_name")} error={getFieldError("bank_name")} />
-                <TextField label="Nomor rekening" value={verificationForm.account_number} onChange={(value) => { markFieldTouched("account_number"); setVerificationForm((current) => ({ ...current, account_number: value })); }} onBlur={() => markFieldTouched("account_number")} error={getFieldError("account_number")} placeholder="1234567890" inputMode="numeric" pattern="[0-9]*" />
-                <TextField label="Nomor HP/Telepon" value={verificationForm.phone_number} onChange={(value) => { markFieldTouched("phone_number"); setVerificationForm((current) => ({ ...current, phone_number: normalizePhoneNumberInput(value) })); }} onBlur={() => markFieldTouched("phone_number")} error={getFieldError("phone_number")} placeholder="081234567890" inputMode="tel" maxLength={14} />
-                <TextField label="Tempat lahir" value={verificationForm.tempat_lahir} onChange={(value) => setVerificationForm((current) => ({ ...current, tempat_lahir: value }))} onBlur={() => markFieldTouched("tempat_lahir")} error={getFieldError("tempat_lahir")} placeholder="Jakarta" list="indonesia-regions" />
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">Tanggal lahir</span>
-                  <input
-                    type="date"
-                    required
-                    value={verificationForm.tanggal_lahir}
-                    onChange={(event) => setVerificationForm((current) => ({ ...current, tanggal_lahir: event.target.value }))}
-                    onBlur={() => markFieldTouched("tanggal_lahir")}
-                    aria-invalid={Boolean(getFieldError("tanggal_lahir"))}
-                    className={`w-full rounded-lg border px-3 py-3 text-sm outline-none transition focus:ring-2 ${
-                      getFieldError("tanggal_lahir")
-                        ? "border-rose-300 bg-rose-50/40 focus:border-rose-500 focus:ring-rose-100"
-                        : "border-slate-300 focus:border-[#0F766E] focus:ring-teal-100"
-                    }`}
-                  />
-                  {getFieldError("tanggal_lahir") && <span className="mt-1.5 block text-xs font-medium text-rose-600">{getFieldError("tanggal_lahir")}</span>}
-                </label>
-                <TextField label="Domisili" value={verificationForm.domicile ?? ""} onChange={(value) => setVerificationForm((current) => ({ ...current, domicile: value }))} placeholder="Jakarta" list="indonesia-regions" />
-              </div>
-              <TextArea label="Alamat lengkap" value={verificationForm.full_address} onChange={(value) => setVerificationForm((current) => ({ ...current, full_address: value }))} onBlur={() => markFieldTouched("full_address")} error={getFieldError("full_address")} placeholder="Jl. Contoh No. 10" />
-              <div className="flex justify-end border-t border-slate-200 pt-5">
-                <button type="submit" disabled={isSubmitting || isVerificationIncomplete} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:cursor-not-allowed disabled:bg-slate-400">
-                  <FileImage className="h-4 w-4" />
-                  {isSubmitting ? "Menyimpan..." : "Simpan data verifikasi"}
-                </button>
-              </div>
-            </form>
-          </section>
-        )
       ) : status === "stopped_agent" ? (
         <section className="rounded-lg border border-rose-200 bg-rose-50 p-5 text-sm font-medium text-rose-800">
           Status agent kamu sedang dihentikan. Hubungi admin untuk mengaktifkan kembali akun agent.
