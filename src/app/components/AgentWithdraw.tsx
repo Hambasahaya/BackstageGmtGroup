@@ -93,13 +93,11 @@ function StatCard({
   value,
   detail,
   featuredMobile = false,
-  pendingValue,
 }: {
   label: string;
   value: string;
   detail: string;
   featuredMobile?: boolean;
-  pendingValue?: string;
 }) {
   if (featuredMobile) {
     return (
@@ -108,11 +106,7 @@ function StatCard({
         <p className="mt-3 truncate text-3xl font-bold leading-none text-slate-950 sm:mt-2 sm:text-2xl">
           {value}
         </p>
-        <div className="mx-auto mt-4 flex w-full max-w-[240px] items-center justify-between gap-3 text-xs font-semibold text-slate-500 sm:hidden">
-          <span>Pending balance</span>
-          <span className="truncate text-slate-900">{pendingValue}</span>
-        </div>
-        <p className="mt-2 hidden text-sm text-slate-500 sm:block sm:line-clamp-1">{detail}</p>
+        <p className="mt-2 text-xs text-slate-500 sm:text-sm sm:line-clamp-1">{detail}</p>
       </div>
     );
   }
@@ -470,7 +464,6 @@ export function AgentWithdraw() {
           value={currencyFormatter.format(wallet.total_commission)}
           detail="Akumulasi komisi approve"
           featuredMobile
-          pendingValue={currencyFormatter.format(wallet.pending_withdraw)}
         />
         <StatCard
           label="Sudah ditarik"
