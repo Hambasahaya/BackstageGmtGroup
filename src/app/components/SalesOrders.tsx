@@ -1,6 +1,7 @@
 import { CheckCircle2, Eye, Search, ShoppingCart, Truck, X, XCircle, Upload, FileText, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
+import { api, getStoredUser, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto } from "../services/api";
+import { initClarity, setClarityTag, identifyClarityUser } from "../services/clarity";
 import Swal from "sweetalert2";
 
 type PurchaseOrderStatus = "draft" | "in_review" | "approve" | "shipped" | "barang_sudah_terkirim" | "invalid";
@@ -342,6 +343,15 @@ export function SalesOrders() {
       }
     }
   }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    initClarity();
+    setClarityTag("page", "sales_orders_po");
+    const storedUser = getStoredUser();
+    if (storedUser?.id) {
+      identifyClarityUser(storedUser.id, storedUser.name || storedUser.email);
+    }
+  }, []);
 
   useEffect(() => {
     void loadOrders();

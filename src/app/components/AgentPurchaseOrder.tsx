@@ -16,7 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
+import { api, getStoredUser, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
+import { initClarity, setClarityTag, identifyClarityUser } from "../services/clarity";
 import Swal from "sweetalert2";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -849,6 +850,15 @@ export function AgentPurchaseOrder() {
   const [mobilePoStep, setMobilePoStep] = useState<"cart" | "details">("cart");
   const [expandedMobilePoId, setExpandedMobilePoId] = useState<number | null>(null);
   const [touchedCustomerFields, setTouchedCustomerFields] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    initClarity();
+    setClarityTag("page", "purchase_order");
+    const storedUser = getStoredUser();
+    if (storedUser?.id) {
+      identifyClarityUser(storedUser.id, storedUser.name || storedUser.email);
+    }
+  }, []);
 
   const isDeletingPo = (poId: number) => actionLoading?.type === "delete" && actionLoading.poId === poId;
   const isPrintingPo = (poId: number) => actionLoading?.type === "print" && actionLoading.poId === poId;
