@@ -27,11 +27,25 @@ export function initClarity(projectId?: string) {
       y = l.getElementsByTagName(r)[0];
       y.parentNode?.insertBefore(t, y);
     })(window, document, "clarity", "script", id);
+  } else {
+    window.clarity("resume");
   }
 
   const storedUser = getStoredUser();
   if (storedUser?.id) {
     identifyClarityUser(storedUser.id, storedUser.name || storedUser.email);
+  }
+}
+
+export function pauseClarity() {
+  if (typeof window !== "undefined" && window.clarity) {
+    window.clarity("pause");
+  }
+}
+
+export function resumeClarity() {
+  if (typeof window !== "undefined" && window.clarity) {
+    window.clarity("resume");
   }
 }
 

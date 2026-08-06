@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, getStoredUser, resolveApiAssetUrl, type PaymentStatus, type PreorderDto, type PreorderItemDto, type ProductDto } from "../services/api";
-import { initClarity, setClarityTag, identifyClarityUser } from "../services/clarity";
+import { initClarity, setClarityTag, identifyClarityUser, pauseClarity } from "../services/clarity";
 import Swal from "sweetalert2";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -858,6 +858,9 @@ export function AgentPurchaseOrder() {
     if (storedUser?.id) {
       identifyClarityUser(storedUser.id, storedUser.name || storedUser.email);
     }
+    return () => {
+      pauseClarity();
+    };
   }, []);
 
   const isDeletingPo = (poId: number) => actionLoading?.type === "delete" && actionLoading.poId === poId;

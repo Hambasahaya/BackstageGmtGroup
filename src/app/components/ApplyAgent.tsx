@@ -12,7 +12,7 @@ import {
 } from "../services/api";
 import { Suspense, lazy } from "react";
 import { useNavigate } from "react-router";
-import { initClarity, setClarityTag, identifyClarityUser } from "../services/clarity";
+import { initClarity, setClarityTag, identifyClarityUser, pauseClarity } from "../services/clarity";
 
 const WebcamCapture = lazy(() => import("./WebcamCapture").then(module => ({ default: module.WebcamCapture })));
 
@@ -634,6 +634,9 @@ export function ApplyAgent() {
     if (storedUser?.id) {
       identifyClarityUser(storedUser.id, storedUser.name || storedUser.email);
     }
+    return () => {
+      pauseClarity();
+    };
   }, [storedUser?.id, storedUser?.name, storedUser?.email]);
 
   // Restore draft from localStorage on initial render
