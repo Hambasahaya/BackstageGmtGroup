@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileImage, Send, UserPlus, X, User, IdCard, Camera, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -12,6 +12,7 @@ import {
 } from "../services/api";
 import { Suspense, lazy } from "react";
 import { useNavigate } from "react-router";
+import { initClarity, setClarityTag, identifyClarityUser } from "../services/clarity";
 
 const WebcamCapture = lazy(() => import("./WebcamCapture").then(module => ({ default: module.WebcamCapture })));
 
@@ -577,6 +578,33 @@ function FeedbackModal({
   );
 }
 
+function getDraftStorageKey(): string {
+  const user = getStoredUser();
+  const id = user?.id || user?.email || "guest";
+  return `gmt_apply_agent_draft_${id}`;
+}
+
+function fileToDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function dataURLtoFile(dataurl: string, filename: string): File {
+  const arr = dataurl.split(",");
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
+
 export function ApplyAgent() {
   const storedUser = getStoredUser();
   const [status, setStatus] = useState<AgentApplicationStatus | null>(storedUser?.detail_user?.status ?? null);
@@ -597,6 +625,135 @@ export function ApplyAgent() {
   const [termsTimeLeft, setTermsTimeLeft] = useState(30);
 
   const [touchedFields, setTouchedFields] = useState<Partial<Record<RequiredFieldKey, boolean>>>({});
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+
+  // Initialize Microsoft Clarity tracking for page sessions, heatmaps & user analytics
+  useEffect(() => {
+    initClarity();
+    setClarityTag("page", "apply_agent");
+    if (storedUser?.id) {
+      identifyClarityUser(storedUser.id, storedUser.name || storedUser.email);
+    }
+  }, [storedUser?.id, storedUser?.name, storedUser?.email]);
+
+  // Restore draft from localStorage on initial render
+  useEffect(() => {
+    try {
+      const key = getDraftStorageKey();
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (!draft) return;
+
+      let restoredAny = false;
+
+      if (draft.applyForm) {
+        setApplyForm((prev) => ({ ...prev, ...draft.applyForm }));
+        restoredAny = true;
+      }
+
+      if (draft.verificationFormText) {
+        setVerificationForm((prev) => ({
+          ...prev,
+          ...draft.verificationFormText,
+          photo: draft.photoDataUrl ? dataURLtoFile(draft.photoDataUrl, "photo_draft.jpg") : prev.photo,
+          ktp_photo: draft.ktpPhotoDataUrl ? dataURLtoFile(draft.ktpPhotoDataUrl, "ktp_draft.jpg") : prev.ktp_photo,
+        }));
+        restoredAny = true;
+      }
+
+      if (draft.selectedSocialMedia) {
+        setSelectedSocialMedia(draft.selectedSocialMedia);
+      }
+      if (typeof draft.termsAccepted === "boolean") {
+        setTermsAccepted(draft.termsAccepted);
+      }
+      if (typeof draft.termsReadCompleted === "boolean") {
+        setTermsReadCompleted(draft.termsReadCompleted);
+      }
+
+      if (restoredAny) {
+        setHasRestoredDraft(true);
+      }
+    } catch (error) {
+      console.warn("Gagal memuat draf pengajuan agent:", error);
+    }
+  }, []);
+
+  // Auto-save draft to localStorage whenever form values change
+  useEffect(() => {
+    let isCancelled = false;
+
+    const saveDraft = async () => {
+      try {
+        const key = getDraftStorageKey();
+
+        const hasApplyContent = Object.values(applyForm).some((v) => Boolean(v && v !== applyInitial[v as keyof ApplyAgentPayload]));
+        const { photo, ktp_photo, ...verificationText } = verificationForm;
+        const hasVerificationContent = Object.values(verificationText).some((v) => Boolean(v));
+        const hasFiles = Boolean(photo || ktp_photo);
+
+        if (!hasApplyContent && !hasVerificationContent && !hasFiles && !termsAccepted) {
+          return;
+        }
+
+        let photoDataUrl: string | null = null;
+        let ktpPhotoDataUrl: string | null = null;
+
+        if (photo) {
+          try {
+            photoDataUrl = await fileToDataURL(photo);
+          } catch {}
+        }
+
+        if (ktp_photo) {
+          try {
+            ktpPhotoDataUrl = await fileToDataURL(ktp_photo);
+          } catch {}
+        }
+
+        if (isCancelled) return;
+
+        const draftPayload = {
+          applyForm,
+          verificationFormText: verificationText,
+          photoDataUrl,
+          ktpPhotoDataUrl,
+          selectedSocialMedia,
+          termsAccepted,
+          termsReadCompleted,
+          updatedAt: new Date().toISOString(),
+        };
+
+        localStorage.setItem(key, JSON.stringify(draftPayload));
+      } catch (error) {
+        console.warn("Auto-save draft warning:", error);
+      }
+    };
+
+    const timeoutId = window.setTimeout(saveDraft, 400);
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [applyForm, verificationForm, selectedSocialMedia, termsAccepted, termsReadCompleted]);
+
+  const clearDraftFromStorage = () => {
+    try {
+      const key = getDraftStorageKey();
+      localStorage.removeItem(key);
+      setHasRestoredDraft(false);
+    } catch {}
+  };
+
+  const handleClearDraft = () => {
+    clearDraftFromStorage();
+    setApplyForm(applyInitial);
+    setVerificationForm(verificationInitial);
+    setTermsAccepted(false);
+    setTermsReadCompleted(false);
+    setTouchedFields({});
+  };
 
   const markFieldTouched = (field: RequiredFieldKey) => {
     setTouchedFields((current) => ({ ...current, [field]: true }));
@@ -702,6 +859,7 @@ export function ApplyAgent() {
       if (isSplitAgentMode) {
         setApplyForm(applyInitial);
         setTouchedFields({});
+        clearDraftFromStorage();
         setStatus("not_verif");
         const currentUser = getStoredUser();
         if (currentUser) {
@@ -744,6 +902,7 @@ export function ApplyAgent() {
         setApplyForm(applyInitial);
         setVerificationForm(verificationInitial);
         setTouchedFields({});
+        clearDraftFromStorage();
         const message = response.message || verificationResponse.message || "Pengajuan dan data verifikasi berhasil dikirim.";
         setSuccessMessage(message);
         setFeedbackDialog({
@@ -800,6 +959,7 @@ export function ApplyAgent() {
       });
       setVerificationForm(verificationInitial);
       setTouchedFields({});
+      clearDraftFromStorage();
       void syncLatestStatus();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Gagal melengkapi data verifikasi.";
@@ -840,6 +1000,8 @@ export function ApplyAgent() {
 
       {errorMessage && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">{errorMessage}</div>}
       {successMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">{successMessage}</div>}
+
+
 
       {status === "official_agent" ? (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-sm font-medium text-emerald-800">
