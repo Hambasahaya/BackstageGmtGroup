@@ -74,7 +74,7 @@ const menuItems: MenuItem[] = [
   { icon: GraduationCap, label: "Agent Onboarding", path: "/agent-onboarding", roles: ["user", "agent"], statuses: ["not_verif", "verif", "official_agent"] },
   { icon: ShoppingCart, label: "Purchase Order", path: "/agent-purchase-orders", roles: ["agent"], statuses: ["official_agent"] },
   { icon: Wallet, label: "Withdraw", path: "/agent-withdraw", roles: ["agent"], statuses: ["official_agent"] },
-  { icon: Headphones, label: "Customer Care", path: "/agent-customer-care", roles: ["agent"], statuses: ["official_agent"] },
+  { icon: Headphones, label: "Customer Care", path: "/agent-customer-care", roles: ["user", "agent"] },
   { icon: ShoppingCart, label: "Sales Orders", path: "/sales-orders", roles: ["sales"] },
   { icon: Bell, label: "Notifications", path: "/notifications", roles: ["super_admin"] },
   { icon: ShieldCheck, label: "Manajemen User", path: "/roles", roles: ["super_admin"] },

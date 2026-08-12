@@ -1,4 +1,4 @@
-﻿import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import type { ReactNode } from "react";
 import { AuthGate } from "./auth/AuthGate";
 import { canAccessRole, getCurrentAgentStatus, getCurrentRole, roleHomePaths, roleLabels, type AppRole } from "./auth/roles";
@@ -87,6 +87,7 @@ function RoleHomeRedirect() {
 const superAdminOnly: AppRole[] = ["super_admin"];
 const agentOnly: AppRole[] = ["agent"];
 const agentApplicantRoles: AppRole[] = ["user", "agent"];
+const customerCareRoles: AppRole[] = ["user", "agent"];
 const salesOnly: AppRole[] = ["sales"];
 const userOnly: AppRole[] = ["user"];
 
@@ -286,10 +287,8 @@ export const router = createBrowserRouter([
       {
         path: "agent-customer-care",
         element: (
-          <RoleGate allowedRoles={agentOnly}>
-            <OfficialAgentGate>
-              <AgentCustomerCareHub />
-            </OfficialAgentGate>
+          <RoleGate allowedRoles={customerCareRoles}>
+            <AgentCustomerCareHub />
           </RoleGate>
         ),
       },
@@ -344,8 +343,4 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-
-
-
-
 
