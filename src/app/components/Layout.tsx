@@ -6,10 +6,12 @@ import {
   CalendarDays,
   CheckCheck,
   ClipboardList,
+  Download,
   FileBarChart,
   FileText,
   GraduationCap,
   Globe2,
+  HelpCircle,
   Images,
   LayoutDashboard,
   Loader2,
@@ -27,9 +29,10 @@ import {
   Users,
   Wallet,
   Trophy,
+  Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ElementType } from "react";
+import { Fragment, useEffect, useRef, useState, type ElementType } from "react";
 import { getCurrentAgentStatus, getCurrentRole, roleLabels, type AppRole } from "../auth/roles";
 import {
   api,
@@ -54,6 +57,7 @@ type MenuItem = {
   path: string;
   roles: AppRole[];
   statuses?: AgentApplicationStatus[];
+  section?: string;
 };
 
 const menuItems: MenuItem[] = [
@@ -69,7 +73,12 @@ const menuItems: MenuItem[] = [
   { icon: UserPlus, label: "Agent Applications", path: "/agent-applications", roles: ["super_admin"] },
   { icon: Wallet, label: "Withdraw Approval", path: "/withdraw-approvals", roles: ["super_admin"] },
   { icon: GraduationCap, label: "Onboarding Videos", path: "/admin-onboarding-videos", roles: ["super_admin"] },
-  { icon: UserPlus, label: "Apply Agent", path: "/apply-agent", roles: ["user"], statuses: ["not_verif", "verif", "stopped_agent"] },
+  { icon: UserPlus, label: "Become an Agent", path: "/apply-agent", roles: ["user"], statuses: ["not_verif", "verif", "stopped_agent"] },
+  { icon: Download, label: "Download", path: "/resources/download", roles: ["user"], section: "Resources" },
+  { icon: CalendarDays, label: "Event & Training", path: "/resources/event-training", roles: ["user"], section: "Resources" },
+  { icon: ShieldCheck, label: "Warranty", path: "/resources/warranty", roles: ["user"], section: "Resources" },
+  { icon: HelpCircle, label: "Help Center", path: "/resources/help-center", roles: ["user"], section: "Resources" },
+  { icon: Trash2, label: "Delete Account", path: "/account/delete", roles: ["user"], section: "Account Setting" },
   { icon: Trophy, label: "Achievement", path: "/agent-achievement", roles: ["agent"], statuses: ["official_agent"] },
   { icon: GraduationCap, label: "Agent Onboarding", path: "/agent-onboarding", roles: ["user", "agent"], statuses: ["not_verif", "verif", "official_agent"] },
   { icon: ShoppingCart, label: "Purchase Order", path: "/agent-purchase-orders", roles: ["agent"], statuses: ["official_agent"] },
@@ -682,26 +691,33 @@ export function Layout() {
           </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-            {visibleMenuItems.map((item) => {
+            {visibleMenuItems.map((item, index) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
+              const showSection = item.section && item.section !== visibleMenuItems[index - 1]?.section;
 
               return (
-                <button
-                  key={item.path}
-                  onClick={() => {
-                    navigate(item.path);
-                    setSidebarOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
-                    isActive
-                      ? "bg-[#0F766E] text-white shadow-sm"
-                      : "text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </button>
+                <Fragment key={item.path}>
+                  {showSection && (
+                    <p className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {item.section}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => {
+                      navigate(item.path);
+                      setSidebarOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
+                      isActive
+                        ? "bg-[#0F766E] text-white shadow-sm"
+                        : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                </Fragment>
               );
             })}
           </nav>

@@ -23,6 +23,13 @@ import { SsoStart } from "./components/SsoStart";
 import { ErrorPage, NotFoundPage } from "./components/ErrorPage";
 import { SuperAdminWithdraws } from "./components/SuperAdminWithdraws";
 import { SuperAdminOnboardingVideos } from "./components/SuperAdminOnboardingVideos";
+import {
+  DeleteAccount,
+  ResourceDownload,
+  ResourceEventTraining,
+  ResourceHelpCenter,
+  ResourceWarranty,
+} from "./components/UserResources";
 import { ProductManagement } from "./components/ProductManagement";
 import { ArticleManagement } from "./components/ArticleManagement";
 import {
@@ -245,6 +252,46 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={userOnly}>
             <ApplyAgent />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "resources/download",
+        element: (
+          <RoleGate allowedRoles={userOnly}>
+            <ResourceDownload />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "resources/event-training",
+        element: (
+          <RoleGate allowedRoles={userOnly}>
+            <ResourceEventTraining />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "resources/warranty",
+        element: (
+          <RoleGate allowedRoles={userOnly}>
+            <ResourceWarranty />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "resources/help-center",
+        element: (
+          <RoleGate allowedRoles={userOnly}>
+            <ResourceHelpCenter />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "account/delete",
+        element: (
+          <RoleGate allowedRoles={userOnly}>
+            <DeleteAccount />
           </RoleGate>
         ),
       },
