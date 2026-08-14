@@ -489,6 +489,7 @@ export type BookingType = "demo" | "event" | string;
 export type BookingDto = {
   id: string;
   type: BookingType;
+  status?: string;
   name: string;
   email: string;
   position?: string;
@@ -512,6 +513,13 @@ export type BookingDto = {
 export type BookingsListResponse = {
   success: boolean;
   data: BookingDto[];
+  message?: string;
+  error?: string;
+};
+
+export type BookingMutationResponse = {
+  success: boolean;
+  data: BookingDto;
   message?: string;
   error?: string;
 };
@@ -1391,6 +1399,16 @@ export const api = {
     apiRequest<BookingsListResponse>("/api/bookings", {
       auth: true,
       query: { type },
+    }),
+  approveBooking: (id: string) =>
+    apiRequest<BookingMutationResponse>(`/api/bookings/${encodeURIComponent(id)}/approve`, {
+      auth: true,
+      method: "POST",
+    }),
+  rejectBooking: (id: string) =>
+    apiRequest<BookingMutationResponse>(`/api/bookings/${encodeURIComponent(id)}/reject`, {
+      auth: true,
+      method: "POST",
     }),
 };
 

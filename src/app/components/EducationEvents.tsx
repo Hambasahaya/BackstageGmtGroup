@@ -1,4 +1,4 @@
-import { CalendarDays, Edit3, Eye, Plus, RefreshCw, Search, Trash2, Users, X, BookmarkCheck, FileText, ExternalLink } from "lucide-react";
+import { CalendarDays, CheckCircle2, Edit3, Eye, Plus, RefreshCw, Search, Trash2, Users, X, XCircle, BookmarkCheck, FileText, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, resolveApiAssetUrl, type BookingDto, type EducationDto, type EducationParticipantDto, type EducationPayload } from "../services/api";
 import Swal from "sweetalert2";
@@ -327,6 +327,7 @@ export function EducationEvents() {
   const [bookingTypeFilter, setBookingTypeFilter] = useState<string>("");
   const [selectedBooking, setSelectedBooking] = useState<BookingDto | null>(null);
   const [isBookingsLoading, setIsBookingsLoading] = useState(true);
+  const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null);
 
   // Educations state
   const [events, setEvents] = useState<EducationDto[]>([]);
@@ -405,6 +406,46 @@ export function EducationEvents() {
     return { total, demoCount, eventCount, corporateCount };
   }, [bookings]);
 
+  const updateBookingStatus = async (booking: BookingDto, action: "approve" | "reject") => {
+    const actionLabel = action === "approve" ? "Approve" : "Reject";
+    const result = await Swal.fire({
+      title: `${actionLabel} Booking?`,
+      text: `Booking ${booking.name || booking.id} akan di-${action === "approve" ? "approve" : "reject"}.`,
+      icon: action === "approve" ? "question" : "warning",
+      showCancelButton: true,
+      confirmButtonColor: action === "approve" ? "#0F766E" : "#DC2626",
+      cancelButtonColor: "#64748B",
+      confirmButtonText: actionLabel,
+      cancelButtonText: "Batal",
+    });
+
+    if (!result.isConfirmed) return;
+
+    setUpdatingBookingId(`${booking.id}:${action}`);
+    setErrorMessage("");
+    try {
+      const response = action === "approve" ? await api.approveBooking(booking.id) : await api.rejectBooking(booking.id);
+      setBookings((current) => current.map((item) => (item.id === booking.id ? response.data : item)));
+      await Swal.fire({
+        icon: "success",
+        title: action === "approve" ? "Booking Approved" : "Booking Rejected",
+        text: response.message || "Status booking berhasil diperbarui.",
+        confirmButtonColor: "#0F766E",
+      });
+      await loadBookings();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Gagal memperbarui status booking.";
+      setErrorMessage(msg);
+      void Swal.fire({
+        icon: "error",
+        title: "Gagal Update Booking",
+        text: msg,
+        confirmButtonColor: "#0F766E",
+      });
+    } finally {
+      setUpdatingBookingId(null);
+    }
+  };
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.toLowerCase();
     return events.filter((event) =>
@@ -660,13 +701,34 @@ export function EducationEvents() {
                               </p>
                             )}
                           </td>
-                          <td className="px-5 py-4 text-right align-top"><button
-                              onClick={() => setSelectedBooking(b)}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Detail
-                            </button>
+                          <td className="px-5 py-4 text-right align-top">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <button
+                                onClick={() => void updateBookingStatus(b, "approve")}
+                                disabled={updatingBookingId !== null || String(b.status || "").toLowerCase() === "approved"}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Approve booking"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {updatingBookingId === `${b.id}:approve` ? "Saving" : "Approve"}
+                              </button>
+                              <button
+                                onClick={() => void updateBookingStatus(b, "reject")}
+                                disabled={updatingBookingId !== null || String(b.status || "").toLowerCase() === "rejected"}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                title="Reject booking"
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
+                                {updatingBookingId === `${b.id}:reject` ? "Saving" : "Reject"}
+                              </button>
+                              <button
+                                onClick={() => setSelectedBooking(b)}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Detail
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
