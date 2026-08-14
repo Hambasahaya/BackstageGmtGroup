@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/api/bookings/:id/approve",
+      "destination": "/api/bookings.js?id=:id&action=approve"
+    },
+    {
+      "source": "/api/bookings/:id/reject",
+      "destination": "/api/bookings.js?id=:id&action=reject"
+    },
+    {
+      "source": "/api/bookings/:id/status",
+      "destination": "/api/bookings.js?id=:id&action=status"
+    },
+    {
       "source": "/api/meta/:path*",
       "destination": "/api/meta/index.js"
     },

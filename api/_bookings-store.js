@@ -59,3 +59,40 @@ export async function writeBookings(bookings) {
   await fs.mkdir(path.dirname(BOOKINGS_STORE_PATH), { recursive: true });
   await fs.writeFile(BOOKINGS_STORE_PATH, JSON.stringify(safeBookings, null, 2), "utf8");
 }
+export async function updateBookingStatus(id, status) {
+  const normalizedId = String(id || "").trim();
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+
+  if (!normalizedId) {
+    const error = new Error("Booking id is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!normalizedStatus) {
+    const error = new Error("Booking status is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const bookings = await readBookings();
+  const bookingIndex = bookings.findIndex((booking) => String(booking.id) === normalizedId);
+
+  if (bookingIndex === -1) {
+    const error = new Error("Booking not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const updatedBooking = {
+    ...bookings[bookingIndex],
+    status: normalizedStatus,
+    updated_at: new Date().toISOString(),
+  };
+
+  const updatedBookings = [...bookings];
+  updatedBookings[bookingIndex] = updatedBooking;
+
+  await writeBookings(updatedBookings);
+  return updatedBooking;
+}
