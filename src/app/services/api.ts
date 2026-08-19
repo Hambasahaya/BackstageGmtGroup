@@ -467,6 +467,201 @@ export type EducationDto = {
   location?: string | null;
   venue?: string | null;
   image?: string | null;
+};
+
+export type ApplyAgentPayload = {
+  job: string;
+  instagram: string;
+  facebook: string;
+  tiktok: string;
+  agent_program_type: string;
+  agent_motivation: string;
+  referral_source: string;
+  referral_name?: string;
+  referral_other?: string;
+  target_product: string;
+};
+
+export type AgentVerificationPayload = {
+  photo: File;
+  ktp_photo: File;
+  bank_name: string;
+  account_number: string;
+  ttl: string;
+  full_address: string;
+  phone_number: string;
+  domicile?: string;
+};
+
+
+export type CustomerCareTicketType = "complaint" | "demo_request" | "warranty_claim" | "general_support";
+export type CustomerCareTicketStatus = "diterima" | "diproses" | "menunggu_customer" | "selesai";
+export type CustomerCareTicketCategory =
+  | "produk_rusak"
+  | "barang_kurang_salah"
+  | "keterlambatan_pengiriman"
+  | "pembayaran"
+  | "garansi"
+  | "lainnya";
+
+export type CustomerCareInvoiceDto = {
+  invoice_id: number;
+  invoice_number: string;
+  date: string;
+  products: { product_id: number; product_name: string; qty: number }[];
+};
+
+export type CustomerCareAttachmentDto = {
+  id: number;
+  ticket_id: number;
+  file_url: string;
+  file_type: "image" | "video" | string;
+  created_at: string;
+};
+
+export type CustomerCareLogDto = {
+  id: number;
+  ticket_id?: number;
+  actor_id?: number;
+  action: string;
+  note?: string;
+  created_at: string;
+};
+
+export type CustomerCareMessageDto = {
+  id: number;
+  ticket_id?: number;
+  sender_id?: number;
+  sender_name: string;
+  sender_role: string;
+  message: string;
+  created_at: string;
+};
+
+export type CustomerCareTicketDto = {
+  id: number;
+  ticket_number: string;
+  type: CustomerCareTicketType;
+  invoice_id?: number;
+  invoice_number?: string;
+  product_id?: number;
+  product_name?: string;
+  category: CustomerCareTicketCategory | string;
+  subject: string;
+  description?: string;
+  status: CustomerCareTicketStatus;
+  pic_id?: number;
+  pic_name?: string;
+  contact_channel?: string;
+  rating?: number | null;
+  feedback?: string | null;
+  response_due_at?: string;
+  resolve_due_at?: string;
+  attachments?: CustomerCareAttachmentDto[];
+  logs?: CustomerCareLogDto[];
+  created_at: string;
+};
+
+export type CustomerCareTicketPayload = {
+  type: CustomerCareTicketType;
+  invoice_id?: number;
+  product_id?: number;
+  category: string;
+  subject: string;
+  description?: string;
+  contact_channel?: string;
+};
+
+export type AgentApplicationDto = UserSession & {
+  phone_number?: string;
+  domicile?: string;
+  ttl?: string;
+  detail_user?: DetailUserDto;
+};
+
+export type UserManagementDto = {
+  id: number;
+  name: string;
+  ttl?: string | null;
+  phone_number?: string | null;
+  gender?: string | null;
+  email: string;
+  domicile?: string | null;
+  role: ApiRole;
+  is_suspended: boolean;
+  detail_user?: DetailUserDto | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type UserPaginationDto = {
+  current_page: number;
+  limit: number;
+  total_items: number;
+  total_pages: number;
+};
+
+export type GetUsersParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+  is_suspended?: boolean;
+};
+
+export type GetUsersResponse = {
+  users: UserManagementDto[];
+  pagination: UserPaginationDto;
+};
+
+
+export type NotificationDto = {
+  id?: number;
+  role?: ApiRole;
+  title?: string;
+  message?: string;
+  data?: string | Record<string, unknown> | null;
+  read_at?: string | null;
+  status?: "belum_terbaca" | "terbaca";
+};
+
+export type EducationStatus = "Available" | "Full" | "Closed" | "Cancelled" | string;
+export type EducationType = "Offline" | "Online" | "Hybrid" | string;
+
+export type EducationParticipantDto = {
+  id?: string | number;
+  registration_id?: string;
+  user_id?: string | number;
+  status?: string;
+  salutation?: string;
+  first_name?: string;
+  surname?: string;
+  name?: string;
+  email?: string;
+  phone_landline?: string | null;
+  phone_mobile?: string | null;
+  company?: string | null;
+  position?: string | null;
+  meal_preference?: string | null;
+  additional_information?: string | null;
+  created_at?: string;
+  registered_at?: string;
+};
+
+export type EducationDto = {
+  id: string;
+  title: string;
+  description?: string | null;
+  full_description?: string | null;
+  date: string;
+  time?: string | null;
+  type: EducationType;
+  status: EducationStatus;
+  max_attendees?: number | null;
+  current_attendees?: number | null;
+  location?: string | null;
+  venue?: string | null;
+  image?: string | null;
   participants?: EducationParticipantDto[];
   registrations?: EducationParticipantDto[];
   [key: string]: unknown;
@@ -498,6 +693,8 @@ export type BookingDto = {
   preferredDate?: string;
   usedGmtProduct?: string;
   interestedProduct?: string;
+  picEmail?: string;
+  pic_email?: string;
   capacity?: number | string;
   eventCapacity?: number | string;
   deck?: string;
@@ -1400,19 +1597,21 @@ export const api = {
       auth: true,
       query: { type },
     }),
-  approveBooking: (id: string) =>
+  approveBooking: (id: string, picEmail?: string) =>
     apiRequest<BookingMutationResponse>(`/api/bookings/${encodeURIComponent(id)}/approve`, {
       auth: true,
       method: "POST",
+      body: JSON.stringify({ picEmail }),
     }),
   rejectBooking: (id: string) =>
     apiRequest<BookingMutationResponse>(`/api/bookings/${encodeURIComponent(id)}/reject`, {
       auth: true,
       method: "POST",
     }),
+  updateBookingStatus: (id: string, status: "approved" | "rejected" | string, picEmail?: string) =>
+    apiRequest<BookingMutationResponse>(`/api/bookings/${encodeURIComponent(id)}/status`, {
+      auth: true,
+      method: "PUT",
+      body: JSON.stringify({ status, picEmail }),
+    }),
 };
-
-
-
-
-

@@ -103,10 +103,22 @@ export default async function handler(request, response) {
         });
       }
 
+      const picEmail = String(body?.picEmail || body?.pic_email || "").trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (normalizedStatus === "approved") {
+        if (!picEmail || !emailRegex.test(picEmail)) {
+          return json(response, 400, {
+            success: false,
+            message: "Email PIC acara wajib diisi untuk menyetujui (approve) booking.",
+          });
+        }
+      }
+
       const authHeader = request.headers.authorization || request.headers.Authorization;
       if (authHeader) {
         try {
-          const forwarded = await forwardUpdateRequest(request, id, action, { ...body, status: normalizedStatus }, authHeader);
+          const forwarded = await forwardUpdateRequest(request, id, action, { ...body, status: normalizedStatus, picEmail: picEmail || undefined }, authHeader);
           if (forwarded) {
             return json(response, forwarded.status, forwarded.data);
           }
@@ -115,10 +127,11 @@ export default async function handler(request, response) {
         }
       }
 
-      const updatedBooking = await updateBookingStatus(id, normalizedStatus);
+      const updatedBooking = await updateBookingStatus(id, normalizedStatus, { picEmail });
+      const successMessage = normalizedStatus === "approved" ? "Booking approved successfully" : `Booking ${normalizedStatus}`;
       return json(response, 200, {
         success: true,
-        message: `Booking ${normalizedStatus}`,
+        message: successMessage,
         data: updatedBooking,
       });
     }

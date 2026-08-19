@@ -933,6 +933,90 @@ Error umum:
 }
 ```
 
+### Approve Booking (Spesifik)
+
+```text
+PUT /api/bookings/:id/approve
+POST /api/bookings/:id/approve
+```
+
+Auth: Bearer `<ADMIN_TOKEN>` (role `super_admin`, `sales`, atau `marketing`).
+Content-Type: `application/json`
+
+Request Body:
+
+```json
+{
+  "picEmail": "pic.acara@gmtgroup.co.id"
+}
+```
+*(Backend menerima nama field `picEmail` maupun `pic_email`)*
+
+Success Response (HTTP 200 OK):
+
+```json
+{
+  "success": true,
+  "message": "Booking approved successfully",
+  "data": {
+    "id": "DEMO-1740000000",
+    "type": "demo",
+    "status": "approved",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "position": "Manager",
+    "referralSource": "InsightRoom booking page",
+    "category": "Private Demo Session",
+    "preferredDate": "2026-08-25 10:00 AM",
+    "picEmail": "pic.acara@gmtgroup.co.id",
+    "created_at": "2026-08-19T05:43:00Z",
+    "updated_at": "2026-08-19T05:48:00Z"
+  }
+}
+```
+
+Error Response (HTTP 400 Bad Request) - Jika Email PIC Kosong / Tidak Valid:
+
+```json
+{
+  "success": false,
+  "message": "Email PIC acara wajib diisi untuk menyetujui (approve) booking."
+}
+```
+
+### Update Booking Status (Generik)
+
+```text
+PUT /api/bookings/:id/status
+PATCH /api/bookings/:id/status
+```
+
+Auth: Bearer `<ADMIN_TOKEN>`
+Content-Type: `application/json`
+
+Request Body (Approve):
+
+```json
+{
+  "status": "approved",
+  "picEmail": "pic.acara@gmtgroup.co.id"
+}
+```
+
+Request Body (Reject):
+
+```json
+{
+  "status": "rejected"
+}
+```
+
+### Alur Email yang Dipicu Otomatis oleh Backend
+
+Saat booking di-approve oleh admin:
+1. **Email ke PIC Acara (`picEmail`)**: Menerima detail lengkap acara & notifikasi penugasan sebagai PIC.
+2. **Email ke Pemesan (`email`)**: Menerima konfirmasi bahwa booking telah di-approve beserta rincian informasi acara & kontak PIC.
+
 ## Super Admin Area
 
 

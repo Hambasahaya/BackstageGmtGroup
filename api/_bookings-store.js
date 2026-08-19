@@ -59,7 +59,7 @@ export async function writeBookings(bookings) {
   await fs.mkdir(path.dirname(BOOKINGS_STORE_PATH), { recursive: true });
   await fs.writeFile(BOOKINGS_STORE_PATH, JSON.stringify(safeBookings, null, 2), "utf8");
 }
-export async function updateBookingStatus(id, status) {
+export async function updateBookingStatus(id, status, options = {}) {
   const normalizedId = String(id || "").trim();
   const normalizedStatus = String(status || "").trim().toLowerCase();
 
@@ -84,9 +84,12 @@ export async function updateBookingStatus(id, status) {
     throw error;
   }
 
+  const picEmail = options?.picEmail || options?.pic_email;
+
   const updatedBooking = {
     ...bookings[bookingIndex],
     status: normalizedStatus,
+    ...(picEmail ? { picEmail: String(picEmail).trim() } : {}),
     updated_at: new Date().toISOString(),
   };
 

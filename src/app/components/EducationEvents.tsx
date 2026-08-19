@@ -136,6 +136,12 @@ function BookingDetailModal({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Produk Diminati</p>
             <p className="mt-1 font-semibold text-[#0F766E]">{booking.interestedProduct || "-"}</p>
           </div>
+          {(booking.picEmail || booking.pic_email) && (
+            <div className="sm:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Email PIC Acara</p>
+              <p className="mt-1 font-semibold text-[#0F766E]">{String(booking.picEmail || booking.pic_email)}</p>
+            </div>
+          )}
 
           {/* Event Specific Details */}
           {(isEvent || capacity !== undefined || deckUrl || description) && (
@@ -407,24 +413,50 @@ export function EducationEvents() {
   }, [bookings]);
 
   const updateBookingStatus = async (booking: BookingDto, action: "approve" | "reject") => {
-    const actionLabel = action === "approve" ? "Approve" : "Reject";
-    const result = await Swal.fire({
-      title: `${actionLabel} Booking?`,
-      text: `Booking ${booking.name || booking.id} akan di-${action === "approve" ? "approve" : "reject"}.`,
-      icon: action === "approve" ? "question" : "warning",
-      showCancelButton: true,
-      confirmButtonColor: action === "approve" ? "#0F766E" : "#DC2626",
-      cancelButtonColor: "#64748B",
-      confirmButtonText: actionLabel,
-      cancelButtonText: "Batal",
-    });
+    let picEmail = "";
+    if (action === "approve") {
+      const result = await Swal.fire({
+        title: "Approve Booking",
+        text: `Masukkan Email PIC Acara untuk menyetujui booking ${booking.name || booking.id}:`,
+        input: "email",
+        inputPlaceholder: "pic.acara@gmtgroup.co.id",
+        inputValue: String(booking.picEmail || booking.pic_email || "pic.acara@gmtgroup.co.id"),
+        showCancelButton: true,
+        confirmButtonColor: "#0F766E",
+        cancelButtonColor: "#64748B",
+        confirmButtonText: "Approve",
+        cancelButtonText: "Batal",
+        inputValidator: (value) => {
+          if (!value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+            return "Email PIC acara wajib diisi untuk menyetujui (approve) booking.";
+          }
+          return null;
+        },
+      });
 
-    if (!result.isConfirmed) return;
+      if (!result.isConfirmed || !result.value) return;
+      picEmail = result.value.trim();
+    } else {
+      const result = await Swal.fire({
+        title: "Reject Booking?",
+        text: `Booking ${booking.name || booking.id} akan di-reject.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#DC2626",
+        cancelButtonColor: "#64748B",
+        confirmButtonText: "Reject",
+        cancelButtonText: "Batal",
+      });
+
+      if (!result.isConfirmed) return;
+    }
 
     setUpdatingBookingId(`${booking.id}:${action}`);
     setErrorMessage("");
     try {
-      const response = action === "approve" ? await api.approveBooking(booking.id) : await api.rejectBooking(booking.id);
+      const response = action === "approve"
+        ? await api.approveBooking(booking.id, picEmail)
+        : await api.rejectBooking(booking.id);
       setBookings((current) => current.map((item) => (item.id === booking.id ? response.data : item)));
       await Swal.fire({
         icon: "success",
