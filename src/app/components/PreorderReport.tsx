@@ -241,6 +241,7 @@ export function PreorderReport() {
   /* ──── Page View Mode Tabs ──── */
   const [mainTab, setMainTab] = useState<"all" | "analytics" | "list">("all");
   const [analyticsTab, setAnalyticsTab] = useState<"agents" | "products" | "region" | "price">("agents");
+  const [regionViewMode, setRegionViewMode] = useState<"detailed" | "grouped">("detailed");
 
   /* ──── Table Filters ──── */
   const [searchTerm, setSearchTerm] = useState("");
@@ -943,7 +944,7 @@ export function PreorderReport() {
                       {[
                         { id: "agents", label: "Top Agent PO", icon: Users, count: (analyticsData.top_agents || []).length },
                         { id: "products", label: "Klasifikasi Produk", icon: Package, count: (analyticsData.by_product || []).length },
-                        { id: "region", label: "Sebaran Wilayah", icon: MapPin, count: (analyticsData.by_region || []).length },
+                        { id: "region", label: "Sebaran Wilayah", icon: MapPin, count: regionViewMode === "detailed" ? (analyticsData.by_region || []).length : formattedRegions.length },
                         { id: "price", label: "Klasifikasi Harga", icon: Tag, count: (analyticsData.by_price || []).length },
                       ].map((tab) => (
                         <button
@@ -1044,8 +1045,35 @@ export function PreorderReport() {
                   {/* TAB 3: REGION */}
                   {analyticsTab === "region" && (
                     <div className="p-4 space-y-4">
+                      {/* View Mode Switcher */}
+                      <div className="flex items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                        <p className="text-xs font-semibold text-slate-500">Mode Tampilan Wilayah:</p>
+                        <div className="inline-flex rounded-lg bg-white p-1 shadow-sm border border-slate-200">
+                          <button
+                            onClick={() => setRegionViewMode("detailed")}
+                            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                              regionViewMode === "detailed"
+                                ? "bg-[#0F766E] text-white shadow-sm"
+                                : "text-slate-600 hover:text-slate-900"
+                            }`}
+                          >
+                            Rincian Semua Wilayah ({(analyticsData.by_region || []).length})
+                          </button>
+                          <button
+                            onClick={() => setRegionViewMode("grouped")}
+                            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                              regionViewMode === "grouped"
+                                ? "bg-[#0F766E] text-white shadow-sm"
+                                : "text-slate-600 hover:text-slate-900"
+                            }`}
+                          >
+                            Gabung per Kota ({formattedRegions.length})
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="overflow-x-auto">
-                        <table className="w-full min-w-[500px] text-left text-sm">
+                        <table className="w-full min-w-[550px] text-left text-sm">
                           <thead>
                             <tr className="border-b border-slate-100 bg-slate-50">
                               <th className="px-4 py-3 font-semibold text-slate-500">Kota / Wilayah</th>
@@ -1055,19 +1083,47 @@ export function PreorderReport() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {formattedRegions.length === 0 ? (
-                              <tr>
-                                <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Tidak ada data wilayah</td>
-                              </tr>
-                            ) : (
-                              formattedRegions.map((r, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50/50">
-                                  <td className="px-4 py-3 font-semibold text-slate-900">{r.city}</td>
-                                  <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_po}</td>
-                                  <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_qty}</td>
-                                  <td className="px-4 py-3 text-right font-bold text-[#0F766E]">{currFmt.format(r.net_revenue)}</td>
+                            {regionViewMode === "detailed" ? (
+                              (analyticsData.by_region || []).length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Tidak ada data wilayah</td>
                                 </tr>
-                              ))
+                              ) : (
+                                (analyticsData.by_region || []).map((r, idx) => {
+                                  const cityName = formatCityName(r.city);
+                                  const isConverted = cityName !== r.city && /^\d+$/.test(r.city.trim());
+                                  return (
+                                    <tr key={idx} className="hover:bg-slate-50/50">
+                                      <td className="px-4 py-3">
+                                        <span className="font-semibold text-slate-900">{cityName}</span>
+                                        {isConverted && (
+                                          <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500">
+                                            {r.city}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_po}</td>
+                                      <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_qty}</td>
+                                      <td className="px-4 py-3 text-right font-bold text-[#0F766E]">{currFmt.format(r.net_revenue)}</td>
+                                    </tr>
+                                  );
+                                })
+                              )
+                            ) : (
+                              formattedRegions.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Tidak ada data wilayah</td>
+                                </tr>
+                              ) : (
+                                formattedRegions.map((r, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50/50">
+                                    <td className="px-4 py-3 font-semibold text-slate-900">{r.city}</td>
+                                    <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_po}</td>
+                                    <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_qty}</td>
+                                    <td className="px-4 py-3 text-right font-bold text-[#0F766E]">{currFmt.format(r.net_revenue)}</td>
+                                  </tr>
+                                ))
+                              )
                             )}
                           </tbody>
                         </table>
