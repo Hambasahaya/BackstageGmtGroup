@@ -1283,6 +1283,49 @@ export type PreorderReportResponse = {
   preorders: PreorderReportItemDto[];
 };
 
+export type PreorderAnalyticsTopAgentDto = {
+  agent_id: number;
+  agent_name: string;
+  total_po: number;
+  total_qty: number;
+  revenue: number;
+};
+
+export type PreorderAnalyticsByProductDto = {
+  id_product: number;
+  product_name: string;
+  unit_price: number;
+  total_po: number;
+  total_qty: number;
+  gross_revenue: number;
+  net_revenue: number;
+};
+
+export type PreorderAnalyticsByPriceDto = {
+  price: number;
+  total_po: number;
+  total_qty: number;
+  net_revenue: number;
+};
+
+export type PreorderAnalyticsByRegionDto = {
+  city: string;
+  total_po: number;
+  total_qty: number;
+  net_revenue: number;
+};
+
+export type PreorderAnalyticsResponse = {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_po: number;
+  top_agents: PreorderAnalyticsTopAgentDto[];
+  by_product: PreorderAnalyticsByProductDto[];
+  by_price: PreorderAnalyticsByPriceDto[];
+  by_region: PreorderAnalyticsByRegionDto[];
+};
+
 export const api = {
 
   login: (payload: { email: string; password: string; client?: string }) =>
@@ -1653,4 +1696,6 @@ export const api = {
     }),
   preordersReport: (params: { period?: string; start_date?: string; end_date?: string }) =>
     apiRequest<PreorderReportResponse>("/api/admin/support/preorders/report", { query: params }),
+  preordersAnalytics: (params: { period?: string; start_date?: string; end_date?: string }) =>
+    apiRequest<PreorderAnalyticsResponse>("/api/admin/support/preorders/analytics", { query: params }),
 };

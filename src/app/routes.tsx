@@ -32,6 +32,7 @@ import {
 } from "./components/UserResources";
 import { ProductManagement } from "./components/ProductManagement";
 import { PreorderReport } from "./components/PreorderReport";
+import { PreorderAnalytics } from "./components/PreorderAnalytics";
 import { ArticleManagement } from "./components/ArticleManagement";
 import {
   MediaLibrary,
@@ -174,6 +175,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={adminAndSales}>
             <PreorderReport />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "analytics-po",
+        element: (
+          <RoleGate allowedRoles={adminAndSales}>
+            <PreorderAnalytics />
           </RoleGate>
         ),
       },
