@@ -538,28 +538,10 @@ export type CustomerCareMessageDto = {
   created_at: string;
 };
 
-export type CustomerCareTicketDto = {
-  id: number;
-  ticket_number: string;
-  type: CustomerCareTicketType;
-  invoice_id?: number;
-  invoice_number?: string;
-  product_id?: number;
-  product_name?: string;
-  category: CustomerCareTicketCategory | string;
-  subject: string;
-  description?: string;
-  status: CustomerCareTicketStatus;
-  pic_id?: number;
-  pic_name?: string;
-  contact_channel?: string;
-  rating?: number | null;
-  feedback?: string | null;
-  response_due_at?: string;
-  resolve_due_at?: string;
-  attachments?: CustomerCareAttachmentDto[];
-  logs?: CustomerCareLogDto[];
-  created_at: string;
+export type CustomerCareCategoryItemDto = {
+  key: string;
+  name: string;
+  description: string;
 };
 
 export type CustomerCareTicketPayload = {
@@ -567,9 +549,39 @@ export type CustomerCareTicketPayload = {
   invoice_id?: number;
   product_id?: number;
   category: string;
+  serial_number?: string;
   subject: string;
   description?: string;
   contact_channel?: string;
+};
+
+export type CustomerCareTicketDto = {
+  id: number;
+  ticket_number: string;
+  type: CustomerCareTicketType;
+  user_id?: number;
+  reporter_name?: string;
+  reporter_phone?: string;
+  invoice_id?: number;
+  invoice_number?: string;
+  product_id?: number;
+  product_name?: string;
+  category: CustomerCareTicketCategory | string;
+  serial_number?: string;
+  subject: string;
+  description?: string;
+  status: CustomerCareTicketStatus;
+  pic_id?: number | null;
+  pic_name?: string;
+  contact_channel?: string;
+  rating?: number | null;
+  feedback?: string | null;
+  response_due_at?: string;
+  resolve_due_at?: string;
+  attachments?: CustomerCareAttachmentDto[];
+  messages?: CustomerCareMessageDto[];
+  logs?: CustomerCareLogDto[];
+  created_at: string;
 };
 
 export type AgentApplicationDto = UserSession & {
@@ -1545,22 +1557,8 @@ export const api = {
 
     return apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/approve`, { method: "PUT" });
   },
-  uploadWithdrawProof: (id: number, transferProof: File | string) => {
-    const body = transferProof instanceof File
-      ? (() => {
-          const formData = new FormData();
-          formData.set("transfer_proof", transferProof);
-          return formData;
-        })()
-      : JSON.stringify({ transfer_proof: transferProof });
-
-    return apiRequest<{ message: string; withdraw: WithdrawDto }>(`/api/super-admin/withdraws/${id}/proof`, {
-      method: "POST",
-      body,
-    });
-  },
   customerCareInvoices: () => apiRequest<{ data: CustomerCareInvoiceDto[] }>("/api/customer-care/invoices"),
-  customerCareCategories: () => apiRequest<{ data: string[] }>("/api/customer-care/categories"),
+  customerCareCategories: () => apiRequest<{ data: CustomerCareCategoryItemDto[] }>("/api/customer-care/categories"),
   customerCareTickets: (query?: { status?: CustomerCareTicketStatus; type?: CustomerCareTicketType; category?: string }) =>
     apiRequest<{ data: CustomerCareTicketDto[] }>("/api/customer-care/tickets", { query }),
   customerCareTicketDetail: (id: number) =>
@@ -1593,6 +1591,8 @@ export const api = {
     }),
   adminCustomerCareTickets: (query?: { status?: CustomerCareTicketStatus; category?: string; type?: CustomerCareTicketType; pic_id?: number; overdue?: number }) =>
     apiRequest<{ data: CustomerCareTicketDto[] }>("/api/admin/customer-care/tickets", { query }),
+  adminCustomerCareTicketDetail: (id: number) =>
+    apiRequest<{ data: CustomerCareTicketDto }>(`/api/admin/customer-care/tickets/${id}`),
   adminUpdateCustomerCareTicketStatus: (ticketId: number, payload: { status: CustomerCareTicketStatus; note?: string }) =>
     apiRequest<{ message: string }>(`/api/admin/customer-care/tickets/${ticketId}/status`, {
       method: "PATCH",
@@ -1607,75 +1607,6 @@ export const api = {
     apiRequest<{ message: string; data: unknown }>(`/api/admin/customer-care/tickets/${ticketId}/internal-notes`, {
       method: "POST",
       body: JSON.stringify({ note }),
-    }),  onboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/agent/onboarding/videos"),
-  onboardingProgress: () => apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress"),
-  saveOnboardingProgress: (payload: {
-    video_id: number;
-    watched_seconds: number;
-    duration_seconds: number;
-    status: OnboardingProgressStatus;
-  }) =>
-    apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  resetOnboardingProgress: () => apiRequest<{ message: string }>("/api/agent/onboarding/progress", { method: "DELETE" }),
-  adminOnboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/super-admin/onboarding/videos"),
-  adminOnboardingVideoDetail: (id: number) => apiRequest<{ video: OnboardingVideoDto }>(`/api/super-admin/onboarding/videos/${id}`),
-  adminCreateOnboardingVideo: (payload: OnboardingVideoPayload) =>
-    apiRequest<{ message: string; video: OnboardingVideoDto }>("/api/super-admin/onboarding/videos", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  adminUpdateOnboardingVideo: (id: number, payload: OnboardingVideoPayload) =>
-    apiRequest<{ message: string; video: OnboardingVideoDto }>(`/api/super-admin/onboarding/videos/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
-  adminDeleteOnboardingVideo: (id: number) => apiRequest<{ message: string }>(`/api/super-admin/onboarding/videos/${id}`, { method: "DELETE" }),
-  educations: (query?: { month?: string; type?: string; status?: string; page?: number; limit?: number }) =>
-    apiRequest<EducationListResponse>("/api/educations", {
-      auth: false,
-      query,
-    }),
-  educationDetail: (id: string) => apiRequest<EducationDetailResponse>(`/api/educations/${id}`, { auth: false }),
-  createEducation: (payload: EducationPayload) =>
-    apiRequest<EducationDetailResponse>("/api/educations", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  updateEducation: (id: string, payload: EducationPayload) =>
-    apiRequest<EducationDetailResponse>(`/api/educations/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
-  deleteEducation: (id: string) => apiRequest<{ success?: boolean; message?: string }>(`/api/educations/${id}`, { method: "DELETE" }),
-  articles: (query?: { search?: string; status?: string; category?: string; page?: number; limit?: number }) =>
-    apiRequest<{ articles: ArticleDto[]; meta: { total: number; page: number; limit: number; total_pages: number } }>("/api/articles", {
-      auth: false,
-      query,
-    }),
-  articleDetail: (id: string | number) => apiRequest<{ article: ArticleDto }>(`/api/articles/${id}`, { auth: false }),
-  createArticle: (payload: ArticlePayload) =>
-    apiRequest<{ message: string; article: ArticleDto }>("/api/articles", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  updateArticle: (id: string | number, payload: ArticlePayload) =>
-    apiRequest<{ message: string; article: ArticleDto }>(`/api/articles/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
-  deleteArticle: (id: string | number) => apiRequest<{ message: string }>(`/api/articles/${id}`, { method: "DELETE" }),
-  importArticles: (payload: { articles: ArticlePayload[] }) =>
-    apiRequest<{ message: string; created_count: number; skipped_count: number; created: ArticleDto[]; skipped_slugs: string[] }>("/api/articles/import", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  bookings: (type?: "demo" | "event" | string) =>
-    apiRequest<BookingsListResponse>("/api/bookings", {
-      auth: true,
-      query: { type },
     }),
   approveBooking: (id: string, picEmail?: string) =>
     apiRequest<BookingMutationResponse>(`/api/bookings/${encodeURIComponent(id)}/approve`, {

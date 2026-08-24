@@ -32,6 +32,7 @@ import {
 } from "./components/UserResources";
 import { ProductManagement } from "./components/ProductManagement";
 import { PreorderReport } from "./components/PreorderReport";
+import { AdminCustomerCare } from "./components/AdminCustomerCare";
 import { ArticleManagement } from "./components/ArticleManagement";
 import {
   MediaLibrary,
@@ -95,7 +96,7 @@ function RoleHomeRedirect() {
 const superAdminOnly: AppRole[] = ["super_admin"];
 const agentOnly: AppRole[] = ["agent"];
 const agentApplicantRoles: AppRole[] = ["user", "agent"];
-const customerCareRoles: AppRole[] = ["user", "agent"];
+const customerCareRoles: AppRole[] = ["user", "agent", "super_admin", "sales"];
 const salesOnly: AppRole[] = ["sales"];
 const adminAndSales: AppRole[] = ["super_admin", "sales"];
 const userOnly: AppRole[] = ["user"];
@@ -174,6 +175,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={adminAndSales}>
             <PreorderReport />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "admin-customer-care",
+        element: (
+          <RoleGate allowedRoles={adminAndSales}>
+            <AdminCustomerCare />
           </RoleGate>
         ),
       },
@@ -293,7 +302,7 @@ export const router = createBrowserRouter([
         path: "resources/help-center",
         element: (
           <RoleGate allowedRoles={userOnly}>
-            <ResourceHelpCenter />
+            <AgentCustomerCareHub />
           </RoleGate>
         ),
       },
