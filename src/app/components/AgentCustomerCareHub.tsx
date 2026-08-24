@@ -31,8 +31,19 @@ const ticketTypeOptions: { value: CustomerCareTicketType; label: string }[] = [
   { value: "general_support", label: "General support" },
 ];
 
-function formatLabel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+function formatLabel(value: unknown): string {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.name === "string" && obj.name) return obj.name;
+    if (typeof obj.label === "string" && obj.label) return obj.label;
+    if (typeof obj.title === "string" && obj.title) return obj.title;
+    if (typeof obj.key === "string" && obj.key) return formatLabel(obj.key);
+    return "-";
+  }
+  const str = String(value).trim();
+  if (!str) return "-";
+  return str.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function ActionCard({ icon: Icon, title, description, action }: { icon: typeof PlayCircle; title: string; description: string; action: string }) {
@@ -78,15 +89,24 @@ export function AgentCustomerCareHub() {
       ]);
       setInvoices(Array.isArray(invoiceResponse.data) ? invoiceResponse.data : []);
       if (Array.isArray(categoryResponse.data) && categoryResponse.data.length > 0) {
-        // Support either object format or string format
         const formattedCats: CustomerCareCategoryItemDto[] = categoryResponse.data.map((item: unknown) => {
           if (typeof item === "string") {
             return { key: item, name: formatLabel(item), description: "" };
           }
-          return item as CustomerCareCategoryItemDto;
+          if (item && typeof item === "object") {
+            const obj = item as Record<string, unknown>;
+            const key = String(obj.key || obj.id || obj.name || "category").trim();
+            const name = String(obj.name || obj.label || formatLabel(key)).trim();
+            return {
+              key: key || "lainnya",
+              name: name || "Lainnya",
+              description: String(obj.description || ""),
+            };
+          }
+          return { key: "lainnya", name: "Lainnya", description: "" };
         });
         setCategories(formattedCats);
-        setCategory(formattedCats[0].key);
+        setCategory(formattedCats[0]?.key || "produk_rusak");
       } else {
         setCategories(fallbackCategories);
         setCategory(fallbackCategories[0].key);

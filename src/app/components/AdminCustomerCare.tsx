@@ -31,9 +31,19 @@ const statusOptions: { value: CustomerCareTicketStatus; label: string; color: st
   { value: "selesai", label: "Selesai", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 ];
 
-function formatLabel(value: string) {
-  if (!value) return "-";
-  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+function formatLabel(value: unknown): string {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.name === "string" && obj.name) return obj.name;
+    if (typeof obj.label === "string" && obj.label) return obj.label;
+    if (typeof obj.title === "string" && obj.title) return obj.title;
+    if (typeof obj.key === "string" && obj.key) return formatLabel(obj.key);
+    return "-";
+  }
+  const str = String(value).trim();
+  if (!str) return "-";
+  return str.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function StatusBadge({ status }: { status: CustomerCareTicketStatus | string }) {

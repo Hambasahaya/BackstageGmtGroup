@@ -107,7 +107,7 @@ const PIE_COLORS = ["#0F766E", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4
 
 function StatusBadge({ status, label }: { status: string; label?: string }) {
   const style = STATUS_COLORS[status] ?? STATUS_COLORS.draft;
-  const displayLabel = label ?? status.replace(/_/g, " ");
+  const displayLabel = label ?? (typeof status === "string" ? status.replace(/_/g, " ") : String(status || "-"));
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ring-black/5 ${style.bg} ${style.text}`}
@@ -383,7 +383,7 @@ export function PreorderReport() {
       map.set(s, (map.get(s) || 0) + 1);
     });
     return Array.from(map.entries()).map(([name, value]) => ({
-      name: name.replace(/_/g, " "),
+      name: String(name || "").replace(/_/g, " "),
       value,
       key: name,
     }));
@@ -396,7 +396,7 @@ export function PreorderReport() {
       map.set(s, (map.get(s) || 0) + 1);
     });
     return Array.from(map.entries()).map(([name, value]) => ({
-      name: name.replace(/_/g, " "),
+      name: String(name || "").replace(/_/g, " "),
       value,
       key: name,
     }));
@@ -1243,7 +1243,7 @@ export function PreorderReport() {
                         <option value="all">Semua Status</option>
                         {uniqueStatuses.map((s) => (
                           <option key={s} value={s}>
-                            {s.replace(/_/g, " ")}
+                            {String(s || "").replace(/_/g, " ")}
                           </option>
                         ))}
                       </select>
@@ -1261,7 +1261,7 @@ export function PreorderReport() {
                         <option value="all">Semua Pembayaran</option>
                         {uniquePaymentStatuses.map((s) => (
                           <option key={s} value={s}>
-                            {s.replace(/_/g, " ")}
+                            {String(s || "").replace(/_/g, " ")}
                           </option>
                         ))}
                       </select>
