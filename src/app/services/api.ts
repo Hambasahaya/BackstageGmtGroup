@@ -1629,4 +1629,25 @@ export const api = {
     apiRequest<PreorderReportResponse>("/api/admin/support/preorders/report", { query: params }),
   preordersAnalytics: (params: { period?: string; start_date?: string; end_date?: string }) =>
     apiRequest<PreorderAnalyticsResponse>("/api/admin/support/preorders/analytics", { query: params }),
+  onboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/agent/onboarding/videos"),
+  onboardingProgress: () => apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress"),
+  saveOnboardingProgress: (payload: { video_id: number; watched_seconds: number; duration_seconds?: number; status?: OnboardingProgressStatus }) =>
+    apiRequest<OnboardingSummaryDto>("/api/agent/onboarding/progress", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  resetOnboardingProgress: () => apiRequest<{ message: string }>("/api/agent/onboarding/progress", { method: "DELETE" }),
+  adminOnboardingVideos: () => apiRequest<{ videos: OnboardingVideoDto[] }>("/api/super-admin/onboarding/videos"),
+  adminCreateOnboardingVideo: (payload: OnboardingVideoPayload) =>
+    apiRequest<{ message: string; video: OnboardingVideoDto }>("/api/super-admin/onboarding/videos", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  adminUpdateOnboardingVideo: (id: number, payload: OnboardingVideoPayload) =>
+    apiRequest<{ message: string; video: OnboardingVideoDto }>(`/api/super-admin/onboarding/videos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  adminDeleteOnboardingVideo: (id: number) =>
+    apiRequest<{ message: string }>(`/api/super-admin/onboarding/videos/${id}`, { method: "DELETE" }),
 };
