@@ -31,6 +31,7 @@ import {
   ResourceWarranty,
 } from "./components/UserResources";
 import { ProductManagement } from "./components/ProductManagement";
+import { PreorderReport } from "./components/PreorderReport";
 import { ArticleManagement } from "./components/ArticleManagement";
 import {
   MediaLibrary,
@@ -96,6 +97,7 @@ const agentOnly: AppRole[] = ["agent"];
 const agentApplicantRoles: AppRole[] = ["user", "agent"];
 const customerCareRoles: AppRole[] = ["user", "agent"];
 const salesOnly: AppRole[] = ["sales"];
+const adminAndSales: AppRole[] = ["super_admin", "sales"];
 const userOnly: AppRole[] = ["user"];
 
 export const router = createBrowserRouter([
@@ -164,6 +166,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGate allowedRoles={superAdminOnly}>
             <ProductManagement />
+          </RoleGate>
+        ),
+      },
+      {
+        path: "report-po",
+        element: (
+          <RoleGate allowedRoles={adminAndSales}>
+            <PreorderReport />
           </RoleGate>
         ),
       },

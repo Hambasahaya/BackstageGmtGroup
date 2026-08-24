@@ -1,0 +1,1251 @@
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  BarChart3,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  DollarSign,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  Loader2,
+  Package,
+  RefreshCw,
+  Search,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { api, type PreorderReportItemDto, type PreorderReportResponse } from "../services/api";
+import * as XLSX from "xlsx";
+
+/* ──────────── Formatters ──────────── */
+
+const currFmt = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  maximumFractionDigits: 0,
+});
+
+const dateFmt = new Intl.DateTimeFormat("id-ID", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+const dateTimeFmt = new Intl.DateTimeFormat("id-ID", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const shortDateFmt = new Intl.DateTimeFormat("id-ID", {
+  day: "2-digit",
+  month: "short",
+});
+
+/* ──────────── Constants ──────────── */
+
+type PeriodOption = "day" | "week" | "month" | "custom";
+
+const PERIOD_LABELS: Record<PeriodOption, string> = {
+  day: "Hari Ini",
+  week: "Minggu Ini",
+  month: "Bulan Ini",
+  custom: "Custom Range",
+};
+
+const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  approve: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  approved: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  draft: { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" },
+  in_review: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
+  shipped: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" },
+  barang_sudah_terkirim: { bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500" },
+  invalid: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500" },
+  pending: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
+  paid: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  unpaid: { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400" },
+  partial: { bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500" },
+  expired: { bg: "bg-red-50", text: "text-red-600", dot: "bg-red-400" },
+  failed: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500" },
+  refund: { bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500" },
+};
+
+const PIE_COLORS = ["#0F766E", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899", "#10B981", "#6366F1"];
+
+function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const style = STATUS_COLORS[status] ?? STATUS_COLORS.draft;
+  const displayLabel = label ?? status.replace(/_/g, " ");
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ring-inset ring-black/5 ${style.bg} ${style.text}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+      {displayLabel}
+    </span>
+  );
+}
+
+/* ──────────── Helpers ──────────── */
+
+function toLocalDate(isoDate: string) {
+  try {
+    return new Date(isoDate);
+  } catch {
+    return new Date();
+  }
+}
+
+function formatDateInput(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
+function getTodayStr() {
+  return formatDateInput(new Date());
+}
+
+function getWeekAgoStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 6);
+  return formatDateInput(d);
+}
+
+function getMonthStartStr() {
+  const d = new Date();
+  d.setDate(1);
+  return formatDateInput(d);
+}
+
+/* ──────────── Component ──────────── */
+
+export function PreorderReport() {
+  const [period, setPeriod] = useState<PeriodOption>("month");
+  const [customStart, setCustomStart] = useState(getMonthStartStr());
+  const [customEnd, setCustomEnd] = useState(getTodayStr());
+  const [reportData, setReportData] = useState<PreorderReportResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [selectedPO, setSelectedPO] = useState<PreorderReportItemDto | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const ITEMS_PER_PAGE = 10;
+
+  /* ──── Load Report ──── */
+  const loadReport = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      let params: { period?: string; start_date?: string; end_date?: string };
+      if (period === "custom") {
+        params = { start_date: customStart, end_date: customEnd };
+      } else {
+        params = { period };
+      }
+      const data = await api.preordersReport(params);
+      setReportData(data);
+      setCurrentPage(1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal memuat laporan PO.");
+      setReportData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadReport();
+  }, [period, customStart, customEnd]);
+
+  /* ──── Computed Data ──── */
+  const preorders = reportData?.preorders ?? [];
+
+  const filtered = useMemo(() => {
+    return preorders.filter((po) => {
+      if (statusFilter !== "all" && po.last_po_status !== statusFilter) return false;
+      if (paymentFilter !== "all" && po.payment_status !== paymentFilter) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const matchPO = po.po_number?.toLowerCase().includes(q);
+        const matchBuyer = po.buyer_name?.toLowerCase().includes(q);
+        const matchCompany = po.buyer_company?.toLowerCase().includes(q);
+        const matchAgent = po.agent_name?.toLowerCase().includes(q);
+        const matchProduct = po.product_names?.some((n) => n.toLowerCase().includes(q));
+        if (!matchPO && !matchBuyer && !matchCompany && !matchAgent && !matchProduct) return false;
+      }
+      return true;
+    });
+  }, [preorders, statusFilter, paymentFilter, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paged = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  /* ──── KPI Summary ──── */
+  const kpi = useMemo(() => {
+    const totalRevenue = preorders.reduce((s, po) => s + (po.total || 0), 0);
+    const totalQty = preorders.reduce((s, po) => s + (po.total_qty || 0), 0);
+    const uniqueAgents = new Set(preorders.map((po) => po.agent_id)).size;
+    const avgOrder = preorders.length > 0 ? totalRevenue / preorders.length : 0;
+    return { totalRevenue, totalQty, uniqueAgents, avgOrder };
+  }, [preorders]);
+
+  /* ──── Chart Data: Daily Revenue ──── */
+  const dailyRevenueData = useMemo(() => {
+    const map = new Map<string, { date: string; revenue: number; count: number }>();
+    preorders.forEach((po) => {
+      const d = toLocalDate(po.created_at);
+      const key = formatDateInput(d);
+      const existing = map.get(key);
+      if (existing) {
+        existing.revenue += po.total || 0;
+        existing.count += 1;
+      } else {
+        map.set(key, { date: key, revenue: po.total || 0, count: 1 });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [preorders]);
+
+  /* ──── Chart Data: PO Status Distribution ──── */
+  const statusDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    preorders.forEach((po) => {
+      const s = po.last_po_status || "unknown";
+      map.set(s, (map.get(s) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, value]) => ({
+      name: name.replace(/_/g, " "),
+      value,
+      key: name,
+    }));
+  }, [preorders]);
+
+  /* ──── Chart Data: Payment Status Distribution ──── */
+  const paymentDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    preorders.forEach((po) => {
+      const s = po.payment_status || "unknown";
+      map.set(s, (map.get(s) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, value]) => ({
+      name: name.replace(/_/g, " "),
+      value,
+      key: name,
+    }));
+  }, [preorders]);
+
+  /* ──── Chart Data: Top Agents ──── */
+  const topAgents = useMemo(() => {
+    const map = new Map<string, { name: string; totalRevenue: number; poCount: number }>();
+    preorders.forEach((po) => {
+      const agentKey = po.agent_name || "Unknown Agent";
+      const existing = map.get(agentKey);
+      if (existing) {
+        existing.totalRevenue += po.total || 0;
+        existing.poCount += 1;
+      } else {
+        map.set(agentKey, { name: agentKey, totalRevenue: po.total || 0, poCount: 1 });
+      }
+    });
+    return Array.from(map.values())
+      .sort((a, b) => b.totalRevenue - a.totalRevenue)
+      .slice(0, 5);
+  }, [preorders]);
+
+  /* ──── Unique values for filters ──── */
+  const uniqueStatuses = useMemo(() => {
+    return [...new Set(preorders.map((po) => po.last_po_status).filter(Boolean))];
+  }, [preorders]);
+
+  const uniquePaymentStatuses = useMemo(() => {
+    return [...new Set(preorders.map((po) => po.payment_status).filter(Boolean))];
+  }, [preorders]);
+
+  /* ──── Excel Export (.xlsx) ──── */
+  const exportExcel = () => {
+    if (!filtered.length || !reportData) return;
+
+    const wb = XLSX.utils.book_new();
+
+    // --- SHEET 1: RINGKASAN & STATISTIK ---
+    const summaryAOA: (string | number)[][] = [];
+
+    summaryAOA.push(["LAPORAN PURCHASE ORDER (PO) - GMT GROUP"]);
+    summaryAOA.push(["Periode Laporan:", periodLabel]);
+    summaryAOA.push(["Tanggal Export:", dateTimeFmt.format(new Date())]);
+    summaryAOA.push(["Filter Status PO:", statusFilter === "all" ? "Semua Status" : statusFilter]);
+    summaryAOA.push(["Filter Pembayaran:", paymentFilter === "all" ? "Semua Pembayaran" : paymentFilter]);
+    summaryAOA.push([]);
+
+    // KPI Summary
+    summaryAOA.push(["METRIK UTAMA"]);
+    summaryAOA.push(["Indikator", "Nilai"]);
+    summaryAOA.push(["Total PO", reportData.total_po]);
+    summaryAOA.push(["Total Revenue", kpi.totalRevenue]);
+    summaryAOA.push(["Total Qty Terjual", kpi.totalQty]);
+    summaryAOA.push(["Rata-rata Nilai Order", kpi.avgOrder]);
+    summaryAOA.push([]);
+
+    // Status PO Breakdown
+    summaryAOA.push(["DISTRIBUSI STATUS PO"]);
+    summaryAOA.push(["Status PO", "Jumlah PO", "Persentase (%)"]);
+    statusDistribution.forEach((st) => {
+      const pct = preorders.length > 0 ? ((st.value / preorders.length) * 100).toFixed(1) + "%" : "0%";
+      summaryAOA.push([st.name, st.value, pct]);
+    });
+    summaryAOA.push([]);
+
+    // Payment Status Breakdown
+    summaryAOA.push(["DISTRIBUSI STATUS PEMBAYARAN"]);
+    summaryAOA.push(["Status Pembayaran", "Jumlah PO", "Persentase (%)"]);
+    paymentDistribution.forEach((pm) => {
+      const pct = preorders.length > 0 ? ((pm.value / preorders.length) * 100).toFixed(1) + "%" : "0%";
+      summaryAOA.push([pm.name, pm.value, pct]);
+    });
+    summaryAOA.push([]);
+
+    // Daily Revenue Breakdown (Chart Data Source)
+    summaryAOA.push(["TREND REVENUE HARIAN (DATA CHART)"]);
+    summaryAOA.push(["Tanggal", "Jumlah PO", "Revenue (Rp)"]);
+    dailyRevenueData.forEach((row) => {
+      summaryAOA.push([row.date, row.count, row.revenue]);
+    });
+    summaryAOA.push([]);
+
+    // Top Agents
+    summaryAOA.push(["TOP 5 AGENT PERFORMANCE"]);
+    summaryAOA.push(["Rank", "Nama Agent", "Jumlah PO", "Total Revenue (Rp)"]);
+    topAgents.forEach((ag, idx) => {
+      summaryAOA.push([`#${idx + 1}`, ag.name, ag.poCount, ag.totalRevenue]);
+    });
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryAOA);
+    wsSummary["!cols"] = [
+      { wch: 32 },
+      { wch: 30 },
+      { wch: 20 },
+      { wch: 25 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Ringkasan & Stats");
+
+    // --- SHEET 2: DATA PO LENGKAP ---
+    const poHeaders = [
+      "No. PO",
+      "Tanggal & Waktu",
+      "Buyer / Customer",
+      "Perusahaan",
+      "Kota Pengiriman",
+      "Alamat",
+      "Daftar Produk",
+      "Total Qty",
+      "Subtotal (Rp)",
+      "Total (Rp)",
+      "Status PO",
+      "Status Bayar",
+      "Status Kirim",
+      "ID Agent",
+      "Nama Agent",
+    ];
+
+    const poRows = filtered.map((po) => [
+      po.po_number || "",
+      toLocalDate(po.created_at).toLocaleString("id-ID"),
+      po.buyer_name || "",
+      po.buyer_company || "-",
+      po.shipping_city || "-",
+      po.address || "-",
+      po.product_names?.join(", ") || "-",
+      po.total_qty || 0,
+      po.subtotal || 0,
+      po.total || 0,
+      po.last_po_status || "-",
+      po.payment_status || "-",
+      po.shipping_status || "-",
+      po.agent_id || "",
+      po.agent_name || "-",
+    ]);
+
+    const wsPO = XLSX.utils.aoa_to_sheet([poHeaders, ...poRows]);
+    wsPO["!cols"] = [
+      { wch: 26 }, // PO Number
+      { wch: 20 }, // Tanggal
+      { wch: 20 }, // Buyer
+      { wch: 22 }, // Perusahaan
+      { wch: 18 }, // Kota
+      { wch: 35 }, // Alamat
+      { wch: 35 }, // Produk
+      { wch: 10 }, // Qty
+      { wch: 15 }, // Subtotal
+      { wch: 15 }, // Total
+      { wch: 15 }, // Status PO
+      { wch: 15 }, // Status Bayar
+      { wch: 15 }, // Status Kirim
+      { wch: 10 }, // ID Agent
+      { wch: 20 }, // Nama Agent
+    ];
+    XLSX.utils.book_append_sheet(wb, wsPO, "Data PO Lengkap");
+
+    // --- SHEET 3: RINCIAN ITEM PRODUK ---
+    const itemHeaders = [
+      "No. PO",
+      "Tanggal",
+      "Buyer",
+      "Perusahaan",
+      "Nama Agent",
+      "ID Produk",
+      "Nama Produk",
+      "Harga Satuan (Rp)",
+      "Qty Item",
+      "Subtotal Item (Rp)",
+      "Total Line Item (Rp)",
+      "Status PO",
+      "Status Bayar",
+    ];
+
+    const itemRows: (string | number)[][] = [];
+    filtered.forEach((po) => {
+      if (po.products && po.products.length > 0) {
+        po.products.forEach((p) => {
+          itemRows.push([
+            po.po_number || "",
+            toLocalDate(po.created_at).toLocaleDateString("id-ID"),
+            po.buyer_name || "",
+            po.buyer_company || "-",
+            po.agent_name || "-",
+            p.id_product || "",
+            p.name || "-",
+            p.unit_price || 0,
+            p.qty || 0,
+            p.subtotal || 0,
+            p.total || 0,
+            po.last_po_status || "-",
+            po.payment_status || "-",
+          ]);
+        });
+      } else {
+        itemRows.push([
+          po.po_number || "",
+          toLocalDate(po.created_at).toLocaleDateString("id-ID"),
+          po.buyer_name || "",
+          po.buyer_company || "-",
+          po.agent_name || "-",
+          "-",
+          po.product_names?.join(", ") || "-",
+          0,
+          po.total_qty || 0,
+          po.subtotal || 0,
+          po.total || 0,
+          po.last_po_status || "-",
+          po.payment_status || "-",
+        ]);
+      }
+    });
+
+    const wsItems = XLSX.utils.aoa_to_sheet([itemHeaders, ...itemRows]);
+    wsItems["!cols"] = [
+      { wch: 26 }, // PO Number
+      { wch: 14 }, // Tanggal
+      { wch: 20 }, // Buyer
+      { wch: 22 }, // Perusahaan
+      { wch: 20 }, // Agent
+      { wch: 12 }, // ID Product
+      { wch: 30 }, // Product Name
+      { wch: 18 }, // Harga Satuan
+      { wch: 10 }, // Qty Item
+      { wch: 18 }, // Subtotal Item
+      { wch: 18 }, // Total Line Item
+      { wch: 15 }, // Status PO
+      { wch: 15 }, // Status Bayar
+    ];
+    XLSX.utils.book_append_sheet(wb, wsItems, "Rincian Item Produk");
+
+    // Save File
+    const dateStr = formatDateInput(new Date());
+    const fileName = `Report_PO_GMT_${reportData.period}_${dateStr}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
+  /* ──── CSV Export ──── */
+  const exportCSV = () => {
+    if (!filtered.length) return;
+    const headers = [
+      "No. PO",
+      "Buyer",
+      "Perusahaan",
+      "Kota",
+      "Produk",
+      "Qty",
+      "Subtotal",
+      "Total",
+      "Status PO",
+      "Status Bayar",
+      "Status Kirim",
+      "Agent",
+      "Tanggal",
+    ];
+    const rows = filtered.map((po) => [
+      po.po_number,
+      po.buyer_name,
+      po.buyer_company,
+      po.shipping_city,
+      po.product_names?.join("; ") || "",
+      po.total_qty,
+      po.subtotal,
+      po.total,
+      po.last_po_status,
+      po.payment_status,
+      po.shipping_status,
+      po.agent_name,
+      toLocalDate(po.created_at).toISOString(),
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report_po_${reportData?.period || "custom"}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  /* ──── Period Display Label ──── */
+  const periodLabel = useMemo(() => {
+    if (!reportData) return "";
+    const s = toLocalDate(reportData.start_date);
+    const e = toLocalDate(reportData.end_date);
+    return `${dateFmt.format(s)} — ${dateFmt.format(e)}`;
+  }, [reportData]);
+
+  /* ──── Custom Tooltip ──── */
+  function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-sm">
+        <p className="mb-1 text-xs font-medium text-slate-500">{label}</p>
+        <p className="text-sm font-bold text-slate-900">{currFmt.format(payload[0].value)}</p>
+      </div>
+    );
+  }
+
+  function PieTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number }[] }) {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-sm">
+        <p className="mb-1 text-xs font-medium capitalize text-slate-500">{payload[0].name}</p>
+        <p className="text-sm font-bold text-slate-900">{payload[0].value} PO</p>
+      </div>
+    );
+  }
+
+  /* ──────────────────────────── RENDER ──────────────────────────── */
+
+  return (
+    <div className="space-y-6">
+      {/* ──── Header ──── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-lg shadow-teal-500/25">
+              <FileText className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Report PO</h1>
+              <p className="text-sm text-slate-500">Laporan Purchase Order berdasarkan periode</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => void loadReport()}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          <button
+            onClick={exportExcel}
+            disabled={!filtered.length}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition hover:from-emerald-700 hover:to-teal-800 active:scale-[0.98] disabled:opacity-50"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export Excel (.xlsx)
+          </button>
+          <button
+            onClick={exportCSV}
+            disabled={!filtered.length}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50"
+          >
+            <ArrowDownToLine className="h-4 w-4" />
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* ──── Period Filter Bar ──── */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          {/* Period Tabs */}
+          <div className="flex-1">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Periode</label>
+            <div className="inline-flex rounded-xl bg-slate-100 p-1">
+              {(Object.keys(PERIOD_LABELS) as PeriodOption[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                    period === p
+                      ? "bg-[#0F766E] text-white shadow-md shadow-teal-500/30"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Date Range */}
+          {period === "custom" && (
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Dari</label>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Sampai</label>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Period display */}
+          {reportData && (
+            <div className="flex items-center gap-2 rounded-xl bg-teal-50 px-4 py-2 text-sm font-medium text-teal-800">
+              <Calendar className="h-4 w-4" />
+              {periodLabel}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ──── Error ──── */}
+      {error && (
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* ──── Loading ──── */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="h-10 w-10 animate-spin text-[#0F766E]" />
+          <p className="mt-3 text-sm text-slate-500">Memuat laporan...</p>
+        </div>
+      )}
+
+      {/* ──── Content ──── */}
+      {!isLoading && reportData && (
+        <>
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                label: "Total PO",
+                value: reportData.total_po.toString(),
+                icon: ClipboardList,
+                gradient: "from-teal-500 to-emerald-600",
+                shadowColor: "shadow-teal-500/20",
+              },
+              {
+                label: "Total Revenue",
+                value: currFmt.format(kpi.totalRevenue),
+                icon: DollarSign,
+                gradient: "from-blue-500 to-indigo-600",
+                shadowColor: "shadow-blue-500/20",
+              },
+              {
+                label: "Total Qty Produk",
+                value: kpi.totalQty.toLocaleString("id-ID"),
+                icon: Package,
+                gradient: "from-amber-500 to-orange-600",
+                shadowColor: "shadow-amber-500/20",
+              },
+              {
+                label: "Rata-rata Order",
+                value: currFmt.format(kpi.avgOrder),
+                icon: TrendingUp,
+                gradient: "from-purple-500 to-fuchsia-600",
+                shadowColor: "shadow-purple-500/20",
+              },
+            ].map((card) => (
+              <div
+                key={card.label}
+                className={`group relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:shadow-lg ${card.shadowColor}`}
+              >
+                <div className="absolute -right-3 -top-3 h-20 w-20 rounded-full bg-gradient-to-br opacity-10 blur-2xl group-hover:opacity-20 transition" />
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{card.value}</p>
+                  </div>
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${card.gradient} shadow-md ${card.shadowColor}`}
+                  >
+                    <card.icon className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            {/* Bar Chart: Revenue Timeline */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+              <div className="mb-4 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-[#0F766E]" />
+                <h2 className="text-base font-bold text-slate-900">Grafik Revenue Harian</h2>
+              </div>
+              {dailyRevenueData.length === 0 ? (
+                <div className="flex h-64 items-center justify-center text-sm text-slate-400">Tidak ada data untuk ditampilkan</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dailyRevenueData} barSize={dailyRevenueData.length > 15 ? 16 : 32}>
+                    <defs>
+                      <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0F766E" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#10B981" stopOpacity={0.6} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(v: string) => {
+                        try { return shortDateFmt.format(new Date(v)); } catch { return v; }
+                      }}
+                      tick={{ fontSize: 11, fill: "#94A3B8" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tickFormatter={(v: number) => {
+                        if (v >= 1e9) return `${(v / 1e9).toFixed(1)}M`;
+                        if (v >= 1e6) return `${(v / 1e6).toFixed(1)}Jt`;
+                        if (v >= 1e3) return `${(v / 1e3).toFixed(0)}rb`;
+                        return v.toString();
+                      }}
+                      tick={{ fontSize: 11, fill: "#94A3B8" }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={55}
+                    />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(15,118,110,0.06)" }} />
+                    <Bar dataKey="revenue" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Pie Charts */}
+            <div className="flex flex-col gap-6">
+              {/* PO Status Pie */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="mb-3 text-base font-bold text-slate-900">Status PO</h2>
+                {statusDistribution.length === 0 ? (
+                  <div className="flex h-40 items-center justify-center text-sm text-slate-400">Tidak ada data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={statusDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={3}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {statusDistribution.map((_entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<PieTooltip />} />
+                      <Legend
+                        formatter={(value) => <span className="text-xs capitalize text-slate-600">{value}</span>}
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Payment Status Pie */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="mb-3 text-base font-bold text-slate-900">Status Pembayaran</h2>
+                {paymentDistribution.length === 0 ? (
+                  <div className="flex h-40 items-center justify-center text-sm text-slate-400">Tidak ada data</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={paymentDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={3}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {paymentDistribution.map((_entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={PIE_COLORS[(idx + 2) % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<PieTooltip />} />
+                      <Legend
+                        formatter={(value) => <span className="text-xs capitalize text-slate-600">{value}</span>}
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11 }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Top Agents */}
+          {topAgents.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <Users className="h-5 w-5 text-[#0F766E]" />
+                <h2 className="text-base font-bold text-slate-900">Top 5 Agent</h2>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {topAgents.map((agent, idx) => (
+                  <div key={agent.name} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-gradient-to-r from-slate-50 to-white p-4 transition hover:shadow-md">
+                    <div
+                      className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ${
+                        idx === 0
+                          ? "bg-gradient-to-br from-amber-400 to-amber-600"
+                          : idx === 1
+                            ? "bg-gradient-to-br from-slate-300 to-slate-500"
+                            : idx === 2
+                              ? "bg-gradient-to-br from-orange-300 to-orange-500"
+                              : "bg-gradient-to-br from-teal-400 to-teal-600"
+                      }`}
+                    >
+                      #{idx + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{agent.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {agent.poCount} PO · {currFmt.format(agent.totalRevenue)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ──── Data Table ──── */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* Table Header & Filters */}
+            <div className="border-b border-slate-200 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5 text-[#0F766E]" />
+                  <h2 className="text-base font-bold text-slate-900">Daftar Purchase Order</h2>
+                  <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700">
+                    {filtered.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Cari PO, buyer, agent..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100 sm:w-64"
+                    />
+                  </div>
+
+                  {/* Filter Toggle */}
+                  <button
+                    onClick={() => setShowFilterPanel(!showFilterPanel)}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                      showFilterPanel || statusFilter !== "all" || paymentFilter !== "all"
+                        ? "border-teal-200 bg-teal-50 text-teal-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Filter
+                    {(statusFilter !== "all" || paymentFilter !== "all") && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0F766E] text-[10px] font-bold text-white">
+                        {(statusFilter !== "all" ? 1 : 0) + (paymentFilter !== "all" ? 1 : 0)}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Panel */}
+              {showFilterPanel && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">Status PO</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    >
+                      <option value="all">Semua Status</option>
+                      {uniqueStatuses.map((s) => (
+                        <option key={s} value={s}>
+                          {s.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">Status Bayar</label>
+                    <select
+                      value={paymentFilter}
+                      onChange={(e) => {
+                        setPaymentFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#0F766E] focus:ring-2 focus:ring-teal-100"
+                    >
+                      <option value="all">Semua Pembayaran</option>
+                      {uniquePaymentStatuses.map((s) => (
+                        <option key={s} value={s}>
+                          {s.replace(/_/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {(statusFilter !== "all" || paymentFilter !== "all") && (
+                    <button
+                      onClick={() => {
+                        setStatusFilter("all");
+                        setPaymentFilter("all");
+                        setCurrentPage(1);
+                      }}
+                      className="mt-4 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                    >
+                      <X className="h-3 w-3" />
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/80">
+                    <th className="px-4 py-3 font-semibold text-slate-500">No. PO</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500">Buyer / Perusahaan</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500">Produk</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500 text-right">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500 text-right">Total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500 text-center">Status PO</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500 text-center">Bayar</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500">Agent</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500">Tanggal</th>
+                    <th className="px-4 py-3 font-semibold text-slate-500 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paged.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-16 text-center text-slate-400">
+                        <ShoppingCart className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                        <p className="font-medium">Tidak ada data PO</p>
+                        <p className="mt-1 text-xs">Coba ubah filter atau periode pencarian</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    paged.map((po) => (
+                      <tr key={po.id} className="group transition hover:bg-teal-50/30">
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-xs font-semibold text-[#0F766E]">{po.po_number}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-900">{po.buyer_name}</p>
+                          <p className="text-xs text-slate-500">{po.buyer_company}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(po.product_names || []).slice(0, 2).map((name, i) => (
+                              <span key={i} className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                                {name}
+                              </span>
+                            ))}
+                            {(po.product_names?.length || 0) > 2 && (
+                              <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                                +{po.product_names.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-slate-700">{po.total_qty}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-900">{currFmt.format(po.total)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge status={po.last_po_status} />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge status={po.payment_status} />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{po.agent_name}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{dateTimeFmt.format(toLocalDate(po.created_at))}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => setSelectedPO(po)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#0F766E] transition hover:bg-teal-50"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Detail
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
+                <p className="text-xs text-slate-500">
+                  Menampilkan {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+                  {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} dari {filtered.length} PO
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`min-w-[2rem] rounded-lg px-2 py-1.5 text-xs font-medium transition ${
+                          currentPage === pageNum
+                            ? "bg-[#0F766E] text-white shadow-sm"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-slate-200 p-1.5 transition hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ──── PO Detail Modal ──── */}
+      {selectedPO && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setSelectedPO(null)}>
+          <div
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-4">
+              <div>
+                <p className="text-xs font-medium text-teal-100">Detail Purchase Order</p>
+                <p className="text-lg font-bold text-white">{selectedPO.po_number}</p>
+              </div>
+              <button
+                onClick={() => setSelectedPO(null)}
+                className="rounded-lg p-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 p-6">
+              {/* Buyer Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Buyer</label>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPO.buyer_name}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Perusahaan</label>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPO.buyer_company || "-"}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kota</label>
+                  <p className="mt-1 text-sm text-slate-700">{selectedPO.shipping_city || "-"}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Agent</label>
+                  <p className="mt-1 text-sm text-slate-700">{selectedPO.agent_name}</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Alamat</label>
+                  <p className="mt-1 text-sm text-slate-700">{selectedPO.address || "-"}</p>
+                </div>
+              </div>
+
+              {/* Status Row */}
+              <div className="flex flex-wrap gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Status PO</label>
+                  <div className="mt-1">
+                    <StatusBadge status={selectedPO.last_po_status} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pembayaran</label>
+                  <div className="mt-1">
+                    <StatusBadge status={selectedPO.payment_status} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pengiriman</label>
+                  <div className="mt-1">
+                    <StatusBadge status={selectedPO.shipping_status} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Products Table */}
+              {selectedPO.products && selectedPO.products.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Produk</label>
+                  <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Produk</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Harga</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Qty</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedPO.products.map((prod, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-2.5 font-medium text-slate-800">{prod.name}</td>
+                            <td className="px-4 py-2.5 text-right text-slate-600">{currFmt.format(prod.unit_price)}</td>
+                            <td className="px-4 py-2.5 text-right text-slate-600">{prod.qty}</td>
+                            <td className="px-4 py-2.5 text-right font-semibold text-slate-800">{currFmt.format(prod.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-slate-200 bg-slate-50">
+                          <td colSpan={2} className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            Subtotal
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-700">{selectedPO.total_qty}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-700">{currFmt.format(selectedPO.subtotal)}</td>
+                        </tr>
+                        <tr className="bg-gradient-to-r from-teal-50 to-emerald-50">
+                          <td colSpan={3} className="px-4 py-2.5 text-right text-sm font-bold uppercase text-[#0F766E]">
+                            Total
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-base font-bold text-[#0F766E]">{currFmt.format(selectedPO.total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer info */}
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">Tanggal Dibuat</p>
+                <p className="text-sm font-semibold text-slate-700">{dateTimeFmt.format(toLocalDate(selectedPO.created_at))}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

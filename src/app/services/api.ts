@@ -1246,8 +1246,45 @@ export async function refreshStoredUser(token = getAuthToken()) {
 
   return response.user;
 }
+export type PreorderReportProductDto = {
+  id_product: number;
+  name: string;
+  unit_price: number;
+  qty: number;
+  subtotal: number;
+  total: number;
+};
+
+export type PreorderReportItemDto = {
+  id: number;
+  po_number: string;
+  product_names: string[];
+  products: PreorderReportProductDto[];
+  buyer_name: string;
+  buyer_company: string;
+  shipping_city: string;
+  address: string;
+  last_po_status: string;
+  payment_status: string;
+  shipping_status: string;
+  agent_id: number;
+  agent_name: string;
+  total_qty: number;
+  subtotal: number;
+  total: number;
+  created_at: string;
+};
+
+export type PreorderReportResponse = {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_po: number;
+  preorders: PreorderReportItemDto[];
+};
 
 export const api = {
+
   login: (payload: { email: string; password: string; client?: string }) =>
     apiRequest<AuthResponse>("/api/auth/login", {
       auth: false,
@@ -1614,4 +1651,6 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ status, picEmail }),
     }),
+  preordersReport: (params: { period?: string; start_date?: string; end_date?: string }) =>
+    apiRequest<PreorderReportResponse>("/api/admin/support/preorders/report", { query: params }),
 };
