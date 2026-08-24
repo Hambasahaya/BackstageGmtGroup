@@ -16,7 +16,30 @@ export default defineConfig(({ mode }) => {
   },
   assetsInclude: ['**/*.svg', '**/*.csv'],
   build: {
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 3000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@tensorflow') || id.includes('tfjs')) {
+              return 'tensorflow-vendor';
+            }
+            if (id.includes('recharts')) {
+              return 'recharts-vendor';
+            }
+            if (id.includes('xlsx')) {
+              return 'xlsx-vendor';
+            }
+            if (id.includes('leaflet')) {
+              return 'leaflet-vendor';
+            }
+            if (id.includes('lucide-react')) {
+              return 'lucide-vendor';
+            }
+          }
+        },
+      },
+    },
   },
   define: {
     'import.meta.env.MODE_Agent': JSON.stringify(agentModeValue),
