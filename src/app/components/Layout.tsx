@@ -64,7 +64,6 @@ const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Overview", path: "/dashboard", roles: ["super_admin"] },
   { icon: Package, label: "Manajemen Produk", path: "/products", roles: ["super_admin"] },
   { icon: FileBarChart, label: "Report PO", path: "/report-po", roles: ["super_admin", "sales"] },
-  { icon: BarChart3, label: "Analytics PO", path: "/analytics-po", roles: ["super_admin", "sales"] },
   { icon: Globe2, label: "Websites", path: "/websites", roles: ["super_admin"] },
   { icon: BarChart3, label: "SEO Management", path: "/seo", roles: ["super_admin"] },
   { icon: Megaphone, label: "Marketing Integrations", path: "/integrations", roles: ["super_admin"] },
