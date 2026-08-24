@@ -142,6 +142,89 @@ function getMonthStartStr() {
   return formatDateInput(d);
 }
 
+/* ──────────── Postal Code to City Name Resolver ──────────── */
+
+const SPECIFIC_POSTAL_CODES: Record<string, string> = {
+  "10150": "Jakarta Pusat",
+  "11320": "Jakarta Barat",
+  "11480": "Jakarta Barat",
+  "11510": "Jakarta Barat",
+  "11610": "Jakarta Barat",
+  "11620": "Jakarta Barat",
+  "11630": "Jakarta Barat",
+  "13470": "Jakarta Timur",
+  "15000": "Tangerang",
+  "15135": "Tangerang",
+  "15141": "Tangerang",
+  "15159": "Tangerang",
+};
+
+export function formatCityName(val: string | null | undefined, address?: string | null): string {
+  if (!val || val.trim() === "" || val === "-") return "-";
+  const trimmed = val.trim();
+
+  // 1. Exact match in specific postal code map
+  if (SPECIFIC_POSTAL_CODES[trimmed]) {
+    return SPECIFIC_POSTAL_CODES[trimmed];
+  }
+
+  // 2. Pure 5-digit number or postal code prefix logic
+  if (/^\d{5}$/.test(trimmed)) {
+    const prefix = trimmed.substring(0, 2);
+    switch (prefix) {
+      case "10": return "Jakarta Pusat";
+      case "11": return "Jakarta Barat";
+      case "12": return "Jakarta Selatan";
+      case "13": return "Jakarta Timur";
+      case "14": return "Jakarta Utara";
+      case "15": return "Tangerang";
+      case "16": return "Bogor / Depok";
+      case "17": return "Bekasi";
+      case "18": return "Banten / Serang";
+      case "20": return "Medan";
+      case "25": return "Padang";
+      case "28": return "Pekanbaru";
+      case "29": return "Batam";
+      case "30": return "Palembang";
+      case "35": return "Bandar Lampung";
+      case "40": return "Bandung";
+      case "41": return "Purwakarta";
+      case "42": return "Serang";
+      case "43": return "Sukabumi";
+      case "45": return "Cirebon";
+      case "50": return "Semarang";
+      case "51": return "Pekalongan";
+      case "52": return "Tegal";
+      case "53": return "Purwokerto";
+      case "55": return "Yogyakarta";
+      case "56": return "Magelang";
+      case "57": return "Surakarta / Solo";
+      case "60": return "Surabaya";
+      case "61": return "Sidoarjo";
+      case "62": return "Tuban";
+      case "63": return "Madiun";
+      case "64": return "Kediri";
+      case "65": return "Malang";
+      case "68": return "Jember";
+      case "80": return "Denpasar";
+      case "83": return "Mataram";
+      case "90": return "Makassar";
+      default: return `Kota (${trimmed})`;
+    }
+  }
+
+  // 3. If numeric but not 5-digit (e.g. ID or other number)
+  if (/^\d+$/.test(trimmed)) {
+    if (address) {
+      const match = address.match(/(Jakarta\s+(?:Pusat|Barat|Selatan|Timur|Utara)|Tangerang(?:\s+Selatan)?|Bekasi|Bogor|Depok|Bandung|Surabaya|Yogyakarta|Semarang|Medan|Makassar|Denpasar)/i);
+      if (match) return match[0];
+    }
+    return `Wilayah ${trimmed}`;
+  }
+
+  return trimmed;
+}
+
 /* ──────────── Main Component ──────────── */
 
 export function PreorderReport() {
@@ -232,6 +315,35 @@ export function PreorderReport() {
   const totalPages = Math.max(1, Math.ceil(filteredPreorders.length / ITEMS_PER_PAGE));
   const pagedPreorders = filteredPreorders.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  /* ──── Formatted & Grouped Regions (City Names) ──── */
+  const formattedRegions = useMemo(() => {
+    const list = analyticsData?.by_region || [];
+    const map = new Map<string, { city: string; rawCities: string[]; total_po: number; total_qty: number; net_revenue: number }>();
+
+    list.forEach((r) => {
+      const cityName = formatCityName(r.city);
+      const existing = map.get(cityName);
+      if (existing) {
+        existing.total_po += r.total_po || 0;
+        existing.total_qty += r.total_qty || 0;
+        existing.net_revenue += r.net_revenue || 0;
+        if (!existing.rawCities.includes(r.city)) {
+          existing.rawCities.push(r.city);
+        }
+      } else {
+        map.set(cityName, {
+          city: cityName,
+          rawCities: [r.city],
+          total_po: r.total_po || 0,
+          total_qty: r.total_qty || 0,
+          net_revenue: r.net_revenue || 0,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.net_revenue - a.net_revenue);
+  }, [analyticsData]);
+
   /* ──── KPI Summary ──── */
   const kpi = useMemo(() => {
     const totalPO = reportData?.total_po ?? analyticsData?.total_po ?? preorders.length;
@@ -240,10 +352,10 @@ export function PreorderReport() {
     const totalQty = preorders.reduce((s, po) => s + (po.total_qty || 0), 0) ||
       (analyticsData?.top_agents || []).reduce((acc, a) => acc + (a.total_qty || 0), 0);
     const uniqueAgents = new Set(preorders.map((po) => po.agent_id)).size || (analyticsData?.top_agents || []).length;
-    const totalCities = (analyticsData?.by_region || []).length;
+    const totalCities = formattedRegions.length;
     const avgOrder = totalPO > 0 ? totalRevenue / totalPO : 0;
     return { totalPO, totalRevenue, totalQty, uniqueAgents, totalCities, avgOrder };
-  }, [reportData, analyticsData, preorders]);
+  }, [reportData, analyticsData, preorders, formattedRegions]);
 
   /* ──── Daily Revenue Chart ──── */
   const dailyRevenueData = useMemo(() => {
@@ -363,7 +475,7 @@ export function PreorderReport() {
         toLocalDate(po.created_at).toLocaleString("id-ID"),
         po.buyer_name || "",
         po.buyer_company || "-",
-        po.shipping_city || "-",
+        formatCityName(po.shipping_city, po.address),
         po.address || "-",
         po.product_names?.join(", ") || "-",
         po.total_qty || 0,
@@ -447,9 +559,9 @@ export function PreorderReport() {
     }
 
     // Sheet 6: Sebaran Wilayah
-    if (analyticsData?.by_region && analyticsData.by_region.length > 0) {
+    if (formattedRegions.length > 0) {
       const regHeaders = ["Kota / Wilayah", "Total PO", "Total Qty", "Net Revenue (Rp)"];
-      const regRows = analyticsData.by_region.map((r) => [r.city, r.total_po, r.total_qty, r.net_revenue]);
+      const regRows = formattedRegions.map((r) => [r.city, r.total_po, r.total_qty, r.net_revenue]);
       const wsReg = XLSX.utils.aoa_to_sheet([regHeaders, ...regRows]);
       wsReg["!cols"] = [{ wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 20 }];
       XLSX.utils.book_append_sheet(wb, wsReg, "Sebaran Wilayah");
@@ -943,12 +1055,12 @@ export function PreorderReport() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {(analyticsData.by_region || []).length === 0 ? (
+                            {formattedRegions.length === 0 ? (
                               <tr>
                                 <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Tidak ada data wilayah</td>
                               </tr>
                             ) : (
-                              analyticsData.by_region.map((r, idx) => (
+                              formattedRegions.map((r, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50/50">
                                   <td className="px-4 py-3 font-semibold text-slate-900">{r.city}</td>
                                   <td className="px-4 py-3 text-right font-medium text-slate-700">{r.total_po}</td>
@@ -1282,7 +1394,7 @@ export function PreorderReport() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kota</label>
-                  <p className="mt-1 text-sm text-slate-700">{selectedPO.shipping_city || "-"}</p>
+                  <p className="mt-1 text-sm text-slate-700">{formatCityName(selectedPO.shipping_city, selectedPO.address)}</p>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Agent</label>
