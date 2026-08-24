@@ -49,6 +49,14 @@
       "destination": "/api/agent/onboarding/progress.js"
     },
     {
+      "source": "/api/customer-care/:path*",
+      "destination": "/api/customer-care.js"
+    },
+    {
+      "source": "/api/admin/customer-care/:path*",
+      "destination": "/api/customer-care.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
